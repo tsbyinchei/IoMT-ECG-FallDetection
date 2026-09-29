@@ -1,5 +1,6 @@
 # 📋 ĐẶC TẢ KỸ THUẬT VÀ TIÊU CHUẨN LÂM SÀNG (PEC)
 ## Project Engineering & Clinical Specification (PEC Document)
+**Tác giả:** Nguyễn Văn Tuấn Sỹ ([@tsbyinchei](https://github.com/tsbyinchei))  
 **Dự án:** Hệ thống IoMT Đeo người Giám sát Điện tim (ECG) & Cảnh báo Té ngã Đa tầng  
 **Tiêu chuẩn áp dụng:** ITU-T Rec. Y.2060 (IoT), ANSI/AAMI EC13 (ECG Standard), IEC 60601-2-47  
 
