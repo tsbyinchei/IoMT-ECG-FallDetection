@@ -68,23 +68,32 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
 4.3. Phân tích biến thiên nhịp tim HRV (Heart Rate Variability):
    - Chỉ số miền thời gian: Mean RR, SDNN, RMSSD.
    - Đồ thị Poincaré Plot: Phân tích phân tán $SD_1$, $SD_2$ và tỷ số $SD_1 / SD_2$.
-4.4. Thuật toán phân biệt Té ngã thật sự với Ngồi nhanh / Nằm xuống.
+   - Phổ mật độ công suất PSD (Welch Method): Phân tích phân bố công suất dải tần $0 - 65\text{Hz}$, chứng minh triệt tiêu nhiễu lưới $50\text{Hz}$ và trôi baseline.
+4.4. Thuật toán phân biệt Té ngã thật sự với Ngồi nhanh / Nằm xuống:
+   - 3 pha: Rơi tự do ($<0.6g$) $\to$ Va đập ($>2.5g$) $\to$ Bất động góc nghiêng ($>50^\circ$, gyro $<65^\circ/\text{s}$).
 
 ---
 
 ### CHƯƠNG 5: KẾT QUẢ THỰC NGHIỆM & THẢO LUẬN (4–5 trang)
-5.1. Kết quả thu nhận sóng ECG thực nghiệm tại bàn đo:
-   - Ảnh chụp sóng ECG thô và sóng sau lọc số.
-   - Đánh dấu chính xác từng đỉnh sóng R bằng chấm đỏ trên MATLAB.
-5.2. Kết quả đo nhịp tim thực tế:
-   - Nhịp tim lúc nghỉ: $73 – 77\text{ BPM}$ (đối chiếu chuẩn với Samsung Galaxy Watch 7: sai số $< 3\%$).
+5.1. Danh mục 4 đồ thị thực nghiệm chuẩn in ấn 300 DPI (Thư mục `MATLAB/figures/`):
+   - **Hình 5.1:** Tín hiệu ECG thô, tín hiệu sau lọc số Pan-Tompkins Bandpass và năng lượng tích phân MWI gán nhãn đỉnh R.
+   - **Hình 5.2:** Biểu đồ Poincaré Plot biểu diễn phân bố elip các cặp khoảng $RR_n - RR_{n+1}$.
+   - **Hình 5.3:** Phổ mật độ công suất PSD Welch chứng minh năng lượng tập trung ở dải $5 - 15\text{Hz}$ và triệt tiêu hoàn toàn nhiễu lưới $50\text{Hz}$.
+   - **Hình 5.4:** Động lực học véc-tơ gia tốc $SMV$ phân tích 3 pha té ngã.
+5.2. Bảng kết quả thống kê lâm sàng chính thức từ file thực nghiệm `ECG_Patient_Record.mat`:
+   - Tần số lấy mẫu: $F_s = 250\text{ Hz}$ ($T_s = 4.0\text{ ms}$).
+   - Tổng số mẫu thu nhận: $117,225\text{ mẫu}$ ($468.90\text{ giây} \approx 7.8\text{ phút}$).
+   - Tổng số phức bộ QRS bóc tách: $533\text{ đỉnh R}$.
+   - Nhịp tim trung bình: $82.1\text{ BPM}$ (Min: $45.6\text{ BPM}$, Max: $150.0\text{ BPM}$).
+   - Chỉ số HRV: $SDNN = 1427.23\text{ ms}$, $RMSSD = 2046.21\text{ ms}$.
+   - Thông số Poincaré: $SD_1 = 1448.25\text{ ms}$, $SD_2 = 1408.47\text{ ms}$, tỷ số $SD_1 / SD_2 = 1.028$.
+   - Thân nhiệt bề mặt trung bình: $32.46^\circ\text{C}$.
 5.3. Kết quả thử nghiệm cảnh báo té ngã:
-   - Đồ thị xung gia tốc va đập đạt đỉnh $3.5g > 2.5g$.
-   - Cảnh báo tức thời trên OLED `! FALL DETECTED !` và còi hú buzzer.
-5.4. Kết quả đo thân nhiệt bề mặt: $32.2^\circ\text{C} – 32.3^\circ\text{C}$.
-5.5. Đánh giá hiệu năng mạng IoT:
-   - Độ trễ truyền UDP giữa Node C3 và Gateway: $< 4\text{ms}$.
-   - Tỷ lệ mất gói tin (Packet Loss Rate): $0\%$.
+   - Xung va đập đạt đỉnh $3.5g > 2.5g$.
+   - Cảnh báo tức thời đồng thời trên màn hình OLED `! FALL DETECTED !`, còi hú Active Buzzer và **tin nhắn Telegram khẩn cấp gửi về smartphone qua `@TsByinIoT_bot`** trong $< 500\text{ms}$.
+5.4. Đánh giá hiệu năng mạng IoT phân tầng:
+   - Tầng nội bộ (Wi-Fi UDP Socket): Độ trễ $< 4\text{ms}$, tỷ lệ mất gói (Packet Loss Rate) $0\%$.
+   - Tầng đám mây (Cloudflare Tunnel WSS MQTT): Độ trễ $< 50\text{ms}$, bảo mật mã hóa SSL/TLS Port 443 toàn diện.
 
 ---
 

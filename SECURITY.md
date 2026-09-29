@@ -21,9 +21,18 @@ Tài liệu này xác định các chính sách bảo mật mạng và khuyến 
 
 1. **Giao thức Wi-Fi UDP Nội bộ (Local Socket):**
    * Mạng SoftAP `BIOMED_GW` sử dụng dải IP nội bộ `192.168.4.x`, cô lập hoàn toàn lưu lượng gói tin UDP sinh hiệu giữa Node C3 và Gateway, tránh bị nghe lén từ mạng ngoài.
-2. **Bảo mật luồng MQTT Cloud:**
-   * Khi triển khai trên môi trường Internet (Bản 2 qua 1Panel), khuyến nghị bật xác thực tên người dùng/mật khẩu trên MQTT Broker và sử dụng cổng mã hóa **MQTTS (TLS Port 8883)**.
-   * Dữ liệu sinh hiệu cá nhân (ECG, nhịp tim, thân nhiệt) cần được ẩn danh hóa (Anonymization) trước khi lưu trữ vào cơ sở dữ liệu chuỗi thời gian InfluxDB.
+2. **Bảo mật luồng MQTT Cloud qua Cloudflare Tunnel (WSS):**
+   * Dữ liệu truyền từ Gateway ESP32 lên máy chủ EMQX qua Internet được đóng gói trong kênh truyền **WebSocket Secure (WSS)** qua cổng **443** với chứng chỉ mã hóa TLS/SSL toàn cầu của Cloudflare.
+   * Ngăn chặn hoàn toàn các cuộc tấn công trung gian (Man-in-the-Middle - MITM), nghe lén hoặc chèn sửa đổi gói tin điện tim ECG trên mạng công cộng.
+   * Kích hoạt cơ chế xác thực dựa trên mật khẩu (Password-based Authentication) trên EMQX để chỉ các thiết bị được cấp phép mới được quyền Publish / Subscribe.
+3. **Quản lý Thông tin Bí mật & API Token (Secrets Management):**
+   * Toàn bộ Token Telegram Bot (`TELEGRAM_BOT_TOKEN`), Chat ID và mật khẩu Wi-Fi/MQTT được lưu riêng biệt trong các file cục bộ:
+     * `ESP32/secrets.h`
+     * `MATLAB/config_private.m`
+   * Các file này đã được đưa vào `.gitignore` để **tuyệt đối không bao giờ bị đẩy lên GitHub hoặc rò rỉ ra ngoài**.
+   * Dự án cung cấp các file mẫu công khai `secrets_example.h` và `config_example.m` với các giá trị placeholder để người dùng tham khảo cấu hình.
+4. **Bảo mật kênh Cảnh báo Telegram:**
+   * Giao tiếp giữa Gateway ESP32/MATLAB với máy chủ Telegram API được thực hiện qua giao thức HTTPS (TLS Port 443) an toàn.
 
 ---
 

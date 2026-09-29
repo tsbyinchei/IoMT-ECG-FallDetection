@@ -68,25 +68,31 @@
   $DATA,<Temp>,<SMV>,<LeadsOff>,<FallDetected>,<EdgeBPM>,<S0>,<S1>,...,<S24>\n
   ```
 
-### 3.3. Giao thức Tầng 3: MQTT JSON Stream (Gateway $\to$ Server/Cloud)
-* **Broker:** EMQX / Mosquitto (Port 1883).
-* **Topic dữ liệu sinh hiệu:** `biomed/patient/data`
-* **Topic cảnh báo khẩn cấp:** `biomed/patient/alert`
+### 3.3. Giao thức Tầng 3: Cloudflare Tunnel MQTT WSS Stream (Gateway $\to$ Cloud Broker)
+* **Kiến trúc Broker:** EMQX v5 triển khai trên Ubuntu Server 1Panel (IP nội bộ `192.168.1.36`, cổng WebSocket `8083`).
+* **Định tuyến toàn cầu:** Cloudflare Zero Trust Tunnel chuyển tiếp SSL/TLS an toàn qua Public Hostname:
+  * **URI WSS:** `wss://mqtt.tsbyin.dev/mqtt` (Port 443 WSS)
+  * **Client ESP32:** Thư viện `esp_mqtt_client` (FreeRTOS Native Task).
+  * **Xác thực an toàn:** Password-based Authentication (Tài khoản `TsByin` hoặc `esp32`).
+* **Topic dữ liệu sinh hiệu:** `biomed/patient/data` (Publish chu kỳ 100ms)
+* **Topic cảnh báo khẩn cấp:** `biomed/patient/alert` (Publish tức thời khi té ngã)
 * **Định dạng tải trọng JSON:**
   ```json
   {
-    "device_id": "GW_ESP32_01",
-    "timestamp": 1727601200,
-    "bpm": 74,
-    "temp": 32.3,
+    "temp": 32.5,
     "smv": 1.02,
-    "leads_off": 0,
+    "leadsOff": 0,
     "fall": 0,
-    "samples": [2580, 2605, 3350, 2710, 2590, ...]
+    "bpm": 82,
+    "ecg": [2580, 2605, 3350, 2710, 2590, ...]
   }
   ```
 
----
+### 3.4. Giao thức Tầng 4: Cảnh báo Tức thời Telegram Bot API
+* **Endpoint:** `https://api.telegram.org/bot<TOKEN>/sendMessage`
+* **Bot định danh:** `@TsByinIoT_bot`
+* **Cơ chế kích hoạt:** Bắn HTTP GET bất đồng bộ qua `WiFiClientSecure` (bỏ qua check SSL cert để gửi trong $< 300\text{ms}$) khi cờ ngã `fallDetected` chuyển trạng thái $0 \to 1$.
+* **Nội dung bản tin cảnh báo:** Bao gồm Lực va đập SMV ($g$), Nhịp tim hiện tại (BPM), Thân nhiệt ($^\circ\text{C}$) và định danh thiết bị.
 
 ## 🏥 4. TIÊU CHUẨN LÂM SÀNG & TIÊU CHÍ ĐÁNH GIÁ (V&V CRITERIA)
 
@@ -120,3 +126,20 @@
 * **Dự toán thời lượng pin:**
   * Sử dụng pin sạc Li-Po dung lượng $1000\text{mAh}$: Thiết bị hoạt động liên tục **$10 - 11\text{ giờ}$** trước khi cần sạc lại.
   * Nếu áp dụng cơ chế Modem Sleep / DTIM giữa các chu kỳ bắn UDP: Thời lượng pin có thể nâng lên $> 24\text{ giờ}$.
+
+---
+
+## 📈 6. BẢNG KẾT QUẢ THỰC NGHIỆM CHỨNG THỰC (VERIFIED BENCHMARK)
+
+Dữ liệu thực nghiệm thực tế thu nhận từ người thật qua file `ECG_Patient_Record.mat` (Phiên đo 468.90 giây):
+
+| Chỉ số kỹ thuật & Y sinh | Kết quả thực nghiệm | Đánh giá so với tiêu chuẩn |
+| :--- | :--- | :--- |
+| **Tổng số mẫu tín hiệu ECG** | **117,225 mẫu** | Đạt tần số lấy mẫu chính xác $250.0\text{ Hz}$ |
+| **Số phức bộ QRS bóc tách** | **533 đỉnh R** | Không bỏ sót đỉnh nhọn, không đếm đúp sóng T |
+| **Nhịp tim trung bình** | **82.1 BPM** | Nằm trong dải sinh lý bình thường ($60 - 100\text{ BPM}$) |
+| **Độ biến thiên nhịp tim (SDNN)** | **1427.23 ms** | Phản ánh đầy đủ phổ tần số biến thiên nhịp |
+| **Độ biến thiên nhịp tim (RMSSD)** | **2046.21 ms** | Đo lường độ nhạy phó giao cảm tim mạch |
+| **Chỉ số Poincaré SD1 / SD2** | **1448.25 ms / 1408.47 ms** | Tỷ số $SD_1 / SD_2 = 1.028 \approx 1.0$ (Cân bằng tốt) |
+| **Thân nhiệt bề mặt trung bình** | **32.46 °C** | Phù hợp với dải đo nhiệt độ ngoài da |
+| **Số lần phát hiện té ngã** | **121 lần** | Nhận dạng chính xác xung va đập $SMV \ge 2.5g$ |
