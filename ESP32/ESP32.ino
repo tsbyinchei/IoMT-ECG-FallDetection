@@ -3,7 +3,8 @@
 #include <WiFiClientSecure.h>
 #include <Wire.h>
 #include <U8g2lib.h>
-#include <PubSubClient.h>
+#include "esp_idf_version.h"
+#include "mqtt_client.h"
 
 // Cấu hình Telegram Bot bảo mật (ưu tiên đọc secrets.h)
 #if __has_include("secrets.h")
@@ -40,12 +41,9 @@ const char* ROUTER_PASS = SECRET_ROUTER_PASS;
 const char* AP_SSID = "BIOMED_GW";
 const unsigned int UDP_PORT = 4210;
 
-// 3. MQTT Broker trên Ubuntu Server (1Panel: EMQX / Eclipse Mosquitto)
-#ifndef SECRET_MQTT_SERVER
-  #define SECRET_MQTT_SERVER "192.168.1.36"
-#endif
-#ifndef SECRET_MQTT_PORT
-  #define SECRET_MQTT_PORT 1883
+// 3. MQTT Broker qua Cloudflare Tunnel (Toàn cầu) hoặc IP LAN
+#ifndef SECRET_MQTT_URI
+  #define SECRET_MQTT_URI "wss://mqtt.tsbyin.dev/mqtt"
 #endif
 #ifndef SECRET_MQTT_USER
   #define SECRET_MQTT_USER ""
@@ -54,8 +52,7 @@ const unsigned int UDP_PORT = 4210;
   #define SECRET_MQTT_PASS ""
 #endif
 
-const char* MQTT_SERVER     = SECRET_MQTT_SERVER;  // IP Ubuntu Server (192.168.1.36)
-const int   MQTT_PORT       = SECRET_MQTT_PORT;
+const char* MQTT_URI        = SECRET_MQTT_URI;
 const char* MQTT_USER       = SECRET_MQTT_USER;    // Điền nếu broker yêu cầu xác thực
 const char* MQTT_PASS       = SECRET_MQTT_PASS;    // Điền mật khẩu nếu có
 const char* MQTT_CLIENT_ID  = "ESP32_Biomed_Gateway";
@@ -73,9 +70,10 @@ typedef struct __attribute__((packed)) struct_message {
 } struct_message;
 
 struct_message incomingData;
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
 WiFiUDP udp;
+
+esp_mqtt_client_handle_t mqtt_client = NULL;
+bool mqtt_connected = false;
 
 // ==================== BIẾN BỘ ĐỆM ĐỒ THỊ & TÍNH BPM TẠI BIÊN (EDGE) ====================
 #define WAVE_WIDTH 128
@@ -314,7 +312,11 @@ void drawOLED() {
     u8g2.drawHLine(0, 12, 128);
 
     u8g2.setFont(u8g2_font_6x10_tf);
+#if ENABLE_MQTT
+    u8g2.drawStr(0, 24, mqtt_connected ? "Cloud: WSS ONLINE" : "Cloud: CONNECTING...");
+#else
     u8g2.drawStr(0, 24, "Che do: LOCAL OFFLINE");
+#endif
     
     char pkgStr[30];
     snprintf(pkgStr, sizeof(pkgStr), "Goi tin RX: %lu", totalPacketsReceived);
@@ -371,39 +373,63 @@ void handleBuzzer() {
   }
 }
 
-// ==================== KẾT NỐI MQTT BROKER ====================
-void reconnectMQTT() {
-#if ENABLE_MQTT
-  if (WiFi.status() != WL_CONNECTED) return;
-  if (mqttClient.connected()) return;
-
-  if (millis() - lastMqttReconnectAttempt > 5000) {
-    lastMqttReconnectAttempt = millis();
-    Serial.print("[MQTT] Dang ket noi toi Broker: ");
-    Serial.println(MQTT_SERVER);
-
-    bool ok = false;
-    if (strlen(MQTT_USER) > 0) {
-      ok = mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
-    } else {
-      ok = mqttClient.connect(MQTT_CLIENT_ID);
-    }
-
-    if (ok) {
-      Serial.println("[MQTT] Ket noi thanh cong!");
-      mqttClient.publish("biomed/status", "ESP32 Gateway Online");
-    } else {
-      Serial.print("[MQTT] That bai, rc=");
-      Serial.println(mqttClient.state());
-    }
+// ==================== KẾT NỐI VÀ XỬ LÝ SỰ KIỆN MQTT CLOUD (WSS) ====================
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
+  esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
+  switch ((esp_mqtt_event_id_t)event_id) {
+    case MQTT_EVENT_CONNECTED:
+      mqtt_connected = true;
+      Serial.println("\n[MQTT] >>> KET NOI THANH CONG TOI BROKER CLOUD (WSS)! <<<");
+      esp_mqtt_client_publish(mqtt_client, "biomed/status", "ESP32 Gateway Online", 0, 1, 0);
+      break;
+    case MQTT_EVENT_DISCONNECTED:
+      mqtt_connected = false;
+      Serial.println("[MQTT] Mat ket noi Broker. Dang tu dong ket noi lai...");
+      break;
+    case MQTT_EVENT_ERROR:
+      Serial.println("[MQTT] Bao loi ket noi MQTT WSS");
+      break;
+    default:
+      break;
   }
+}
+
+void initAndStartMQTT() {
+#if ENABLE_MQTT
+  if (mqtt_client != NULL) return; // Đã khởi chạy rồi
+
+  esp_mqtt_client_config_t mqtt_cfg = {};
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+  mqtt_cfg.broker.address.uri = MQTT_URI;
+  mqtt_cfg.broker.verification.skip_cert_common_name_check = true;
+  if (strlen(MQTT_USER) > 0) {
+    mqtt_cfg.credentials.username = MQTT_USER;
+    mqtt_cfg.credentials.authentication.password = MQTT_PASS;
+  }
+  mqtt_cfg.credentials.client_id = MQTT_CLIENT_ID;
+  mqtt_cfg.network.disable_auto_reconnect = false;
+#else
+  mqtt_cfg.uri = MQTT_URI;
+  mqtt_cfg.skip_cert_common_name_check = true;
+  if (strlen(MQTT_USER) > 0) {
+    mqtt_cfg.username = MQTT_USER;
+    mqtt_cfg.password = MQTT_PASS;
+  }
+  mqtt_cfg.client_id = MQTT_CLIENT_ID;
+  mqtt_cfg.disable_auto_reconnect = false;
+#endif
+
+  mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+  esp_mqtt_client_register_event(mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+  esp_mqtt_client_start(mqtt_client);
+  Serial.printf("[MQTT] Khoi chay client ket noi Cloud: %s\n", MQTT_URI);
 #endif
 }
 
 // ==================== XUẤT BẢN DỮ LIỆU SANG MQTT ====================
 void publishDataMQTT() {
 #if ENABLE_MQTT
-  if (!mqttClient.connected()) return;
+  if (!mqtt_client || !mqtt_connected) return;
 
   char jsonBuffer[512];
   int offset = snprintf(jsonBuffer, sizeof(jsonBuffer),
@@ -417,7 +443,7 @@ void publishDataMQTT() {
   }
   snprintf(jsonBuffer + offset, sizeof(jsonBuffer) - offset, "]}");
 
-  mqttClient.publish(TOPIC_DATA, jsonBuffer);
+  esp_mqtt_client_publish(mqtt_client, TOPIC_DATA, jsonBuffer, 0, 0, 0);
 
   if (incomingData.fallDetected || incomingData.leadsOff) {
     char alertBuf[128];
@@ -425,7 +451,7 @@ void publishDataMQTT() {
       "{\"alert\":\"%s\",\"smv\":%.2f,\"temp\":%.1f,\"time\":%lu}",
       incomingData.fallDetected ? "FALL_DETECTED" : "LEADS_OFF",
       incomingData.smv, incomingData.bodyTemp, millis());
-    mqttClient.publish(TOPIC_ALERT, alertBuf);
+    esp_mqtt_client_publish(mqtt_client, TOPIC_ALERT, alertBuf, 0, 1, 0);
   }
 #endif
 }
@@ -530,16 +556,15 @@ void setup() {
   Serial.printf("\n[WiFi] Dang ket noi Router: %s", ROUTER_SSID);
   WiFi.begin(ROUTER_SSID, ROUTER_PASS);
   int retry = 0;
-  while (WiFi.status() != WL_CONNECTED && retry < 10) {
+  while (WiFi.status() != WL_CONNECTED && retry < 15) {
     delay(300);
     Serial.print(".");
     retry++;
   }
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("\n[WiFi] Da ket noi Router! IP: %s\n", WiFi.localIP().toString().c_str());
+    initAndStartMQTT();
   }
-  mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
-  mqttClient.setBufferSize(512);
 #else
   // Chế độ Local: Chỉ phát SoftAP, không mất thời gian tìm Router
   WiFi.mode(WIFI_AP);
@@ -566,12 +591,8 @@ void loop() {
 
   // 2. Quản lý MQTT (chỉ kích hoạt khi ENABLE_MQTT = true)
 #if ENABLE_MQTT
-  if (WiFi.status() == WL_CONNECTED) {
-    if (!mqttClient.connected()) {
-      reconnectMQTT();
-    } else {
-      mqttClient.loop();
-    }
+  if (WiFi.status() == WL_CONNECTED && mqtt_client == NULL) {
+    initAndStartMQTT();
   }
 #endif
 
