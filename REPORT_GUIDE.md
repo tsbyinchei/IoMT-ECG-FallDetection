@@ -90,7 +90,7 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
    - Thân nhiệt bề mặt trung bình: $32.46^\circ\text{C}$.
 5.3. Kết quả thử nghiệm cảnh báo té ngã:
    - Xung va đập đạt đỉnh $3.5g > 2.5g$.
-   - Cảnh báo tức thời đồng thời trên màn hình OLED `! FALL DETECTED !`, còi hú Active Buzzer và **tin nhắn Telegram khẩn cấp gửi về smartphone qua `@TsByinIoT_bot`** trong $< 500\text{ms}$.
+   - Cảnh báo tức thời đồng thời trên màn hình OLED `! FALL DETECTED !`, còi hú Active Buzzer và **tin nhắn Telegram khẩn cấp gửi về smartphone qua `@your_telegram_bot`** trong $< 500\text{ms}$.
 5.4. Đánh giá hiệu năng mạng IoT phân tầng:
    - Tầng nội bộ (Wi-Fi UDP Socket): Độ trễ $< 4\text{ms}$, tỷ lệ mất gói (Packet Loss Rate) $0\%$.
    - Tầng đám mây (Cloudflare Tunnel WSS MQTT): Độ trễ $< 50\text{ms}$, bảo mật mã hóa SSL/TLS Port 443 toàn diện.

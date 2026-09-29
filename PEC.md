@@ -69,11 +69,11 @@
   ```
 
 ### 3.3. Giao thức Tầng 3: Cloudflare Tunnel MQTT WSS Stream (Gateway $\to$ Cloud Broker)
-* **Kiến trúc Broker:** EMQX v5 triển khai trên Ubuntu Server 1Panel (IP nội bộ `192.168.1.36`, cổng WebSocket `8083`).
+* **Kiến trúc Broker:** EMQX v5 triển khai trên Ubuntu Server 1Panel (IP nội bộ `192.168.1.x`, cổng WebSocket `8083`).
 * **Định tuyến toàn cầu:** Cloudflare Zero Trust Tunnel chuyển tiếp SSL/TLS an toàn qua Public Hostname:
-  * **URI WSS:** `wss://mqtt.tsbyin.dev/mqtt` (Port 443 WSS)
+  * **URI WSS:** `wss://mqtt.yourdomain.com/mqtt` (Port 443 WSS)
   * **Client ESP32:** Thư viện `esp_mqtt_client` (FreeRTOS Native Task).
-  * **Xác thực an toàn:** Password-based Authentication (Tài khoản `TsByin` hoặc `esp32`).
+  * **Xác thực an toàn:** Password-based Authentication (Tài khoản xác thực trên EMQX Broker của bạn).
 * **Topic dữ liệu sinh hiệu:** `biomed/patient/data` (Publish chu kỳ 100ms)
 * **Topic cảnh báo khẩn cấp:** `biomed/patient/alert` (Publish tức thời khi té ngã)
 * **Định dạng tải trọng JSON:**
@@ -90,7 +90,7 @@
 
 ### 3.4. Giao thức Tầng 4: Cảnh báo Tức thời Telegram Bot API
 * **Endpoint:** `https://api.telegram.org/bot<TOKEN>/sendMessage`
-* **Bot định danh:** `@TsByinIoT_bot`
+* **Bot định danh:** `@your_telegram_bot`
 * **Cơ chế kích hoạt:** Bắn HTTP GET bất đồng bộ qua `WiFiClientSecure` (bỏ qua check SSL cert để gửi trong $< 300\text{ms}$) khi cờ ngã `fallDetected` chuyển trạng thái $0 \to 1$.
 * **Nội dung bản tin cảnh báo:** Bao gồm Lực va đập SMV ($g$), Nhịp tim hiện tại (BPM), Thân nhiệt ($^\circ\text{C}$) và định danh thiết bị.
 

@@ -92,17 +92,17 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 ```
 +=============================================================================+
 | 4. TẦNG ỨNG DỤNG (Application Layer)                                        |
-|    - Web Dashboard: Grafana (https://grafana.tsbyin.dev)                    |
-|    - Quản trị Broker: EMQX Console (https://emqx.tsbyin.dev)                |
-|    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@TsByinIoT_bot)             |
+|    - Web Dashboard: Grafana (https://grafana.yourdomain.com)                 |
+|    - Quản trị Broker: EMQX Console (https://emqx.yourdomain.com)             |
+|    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@your_telegram_bot)          |
 |    - Phân tích chuyên sâu: MATLAB Biomedical Signal Processing Toolbox      |
 +=============================================================================+
                                       ▲
                                       │ WSS / HTTPS (Port 443 - Cloudflare Tunnel)
 +=============================================================================+
 | 3. TẦNG HỖ TRỢ DỊCH VỤ & ỨNG DỤNG (Service & Application Support Layer)     |
-|    - Hạ tầng: Ubuntu Server cá nhân quản lý qua 1Panel (192.168.1.36)       |
-|    - MQTT Broker: EMQX (Cổng WebSocket 8083 -> Domain: wss://mqtt.tsbyin.dev) |
+|    - Hạ tầng: Ubuntu Server cá nhân quản lý qua 1Panel (192.168.1.x)        |
+|    - MQTT Broker: EMQX (Cổng WebSocket 8083 -> Domain: wss://mqtt.yourdomain.com) |
 |    - Cơ sở dữ liệu chuỗi thời gian: InfluxDB (Lưu ECG 250Hz, Temp, SMV)     |
 |    - Bảo mật & Chứng chỉ số: Cloudflare Zero Trust SSL/TLS Tunnel           |
 +=============================================================================+
@@ -112,7 +112,7 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 | 2. TẦNG MẠNG (Network Layer)                                                |
 |    - Gateway: ESP32-WROOM-32 (Chế độ Wi-Fi kép AP + STA)                    |
 |      + AP Mode: BIOMED_GW (Giao tiếp UDP nội bộ 192.168.4.1)                |
-|      + STA Mode: Đẩy dữ liệu lên Cloud Broker qua wss://mqtt.tsbyin.dev/mqtt|
+|      + STA Mode: Đẩy dữ liệu lên Cloud qua wss://mqtt.yourdomain.com/mqtt    |
 |      + Khách thể ngầm: Native esp_mqtt_client FreeRTOS đa luồng             |
 |    - Giao thức nội bộ: Wi-Fi UDP Socket (Port 4210, 60 bytes/packet)        |
 +=============================================================================+
@@ -233,9 +233,9 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
    ```c
    #define SECRET_ROUTER_SSID "Tên_WiFi_Nhà_Bạn"
    #define SECRET_ROUTER_PASS "Mật_Khẩu_WiFi"
-   #define SECRET_MQTT_URI    "wss://mqtt.tsbyin.dev/mqtt"
-   #define SECRET_MQTT_USER   "TsByin"
-   #define SECRET_MQTT_PASS   "Mật_Khẩu_EMQX"
+   #define SECRET_MQTT_URI    "wss://mqtt.yourdomain.com/mqtt"
+   #define SECRET_MQTT_USER   "YOUR_MQTT_USERNAME"
+   #define SECRET_MQTT_PASS   "YOUR_MQTT_PASSWORD"
    #define TELEGRAM_BOT_TOKEN "Token_Telegram_Bot_Của_Bạn"
    #define TELEGRAM_CHAT_ID   "Chat_ID_Của_Bạn"
    ```

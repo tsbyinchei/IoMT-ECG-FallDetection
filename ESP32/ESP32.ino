@@ -1,72 +1,78 @@
-#include <WiFi.h>
-#include <WiFiUdp.h>
-#include <WiFiClientSecure.h>
-#include <Wire.h>
-#include <U8g2lib.h>
 #include "esp_idf_version.h"
 #include "mqtt_client.h"
+#include <U8g2lib.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <WiFiUdp.h>
+#include <Wire.h>
 
 // Cấu hình Telegram Bot bảo mật (ưu tiên đọc secrets.h)
 #if __has_include("secrets.h")
-  #include "secrets.h"
+#include "secrets.h"
 #else
-  #include "secrets_example.h"
+#include "secrets_example.h"
 #endif
 
 // ==================== CẤU HÌNH PHẦN CỨNG GATEWAY ESP32 ====================
-#define BUZZER_PIN      23   // Active Buzzer cảnh báo biến cố y sinh
-#define OLED_SDA_PIN    21   // Chân I2C SDA cho màn hình OLED SH1106
-#define OLED_SCL_PIN    22   // Chân I2C SCL cho màn hình OLED SH1106
-#define BUTTON_PIN      0    // Nút BOOT có sẵn trên kit ESP32 (GPIO 0) bấm chuyển trang
+#define BUZZER_PIN 23   // Active Buzzer cảnh báo biến cố y sinh
+#define OLED_SDA_PIN 21 // Chân I2C SDA cho màn hình OLED SH1106
+#define OLED_SCL_PIN 22 // Chân I2C SCL cho màn hình OLED SH1106
+#define BUTTON_PIN 0 // Nút BOOT có sẵn trên kit ESP32 (GPIO 0) bấm chuyển trang
 
 // Khởi tạo màn hình OLED SH1106 I2C 128x64
-U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ OLED_SCL_PIN, /* data=*/ OLED_SDA_PIN);
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE,
+                                        /* clock=*/OLED_SCL_PIN,
+                                        /* data=*/OLED_SDA_PIN);
 
 // ==================== CẤU HÌNH CHẾ ĐỘ HOẠT ĐỘNG ====================
-// Đặt 'false' khi test Local tại bàn (không cần kết nối máy chủ 1Panel, tránh báo lỗi rc=-2)
-// Đặt 'true' khi chạy chính thức đẩy dữ liệu lên Ubuntu Server (1Panel: EMQX Broker)
-#define ENABLE_MQTT     true 
+// Đặt 'false' khi test Local tại bàn (không cần kết nối máy chủ 1Panel, tránh
+// báo lỗi rc=-2) Đặt 'true' khi chạy chính thức đẩy dữ liệu lên Ubuntu Server
+// (1Panel: EMQX Broker)
+#define ENABLE_MQTT true
 
 // 1. Wi-Fi Router kết nối ra Internet / Mạng nội bộ tới Ubuntu Server
 #ifndef SECRET_ROUTER_SSID
-  #define SECRET_ROUTER_SSID "IoT"
+#define SECRET_ROUTER_SSID "IoT"
 #endif
 #ifndef SECRET_ROUTER_PASS
-  #define SECRET_ROUTER_PASS "1234567888"
+#define SECRET_ROUTER_PASS "1234567888"
 #endif
-const char* ROUTER_SSID = SECRET_ROUTER_SSID;
-const char* ROUTER_PASS = SECRET_ROUTER_PASS;
+const char *ROUTER_SSID = SECRET_ROUTER_SSID;
+const char *ROUTER_PASS = SECRET_ROUTER_PASS;
 
 // 2. Mạng SoftAP phát riêng cho Node cảm biến ESP32-C3
-const char* AP_SSID = "BIOMED_GW";
+const char *AP_SSID = "BIOMED_GW";
 const unsigned int UDP_PORT = 4210;
 
 // 3. MQTT Broker qua Cloudflare Tunnel (Toàn cầu) hoặc IP LAN
 #ifndef SECRET_MQTT_URI
-  #define SECRET_MQTT_URI "wss://mqtt.tsbyin.dev/mqtt"
+#define SECRET_MQTT_URI "wss://mqtt.tsbyin.dev/mqtt"
 #endif
 #ifndef SECRET_MQTT_USER
-  #define SECRET_MQTT_USER ""
+#define SECRET_MQTT_USER ""
 #endif
 #ifndef SECRET_MQTT_PASS
-  #define SECRET_MQTT_PASS ""
+#define SECRET_MQTT_PASS ""
 #endif
 
-const char* MQTT_URI        = SECRET_MQTT_URI;
-const char* MQTT_USER       = SECRET_MQTT_USER;    // Điền nếu broker yêu cầu xác thực
-const char* MQTT_PASS       = SECRET_MQTT_PASS;    // Điền mật khẩu nếu có
-const char* MQTT_CLIENT_ID  = "ESP32_Biomed_Gateway";
+const char *MQTT_URI = SECRET_MQTT_URI;
+const char *MQTT_USER = SECRET_MQTT_USER; // Điền nếu broker yêu cầu xác thực
+const char *MQTT_PASS = SECRET_MQTT_PASS; // Điền mật khẩu nếu có
+const char *MQTT_CLIENT_ID = "ESP32_Biomed_Gateway";
 
-const char* TOPIC_DATA      = "biomed/patient/data";   // Dữ liệu đo đạc (ECG, Temp, SMV, BPM)
-const char* TOPIC_ALERT     = "biomed/patient/alert";  // Cảnh báo khẩn (Fall, LeadOff)
+const char *TOPIC_DATA =
+    "biomed/patient/data"; // Dữ liệu đo đạc (ECG, Temp, SMV, BPM)
+const char *TOPIC_ALERT =
+    "biomed/patient/alert"; // Cảnh báo khẩn (Fall, LeadOff)
 
-// ==================== ĐỊNH NGHĨA GÓI TIN ĐỒNG BỘ TỪ ESP32-C3 ====================
+// ==================== ĐỊNH NGHĨA GÓI TIN ĐỒNG BỘ TỪ ESP32-C3
+// ====================
 typedef struct __attribute__((packed)) struct_message {
-  uint16_t ecgSamples[25];  // 25 mẫu ECG thô (ADC 12-bit: 0-4095 @ 250Hz)
-  float bodyTemp;           // Nhiệt độ cơ thể (°C)
-  float smv;                // Signal Magnitude Vector gia tốc (g)
-  uint8_t leadsOff;         // 1: Hở điện cực | 0: Bình thường
-  uint8_t fallDetected;     // 1: Phát hiện ngã  | 0: Bình thường
+  uint16_t ecgSamples[25]; // 25 mẫu ECG thô (ADC 12-bit: 0-4095 @ 250Hz)
+  float bodyTemp;          // Nhiệt độ cơ thể (°C)
+  float smv;               // Signal Magnitude Vector gia tốc (g)
+  uint8_t leadsOff;        // 1: Hở điện cực | 0: Bình thường
+  uint8_t fallDetected;    // 1: Phát hiện ngã  | 0: Bình thường
 } struct_message;
 
 struct_message incomingData;
@@ -75,7 +81,8 @@ WiFiUDP udp;
 esp_mqtt_client_handle_t mqtt_client = NULL;
 bool mqtt_connected = false;
 
-// ==================== BIẾN BỘ ĐỆM ĐỒ THỊ & TÍNH BPM TẠI BIÊN (EDGE) ====================
+// ==================== BIẾN BỘ ĐỆM ĐỒ THỊ & TÍNH BPM TẠI BIÊN (EDGE)
+// ====================
 #define WAVE_WIDTH 128
 uint8_t waveBuffer[WAVE_WIDTH]; // Bộ đệm vẽ đồ thị sóng ECG mini cuộn trên OLED
 uint8_t waveWriteIdx = 0;
@@ -92,7 +99,7 @@ bool prevFallState = false;
 
 // ==================== QUẢN LÝ CHUYỂN TRANG MÀN HÌNH ====================
 #define TOTAL_PAGES 4
-uint8_t currentPage = 0; 
+uint8_t currentPage = 0;
 // Trang 0: Đồ thị sóng ECG & Nhịp tim (ECG Waveform Focus)
 // Trang 1: Tổng quan chỉ số Sinh hiệu (Clinical Vitals: BPM, Temp, Status)
 // Trang 2: Giám sát Gia tốc & Té ngã (Motion & Fall Level Bar)
@@ -107,14 +114,15 @@ void handleButton() {
     if (millis() - lastDebounceTime > 200) {
       lastDebounceTime = millis();
       currentPage = (currentPage + 1) % TOTAL_PAGES;
-      Serial.printf("[OLED] Chuyen sang Trang %d/%d\n", currentPage + 1, TOTAL_PAGES);
+      Serial.printf("[OLED] Chuyen sang Trang %d/%d\n", currentPage + 1,
+                    TOTAL_PAGES);
     }
   }
   lastButtonState = reading;
 }
 
-// ==================== THUẬT TOÁN ĐO NHỊP TIM TẠI BIÊN (EDGE BPM) ====================
-// Tần số lấy mẫu 250Hz -> Mỗi mẫu = 4ms
+// ==================== THUẬT TOÁN ĐO NHỊP TIM TẠI BIÊN (EDGE BPM)
+// ==================== Tần số lấy mẫu 250Hz -> Mỗi mẫu = 4ms
 unsigned long edgeSampleCounter = 0;
 unsigned long lastPeakSample = 0;
 uint16_t prevSample1 = 3400;
@@ -133,12 +141,14 @@ void processEdgeBPM(uint16_t sample) {
   if (slope > slopeThreshold) {
     slopeThreshold = (slopeThreshold * 7 + slope) / 8;
   } else {
-    slopeThreshold = (slopeThreshold * 511 + 60) / 512; // Hạ dần về ngưỡng sàn 60
+    slopeThreshold =
+        (slopeThreshold * 511 + 60) / 512; // Hạ dần về ngưỡng sàn 60
   }
 
   // Phát hiện đỉnh sóng R:
   // - Vượt ngưỡng độ dốc sườn QRS nhọn
-  // - Thời gian trơ sinh lý (Refractory Period): 380ms = 95 mẫu @ 250Hz để LOẠI BỎ HOÀN TOÀN SÓNG T
+  // - Thời gian trơ sinh lý (Refractory Period): 380ms = 95 mẫu @ 250Hz để LOẠI
+  // BỎ HOÀN TOÀN SÓNG T
   if (slope > slopeThreshold && (edgeSampleCounter - lastPeakSample > 95)) {
     unsigned long rrSamples = edgeSampleCounter - lastPeakSample;
     lastPeakSample = edgeSampleCounter;
@@ -153,12 +163,14 @@ void processEdgeBPM(uint16_t sample) {
         edgeBpm = calculatedBpm;
       } else {
         // Thuật toán chống nhảy vọt (Outlier Rejection):
-        // Nếu nhịp tính toán lệch quá 20 BPM so với nhịp nền (thường do co cơ/rung lắc MPU tạo đỉnh giả)
+        // Nếu nhịp tính toán lệch quá 20 BPM so với nhịp nền (thường do co
+        // cơ/rung lắc MPU tạo đỉnh giả)
         // -> Lọc bỏ đỉnh giả đó, không cho nhịp tim nhảy vọt
         if (abs(calculatedBpm - edgeBpm) <= 18) {
           edgeBpm = (edgeBpm * 7 + calculatedBpm) / 8;
         } else {
-          // Nếu lệch nhiều, chỉ dịch chuyển rất từ từ (1/16) để bám theo nhịp tim thực
+          // Nếu lệch nhiều, chỉ dịch chuyển rất từ từ (1/16) để bám theo nhịp
+          // tim thực
           edgeBpm = (edgeBpm * 15 + calculatedBpm) / 16;
         }
       }
@@ -171,36 +183,44 @@ void processEdgeBPM(uint16_t sample) {
   }
 }
 
-// ==================== CẬP NHẬT ĐỒ THỊ SÓNG OLED MINI (DYNAMIC AUTO-RANGING) ====================
+// ==================== CẬP NHẬT ĐỒ THỊ SÓNG OLED MINI (DYNAMIC AUTO-RANGING)
+// ====================
 void updateWaveformBuffer(uint16_t rawSample) {
   // Tự động thích ứng với dải tín hiệu thực tế (Ví dụ: 3200 - 4095)
   static uint16_t sigMin = 3200;
   static uint16_t sigMax = 3800;
 
-  if (rawSample < sigMin && rawSample > 200) sigMin = rawSample;
-  if (rawSample > sigMax && rawSample <= 4095) sigMax = rawSample;
+  if (rawSample < sigMin && rawSample > 200)
+    sigMin = rawSample;
+  if (rawSample > sigMax && rawSample <= 4095)
+    sigMax = rawSample;
 
   // Co giãn ngưỡng từ từ để bám sát nhịp thở và đường đẳng điện
   sigMin = (sigMin * 63 + 3200) / 64;
   sigMax = (sigMax * 63 + 3900) / 64;
 
   int span = sigMax - sigMin;
-  if (span < 150) span = 150; // Bảo vệ chống chia cho 0
+  if (span < 150)
+    span = 150; // Bảo vệ chống chia cho 0
 
   // Ánh xạ tín hiệu vừa vặn vào khung đồ thị OLED (Y: 54 ở dưới, 16 ở trên)
-  int mappedY = 54 - (int)((long)(constrain(rawSample, sigMin, sigMax) - sigMin) * 38 / span);
+  int mappedY =
+      54 -
+      (int)((long)(constrain(rawSample, sigMin, sigMax) - sigMin) * 38 / span);
   waveBuffer[waveWriteIdx] = (uint8_t)constrain(mappedY, 16, 56);
   waveWriteIdx = (waveWriteIdx + 1) % WAVE_WIDTH;
 }
 
-// ==================== HIỂN THỊ MÀN HÌNH OLED THEO TỪNG TRANG ====================
+// ==================== HIỂN THỊ MÀN HÌNH OLED THEO TỪNG TRANG
+// ====================
 void drawOLED() {
   u8g2.clearBuffer();
 
-  // ==================== TRANG 0: ĐỒ THỊ SÓNG ECG CHUYÊN SÂU ====================
+  // ==================== TRANG 0: ĐỒ THỊ SÓNG ECG CHUYÊN SÂU
+  // ====================
   if (currentPage == 0) {
     u8g2.setFont(u8g2_font_6x10_tf);
-    
+
     // Dòng thông tin trên cùng (BPM | Temp | SMV)
     if (incomingData.leadsOff) {
       u8g2.drawStr(0, 9, "HR: --");
@@ -234,7 +254,8 @@ void drawOLED() {
     u8g2.drawStr(0, 63, "P1:ECG WAVE (Bam BOOT chuyen)");
   }
 
-  // ==================== TRANG 1: TỔNG QUAN CHỈ SỐ SINH HIỆU ====================
+  // ==================== TRANG 1: TỔNG QUAN CHỈ SỐ SINH HIỆU
+  // ====================
   else if (currentPage == 1) {
     u8g2.setFont(u8g2_font_6x10_tf);
     u8g2.drawStr(0, 9, "CLINICAL VITALS [P2/4]");
@@ -274,7 +295,8 @@ void drawOLED() {
     }
   }
 
-  // ==================== TRANG 2: GIÁM SÁT GIA TỐC & TÉ NGÃ ====================
+  // ==================== TRANG 2: GIÁM SÁT GIA TỐC & TÉ NGÃ
+  // ====================
   else if (currentPage == 2) {
     u8g2.setFont(u8g2_font_6x10_tf);
     u8g2.drawStr(0, 9, "MOTION & FALL [P3/4]");
@@ -286,9 +308,10 @@ void drawOLED() {
 
     // Thanh đo lực gia tốc đồ họa (Level Bar từ 0 đến 4.0g)
     u8g2.drawFrame(5, 28, 118, 10);
-    int barWidth = map(constrain((int)(incomingData.smv * 100), 0, 400), 0, 400, 0, 116);
+    int barWidth =
+        map(constrain((int)(incomingData.smv * 100), 0, 400), 0, 400, 0, 116);
     u8g2.drawBox(6, 29, barWidth, 8);
-    
+
     // Vạch đánh dấu ngưỡng ngã 2.5g
     int threshX = 6 + (int)(116.0 * 2.5 / 4.0);
     u8g2.drawVLine(threshX, 26, 14);
@@ -301,7 +324,8 @@ void drawOLED() {
     // Thống kê số lần ngã
     u8g2.setFont(u8g2_font_6x10_tf);
     char fallCountBuf[30];
-    snprintf(fallCountBuf, sizeof(fallCountBuf), "So lan nga: %u lan", totalFallsCount);
+    snprintf(fallCountBuf, sizeof(fallCountBuf), "So lan nga: %u lan",
+             totalFallsCount);
     u8g2.drawStr(5, 59, fallCountBuf);
   }
 
@@ -313,11 +337,12 @@ void drawOLED() {
 
     u8g2.setFont(u8g2_font_6x10_tf);
 #if ENABLE_MQTT
-    u8g2.drawStr(0, 24, mqtt_connected ? "Cloud: WSS ONLINE" : "Cloud: CONNECTING...");
+    u8g2.drawStr(0, 24,
+                 mqtt_connected ? "Cloud: WSS ONLINE" : "Cloud: CONNECTING...");
 #else
     u8g2.drawStr(0, 24, "Che do: LOCAL OFFLINE");
 #endif
-    
+
     char pkgStr[30];
     snprintf(pkgStr, sizeof(pkgStr), "Goi tin RX: %lu", totalPacketsReceived);
     u8g2.drawStr(0, 37, pkgStr);
@@ -326,7 +351,8 @@ void drawOLED() {
     u8g2.drawStr(0, 63, "Node C3: 192.168.4.2");
   }
 
-  // ==================== POPUP CẢNH BÁO KHẨN CẤP (HIỂN THỊ TRÊN MỌI TRANG) ====================
+  // ==================== POPUP CẢNH BÁO KHẨN CẤP (HIỂN THỊ TRÊN MỌI TRANG)
+  // ====================
   if (incomingData.fallDetected) {
     u8g2.setDrawColor(0);
     u8g2.drawBox(4, 18, 120, 28);
@@ -340,7 +366,8 @@ void drawOLED() {
   u8g2.sendBuffer();
 }
 
-// ==================== ĐIỀU KHIỂN CÒI BÁO ĐỘNG BUZZER (GPIO 23) ====================
+// ==================== ĐIỀU KHIỂN CÒI BÁO ĐỘNG BUZZER (GPIO 23)
+// ====================
 void handleBuzzer() {
   static unsigned long lastBeep = 0;
   static bool beepState = false;
@@ -373,30 +400,35 @@ void handleBuzzer() {
   }
 }
 
-// ==================== KẾT NỐI VÀ XỬ LÝ SỰ KIỆN MQTT CLOUD (WSS) ====================
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
+// ==================== KẾT NỐI VÀ XỬ LÝ SỰ KIỆN MQTT CLOUD (WSS)
+// ====================
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
+                               int32_t event_id, void *event_data) {
   esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
   switch ((esp_mqtt_event_id_t)event_id) {
-    case MQTT_EVENT_CONNECTED:
-      mqtt_connected = true;
-      Serial.println("\n[MQTT] >>> KET NOI THANH CONG TOI BROKER CLOUD (WSS)! <<<");
-      esp_mqtt_client_publish(mqtt_client, "biomed/status", "ESP32 Gateway Online", 0, 1, 0);
-      break;
-    case MQTT_EVENT_DISCONNECTED:
-      mqtt_connected = false;
-      Serial.println("[MQTT] Mat ket noi Broker. Dang tu dong ket noi lai...");
-      break;
-    case MQTT_EVENT_ERROR:
-      Serial.println("[MQTT] Bao loi ket noi MQTT WSS");
-      break;
-    default:
-      break;
+  case MQTT_EVENT_CONNECTED:
+    mqtt_connected = true;
+    Serial.println(
+        "\n[MQTT] >>> KET NOI THANH CONG TOI BROKER CLOUD (WSS)! <<<");
+    esp_mqtt_client_publish(mqtt_client, "biomed/status",
+                            "ESP32 Gateway Online", 0, 1, 0);
+    break;
+  case MQTT_EVENT_DISCONNECTED:
+    mqtt_connected = false;
+    Serial.println("[MQTT] Mat ket noi Broker. Dang tu dong ket noi lai...");
+    break;
+  case MQTT_EVENT_ERROR:
+    Serial.println("[MQTT] Bao loi ket noi MQTT WSS");
+    break;
+  default:
+    break;
   }
 }
 
 void initAndStartMQTT() {
 #if ENABLE_MQTT
-  if (mqtt_client != NULL) return; // Đã khởi chạy rồi
+  if (mqtt_client != NULL)
+    return; // Đã khởi chạy rồi
 
   esp_mqtt_client_config_t mqtt_cfg = {};
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
@@ -420,7 +452,9 @@ void initAndStartMQTT() {
 #endif
 
   mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-  esp_mqtt_client_register_event(mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+  esp_mqtt_client_register_event(mqtt_client,
+                                 (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID,
+                                 mqtt_event_handler, NULL);
   esp_mqtt_client_start(mqtt_client);
   Serial.printf("[MQTT] Khoi chay client ket noi Cloud: %s\n", MQTT_URI);
 #endif
@@ -429,13 +463,16 @@ void initAndStartMQTT() {
 // ==================== XUẤT BẢN DỮ LIỆU SANG MQTT ====================
 void publishDataMQTT() {
 #if ENABLE_MQTT
-  if (!mqtt_client || !mqtt_connected) return;
+  if (!mqtt_client || !mqtt_connected)
+    return;
 
   char jsonBuffer[512];
-  int offset = snprintf(jsonBuffer, sizeof(jsonBuffer),
-    "{\"temp\":%.1f,\"smv\":%.2f,\"leadsOff\":%d,\"fall\":%d,\"bpm\":%d,\"ecg\":[",
-    incomingData.bodyTemp, incomingData.smv, incomingData.leadsOff,
-    incomingData.fallDetected, edgeBpm);
+  int offset =
+      snprintf(jsonBuffer, sizeof(jsonBuffer),
+               "{\"temp\":%.1f,\"smv\":%.2f,\"leadsOff\":%d,\"fall\":%d,"
+               "\"bpm\":%d,\"ecg\":[",
+               incomingData.bodyTemp, incomingData.smv, incomingData.leadsOff,
+               incomingData.fallDetected, edgeBpm);
 
   for (int i = 0; i < 25; i++) {
     offset += snprintf(jsonBuffer + offset, sizeof(jsonBuffer) - offset,
@@ -448,16 +485,17 @@ void publishDataMQTT() {
   if (incomingData.fallDetected || incomingData.leadsOff) {
     char alertBuf[128];
     snprintf(alertBuf, sizeof(alertBuf),
-      "{\"alert\":\"%s\",\"smv\":%.2f,\"temp\":%.1f,\"time\":%lu}",
-      incomingData.fallDetected ? "FALL_DETECTED" : "LEADS_OFF",
-      incomingData.smv, incomingData.bodyTemp, millis());
+             "{\"alert\":\"%s\",\"smv\":%.2f,\"temp\":%.1f,\"time\":%lu}",
+             incomingData.fallDetected ? "FALL_DETECTED" : "LEADS_OFF",
+             incomingData.smv, incomingData.bodyTemp, millis());
     esp_mqtt_client_publish(mqtt_client, TOPIC_ALERT, alertBuf, 0, 1, 0);
   }
 #endif
 }
 
-// ==================== GỬI CẢNH BÁO TÉ NGÃ QUA TELEGRAM BOT ====================
-String urlEncodeString(const char* msg) {
+// ==================== GỬI CẢNH BÁO TÉ NGÃ QUA TELEGRAM BOT
+// ====================
+String urlEncodeString(const char *msg) {
   String encoded = "";
   char c;
   while ((c = *msg++) != 0) {
@@ -476,10 +514,12 @@ String urlEncodeString(const char* msg) {
 
 void sendTelegramFallAlert(float smv, float temp, int bpm) {
   // Chỉ gửi qua Internet nếu kit Gateway đang kết nối Router Wi-Fi
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED)
+    return;
 
   WiFiClientSecure client;
-  client.setInsecure(); // Bỏ qua chứng chỉ SSL để gửi tin nhắn nhanh không bị trễ
+  client
+      .setInsecure(); // Bỏ qua chứng chỉ SSL để gửi tin nhắn nhanh không bị trễ
   client.setTimeout(4000);
 
   if (!client.connect("api.telegram.org", 443)) {
@@ -489,25 +529,28 @@ void sendTelegramFallAlert(float smv, float temp, int bpm) {
 
   char textBuf[256];
   snprintf(textBuf, sizeof(textBuf),
-    "🚨 [CẢNH BÁO TÉ NGÃ KHẨN CẤP - GATEWAY ESP32]!\n"
-    "Bệnh nhân vừa bị té ngã!\n"
-    "- Lực va đập SMV: %.2fg\n"
-    "- Nhịp tim hiện tại: %d BPM\n"
-    "- Thân nhiệt: %.1f*C\n"
-    "- Thiết bị: IoMT Gateway\n"
-    "Cần kiểm tra người bệnh ngay lập tức!",
-    smv, bpm, temp);
+           "🚨 [CẢNH BÁO TÉ NGÃ KHẨN CẤP - GATEWAY ESP32]!\n"
+           "Bệnh nhân vừa bị té ngã!\n"
+           "- Lực va đập SMV: %.2fg\n"
+           "- Nhịp tim hiện tại: %d BPM\n"
+           "- Thân nhiệt: %.1f*C\n"
+           "- Thiết bị: IoMT Gateway\n"
+           "Cần kiểm tra người bệnh ngay lập tức!",
+           smv, bpm, temp);
 
-  String url = "/bot" + String(TELEGRAM_BOT_TOKEN) + "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) + "&text=" + urlEncodeString(textBuf);
+  String url = "/bot" + String(TELEGRAM_BOT_TOKEN) +
+               "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) +
+               "&text=" + urlEncodeString(textBuf);
   client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: api.telegram.org\r\n" +
-               "Connection: close\r\n\r\n");
+               "Host: api.telegram.org\r\n" + "Connection: close\r\n\r\n");
 
-  Serial.println("[TELEGRAM] >>> Da gui tin nhan canh bao te nga thanh cong! <<<");
+  Serial.println(
+      "[TELEGRAM] >>> Da gui tin nhan canh bao te nga thanh cong! <<<");
   client.stop();
 }
 
-// ==================== IN DỮ LIỆU SERIAL (CHO MATLAB OFFLINE & DEBUG) ====================
+// ==================== IN DỮ LIỆU SERIAL (CHO MATLAB OFFLINE & DEBUG)
+// ====================
 void outputSerialForMatlab() {
   Serial.print("$DATA,");
   Serial.print(incomingData.bodyTemp, 1);
@@ -562,13 +605,15 @@ void setup() {
     retry++;
   }
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("\n[WiFi] Da ket noi Router! IP: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("\n[WiFi] Da ket noi Router! IP: %s\n",
+                  WiFi.localIP().toString().c_str());
     initAndStartMQTT();
   }
 #else
   // Chế độ Local: Chỉ phát SoftAP, không mất thời gian tìm Router
   WiFi.mode(WIFI_AP);
-  Serial.println("\n[WiFi] Dang chay che do LOCAL TEST (Tien trinh MQTT da tam tat)");
+  Serial.println(
+      "\n[WiFi] Dang chay che do LOCAL TEST (Tien trinh MQTT da tam tat)");
 #endif
 
   // Phát SoftAP cho Node ESP32-C3
@@ -599,10 +644,11 @@ void loop() {
   // 3. Lắng nghe và đọc gói tin UDP từ ESP32-C3
   int packetSize = udp.parsePacket();
   if (packetSize >= sizeof(incomingData)) {
-    udp.read((char*)&incomingData, sizeof(incomingData));
+    udp.read((char *)&incomingData, sizeof(incomingData));
     totalPacketsReceived++;
 
-    // Đếm số lần ngã và gửi cảnh báo Telegram khẩn cấp (chỉ tăng khi cờ chuyển từ 0 lên 1)
+    // Đếm số lần ngã và gửi cảnh báo Telegram khẩn cấp (chỉ tăng khi cờ chuyển
+    // từ 0 lên 1)
     if (incomingData.fallDetected && !prevFallState) {
       totalFallsCount++;
       sendTelegramFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
