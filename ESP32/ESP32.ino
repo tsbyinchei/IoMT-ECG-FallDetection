@@ -1,8 +1,16 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <PubSubClient.h>
+
+// Cấu hình Telegram Bot bảo mật (ưu tiên đọc secrets.h)
+#if __has_include("secrets.h")
+  #include "secrets.h"
+#else
+  #include "secrets_example.h"
+#endif
 
 // ==================== CẤU HÌNH PHẦN CỨNG GATEWAY ESP32 ====================
 #define BUZZER_PIN      23   // Active Buzzer cảnh báo biến cố y sinh
@@ -403,6 +411,57 @@ void publishDataMQTT() {
 #endif
 }
 
+// ==================== GỬI CẢNH BÁO TÉ NGÃ QUA TELEGRAM BOT ====================
+String urlEncodeString(const char* msg) {
+  String encoded = "";
+  char c;
+  while ((c = *msg++) != 0) {
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      encoded += c;
+    } else if (c == ' ') {
+      encoded += "%20";
+    } else {
+      char buf[4];
+      snprintf(buf, sizeof(buf), "%%%02X", (unsigned char)c);
+      encoded += buf;
+    }
+  }
+  return encoded;
+}
+
+void sendTelegramFallAlert(float smv, float temp, int bpm) {
+  // Chỉ gửi qua Internet nếu kit Gateway đang kết nối Router Wi-Fi
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  WiFiClientSecure client;
+  client.setInsecure(); // Bỏ qua chứng chỉ SSL để gửi tin nhắn nhanh không bị trễ
+  client.setTimeout(4000);
+
+  if (!client.connect("api.telegram.org", 443)) {
+    Serial.println("[TELEGRAM] Khong the ket noi api.telegram.org");
+    return;
+  }
+
+  char textBuf[256];
+  snprintf(textBuf, sizeof(textBuf),
+    "🚨 [CẢNH BÁO TÉ NGÃ KHẨN CẤP - GATEWAY ESP32]!\n"
+    "Bệnh nhân vừa bị té ngã!\n"
+    "- Lực va đập SMV: %.2fg\n"
+    "- Nhịp tim hiện tại: %d BPM\n"
+    "- Thân nhiệt: %.1f*C\n"
+    "- Thiết bị: IoMT Gateway\n"
+    "Cần kiểm tra người bệnh ngay lập tức!",
+    smv, bpm, temp);
+
+  String url = "/bot" + String(TELEGRAM_BOT_TOKEN) + "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) + "&text=" + urlEncodeString(textBuf);
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: api.telegram.org\r\n" +
+               "Connection: close\r\n\r\n");
+
+  Serial.println("[TELEGRAM] >>> Da gui tin nhan canh bao te nga thanh cong! <<<");
+  client.stop();
+}
+
 // ==================== IN DỮ LIỆU SERIAL (CHO MATLAB OFFLINE & DEBUG) ====================
 void outputSerialForMatlab() {
   Serial.print("$DATA,");
@@ -503,9 +562,10 @@ void loop() {
     udp.read((char*)&incomingData, sizeof(incomingData));
     totalPacketsReceived++;
 
-    // Đếm số lần ngã (chỉ tăng khi cờ chuyển từ 0 lên 1)
+    // Đếm số lần ngã và gửi cảnh báo Telegram khẩn cấp (chỉ tăng khi cờ chuyển từ 0 lên 1)
     if (incomingData.fallDetected && !prevFallState) {
       totalFallsCount++;
+      sendTelegramFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
     }
     prevFallState = incomingData.fallDetected;
 
