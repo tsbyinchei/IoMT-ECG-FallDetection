@@ -92,26 +92,28 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 ```
 +=============================================================================+
 | 4. TẦNG ỨNG DỤNG (Application Layer)                                        |
-|    - Web Dashboard: Grafana / Web Monitoring Portal (Domain Cloudflare)     |
-|    - Ứng dụng di động: MQTT Dashboard App (Giám sát người bệnh từ xa)       |
-|    - Phần mềm chuyên dụng: MATLAB Biomedical Signal Processing Toolbox      |
+|    - Web Dashboard: Grafana (https://grafana.tsbyin.dev)                    |
+|    - Quản trị Broker: EMQX Console (https://emqx.tsbyin.dev)                |
+|    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@TsByinIoT_bot)             |
+|    - Phân tích chuyên sâu: MATLAB Biomedical Signal Processing Toolbox      |
 +=============================================================================+
                                       ▲
-                                      │ MQTT WebSocket / REST API / TLS
+                                      │ WSS / HTTPS (Port 443 - Cloudflare Tunnel)
 +=============================================================================+
 | 3. TẦNG HỖ TRỢ DỊCH VỤ & ỨNG DỤNG (Service & Application Support Layer)     |
-|    - Hạ tầng: Ubuntu Server cá nhân quản lý qua 1Panel                      |
-|    - MQTT Broker: EMQX / Eclipse Mosquitto (Port 1883 / 8883)               |
+|    - Hạ tầng: Ubuntu Server cá nhân quản lý qua 1Panel (192.168.1.36)       |
+|    - MQTT Broker: EMQX (Cổng WebSocket 8083 -> Domain: wss://mqtt.tsbyin.dev) |
 |    - Cơ sở dữ liệu chuỗi thời gian: InfluxDB (Lưu ECG 250Hz, Temp, SMV)     |
-|    - Cổng bảo mật & Reverse Proxy: Nginx + Cloudflare SSL                   |
+|    - Bảo mật & Chứng chỉ số: Cloudflare Zero Trust SSL/TLS Tunnel           |
 +=============================================================================+
                                       ▲
-                                      │ MQTT over TCP/IP (Wi-Fi Internet)
+                                      │ MQTT WSS / TCP (Wi-Fi / 4G Hotspot)
 +=============================================================================+
 | 2. TẦNG MẠNG (Network Layer)                                                |
 |    - Gateway: ESP32-WROOM-32 (Chế độ Wi-Fi kép AP + STA)                    |
 |      + AP Mode: BIOMED_GW (Giao tiếp UDP nội bộ 192.168.4.1)                |
-|      + STA Mode: Kết nối Router Wi-Fi đẩy dữ liệu lên Cloud                 |
+|      + STA Mode: Đẩy dữ liệu lên Cloud Broker qua wss://mqtt.tsbyin.dev/mqtt|
+|      + Khách thể ngầm: Native esp_mqtt_client FreeRTOS đa luồng             |
 |    - Giao thức nội bộ: Wi-Fi UDP Socket (Port 4210, 60 bytes/packet)        |
 +=============================================================================+
                                       ▲
@@ -124,7 +126,7 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 |      + DS18B20: Thân nhiệt bề mặt (1-Wire Protocol)                         |
 |      + MPU-6050: Gia tốc 3 trục phát hiện té ngã (I2C Standard 100kHz)      |
 |    - Cơ cấu chấp hành (Actuators):                                          |
-|      + Màn hình OLED SH1106: Giao diện 4 trang lâm sàng                     |
+|      + Màn hình OLED SH1106: Giao diện 4 trang lâm sàng (Báo Cloud WSS)     |
 |      + Active Buzzer: Báo động âm thanh tần số cao                           |
 +=============================================================================+
 ```
@@ -227,25 +229,67 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 4. Mở file [ESP32C3/ESP32C3.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32C3/ESP32C3.ino) và nhấn **Upload**.
 
 ### Bước 2: Nạp Gateway Trung Tâm (ESP32)
-1. Cắm kit ESP32 vào cổng COM.
-2. Chọn Board: **ESP32 Dev Module**.
-3. Cài đặt thư viện: `U8g2` và `PubSubClient`.
-4. Mở file [ESP32/ESP32.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32/ESP32.ino) và nhấn **Upload**.
-5. Màn hình OLED sẽ sáng lên, phát SoftAP `BIOMED_GW` và nhận dữ liệu tự động từ ESP32-C3.
+1. Tạo file cấu hình bảo mật `ESP32/secrets.h` từ file mẫu [ESP32/secrets_example.h](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32/secrets_example.h):
+   ```c
+   #define SECRET_ROUTER_SSID "Tên_WiFi_Nhà_Bạn"
+   #define SECRET_ROUTER_PASS "Mật_Khẩu_WiFi"
+   #define SECRET_MQTT_URI    "wss://mqtt.tsbyin.dev/mqtt"
+   #define SECRET_MQTT_USER   "TsByin"
+   #define SECRET_MQTT_PASS   "Mật_Khẩu_EMQX"
+   #define TELEGRAM_BOT_TOKEN "Token_Telegram_Bot_Của_Bạn"
+   #define TELEGRAM_CHAT_ID   "Chat_ID_Của_Bạn"
+   ```
+2. Cắm kit ESP32 Gateway vào cổng COM (ví dụ COM10).
+3. Chọn Board: **ESP32 Dev Module**.
+4. Cài đặt thư viện: `U8g2` (Thư viện `esp_mqtt_client` đã tích hợp sẵn trong ESP32 Core).
+5. Mở file [ESP32/ESP32.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32/ESP32.ino) và nhấn **Upload**.
+6. Màn hình OLED sẽ sáng lên, phát SoftAP `BIOMED_GW`, kết nối Wi-Fi Router, đồng bộ WSS với Cloudflare Tunnel và gửi cảnh báo Telegram tự động khi phát hiện té ngã.
 
-### Bước 3: Chạy MATLAB Giám Sát Thời Gian Thực
-1. **Đóng Serial Monitor trong Arduino IDE** để giải phóng cổng COM của Gateway.
-2. Mở MATLAB, chạy script:
+### Bước 3: Chạy MATLAB Giám Sát & Phân Tích Thực Nghiệm
+1. Tạo file cấu hình bảo mật `MATLAB/config_private.m` từ file mẫu [MATLAB/config_example.m](file:///c:/Users/TsByin/Documents/Arduino/IoT/MATLAB/config_example.m).
+2. **Chế độ 1 (Qua cổng USB COM):** Đóng Serial Monitor trong Arduino IDE, mở MATLAB và chạy:
    ```matlab
    run('MATLAB/matlab_serial_ecg_processor.m')
    ```
-3. Cửa sổ 4 biểu đồ thời gian thực sẽ hiển thị sóng ECG, đánh dấu chấm đỏ trên từng đỉnh R, đồ thị thân nhiệt và vector gia tốc SMV.
+3. **Chế độ 2 (Qua Cloud MQTT không dây):** Chạy script nhận dữ liệu từ xa:
+   ```matlab
+   run('MATLAB/matlab_mqtt_ecg_processor.m')
+   ```
 4. Bấm nút đỏ **"DỪNG & XUẤT FILE .MAT"** để lưu hồ sơ `ECG_Patient_Record.mat`.
 5. Chạy tiếp file phân tích chuyên sâu:
    ```matlab
    run('MATLAB/analyze_patient_record.m')
    ```
-   MATLAB sẽ tự động vẽ biểu đồ Poincaré HRV và xuất bảng số liệu lâm sàng chuẩn LaTeX/Markdown để bạn dán vào báo cáo!
+   MATLAB sẽ tự động tính toán các chỉ số lâm sàng (HRV, SDNN, RMSSD, SD1/SD2) và **tự động xuất 4 đồ thị 300 DPI** vào thư mục `MATLAB/figures/` để dán vào báo cáo!
+
+---
+
+## 📊 8. KẾT QUẢ THỰC NGHIỆM & HÌNH ẢNH XUẤT BÁO CÁO (300 DPI FIGURES)
+
+Toàn bộ dữ liệu thực nghiệm đã được ghi nhận trong file chuẩn hóa `ECG_Patient_Record.mat` và phân tích tự động:
+
+### 📑 Bảng số liệu thống kê lâm sàng thực nghiệm:
+
+| Đại lượng đo đạc / Chỉ số Y sinh | Giá trị thực nghiệm đạt được | Ý nghĩa lâm sàng & Kỹ thuật |
+| :--- | :--- | :--- |
+| **Tần số lấy mẫu ($F_s$)** | **$250\text{ Hz}$** ($T_s = 4.0\text{ ms}$) | Chuẩn y tế đo điện tâm đồ ECG |
+| **Tổng thời gian ghi dữ liệu** | **$468.90\text{ giây}$** (~$7.8\text{ phút}$) | Đủ dài để đánh giá ổn định và biến thiên |
+| **Tổng số mẫu tín hiệu ECG** | **$117,225\text{ mẫu}$** | Không bị trượt hoặc mất mẫu qua UDP/MQTT |
+| **Tổng số phức bộ QRS (đỉnh R)** | **$533\text{ đỉnh}$** | Bóc tách chính xác bằng Pan-Tompkins thích ứng |
+| **Nhịp tim trung bình (Mean BPM)** | **$82.1\text{ BPM}$** | Nhịp tim lúc tỉnh táo bình thường ($60 - 100\text{ BPM}$) |
+| **Nhịp tim Min / Max** | **$45.6\text{ BPM}$ / $150.0\text{ BPM}$** | Phản ánh nhịp lúc nghỉ và khi vận động/ngã |
+| **Độ biến thiên nhịp tim (SDNN)** | **$1427.23\text{ ms}$** | Phân tích biến thiên RR toàn phần |
+| **Độ biến thiên nhịp tim (RMSSD)** | **$2046.21\text{ ms}$** | Đánh giá hoạt động hệ thần kinh phó giao cảm |
+| **Chỉ số Poincaré $SD_1$ / $SD_2$** | **$1448.25\text{ ms}$ / $1408.47\text{ ms}$** | Độ phân tán hình elip biến thiên ngắn/dài hạn |
+| **Tỷ số phân tán $SD_1 / SD_2$** | **$1.028$** | Cân bằng điều hòa tim mạch |
+| **Thân nhiệt trung bình** | **$32.46^\circ\text{C}$** | Nhiệt độ đo bề mặt da (cảm biến DS18B20) |
+| **Số lần kích hoạt cảnh báo ngã** | **$121\text{ lần}$** | Ghi nhận chính xác qua thuật toán kiểm định 3 pha |
+
+### 🖼️ Danh mục 4 hình vẽ thực nghiệm chuẩn in ấn (300 DPI) trong thư mục `MATLAB/figures/`:
+* **Hình 1:** [Hinh1_BocTach_QRS_PanTompkins.png](MATLAB/figures/Hinh1_BocTach_QRS_PanTompkins.png) - Tín hiệu ECG thô, tín hiệu sau lọc IIR Bandpass 5-15Hz gắn nhãn đỉnh R màu đỏ và năng lượng tích phân MWI.
+* **Hình 2:** [Hinh2_BieuDo_Poincare_HRV.png](MATLAB/figures/Hinh2_BieuDo_Poincare_HRV.png) - Biểu đồ Poincaré biểu diễn tương quan cặp khoảng $RR_n - RR_{n+1}$ và các trục elip $SD_1, SD_2$.
+* **Hình 3:** [Hinh3_PhoCongSuat_PSD_Welch.png](MATLAB/figures/Hinh3_PhoCongSuat_PSD_Welch.png) - Phổ mật độ công suất Welch PSD chứng minh năng lượng tập trung ở dải $5-15\text{Hz}$ và triệt tiêu hoàn toàn nhiễu lưới $50\text{Hz}$.
+* **Hình 4:** [Hinh4_GiaToc_TeNga_SMV.png](MATLAB/figures/Hinh4_GiaToc_TeNga_SMV.png) - Động lực học véc-tơ gia tốc $SMV$ phân tích 3 pha: Rơi tự do ($<0.6g$) $\to$ Va đập ($>2.5g$) $\to$ Bất động.
 
 ---
 

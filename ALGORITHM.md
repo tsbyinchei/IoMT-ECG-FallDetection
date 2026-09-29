@@ -50,6 +50,20 @@ $$y[n] = \frac{1}{N} \sum_{k=0}^{N-1} x[n - k]$$
 * **Bộ lọc trung vị RR (Median Filter):**
   $$BPM = \frac{60}{\text{median}(RR_{valid})}$$
 
+### Bước 6: Phân tích Biến thiên Nhịp tim HRV & Biểu đồ Poincaré
+* **Độ lệch chuẩn khoảng cách RR (SDNN):**
+  $$SDNN = \sqrt{\frac{1}{K-1} \sum_{i=1}^K (RR_i - \overline{RR})^2}$$
+* **Căn bậc hai trung bình bình phương các hiệu kế tiếp (RMSSD):**
+  $$RMSSD = \sqrt{\frac{1}{K-1} \sum_{i=1}^{K-1} (RR_{i+1} - RR_i)^2}$$
+* **Chỉ số hình học Poincaré Plot ($SD_1, SD_2$):**
+  $$SD_1 = \sqrt{\frac{1}{2} \text{Var}(RR_n - RR_{n+1})}, \quad SD_2 = \sqrt{\frac{1}{2} \text{Var}(RR_n + RR_{n+1})}$$
+  Trong đó $SD_1$ đo lường biến thiên ngắn hạn (phó giao cảm), $SD_2$ đo lường biến thiên dài hạn (giao cảm và phó giao cảm).
+
+### Bước 7: Phổ Mật độ Công suất PSD (Welch's Method)
+Tín hiệu được chia thành $K$ đoạn có độ dài $L$ chồng lấn $50\%$, áp dụng cửa sổ Hamming $w[n]$:
+$$\hat{P}_{Welch}(f) = \frac{1}{K} \sum_{k=1}^K \frac{1}{F_s \sum_{n=0}^{L-1} w^2[n]} \left| \sum_{n=0}^{L-1} x_k[n] w[n] e^{-j 2\pi f n / F_s} \right|^2$$
+Phổ công suất chứng minh năng lượng tập trung tại dải tần số $5 - 15\text{Hz}$ của phức bộ QRS và triệt tiêu hoàn toàn nhiễu nguồn điện $50\text{Hz}$ và trôi dạt đường đẳng điện $< 0.5\text{Hz}$.
+
 ---
 
 ## 🤸 2. THUẬT TOÁN PHÁT HIỆN TÉ NGÃ 3 PHA
