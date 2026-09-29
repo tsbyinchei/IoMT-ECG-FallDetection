@@ -6,14 +6,14 @@
 #define SECRET_ROUTER_PASS "YOUR_WIFI_PASSWORD"
 
 // Mẫu cấu hình MQTT Broker qua Cloudflare Tunnel (Toàn cầu)
-#define SECRET_MQTT_URI    "wss://mqtt.tsbyin.dev/mqtt"
-#define SECRET_MQTT_SERVER "mqtt.tsbyin.dev"
-#define SECRET_MQTT_PORT   443
-#define SECRET_MQTT_USER   ""
-#define SECRET_MQTT_PASS   ""
+#define SECRET_MQTT_URI "wss://mqtt.your_domain.com/mqtt"
+#define SECRET_MQTT_SERVER "mqtt.your_domain.com"
+#define SECRET_MQTT_PORT 443
+#define SECRET_MQTT_USER ""
+#define SECRET_MQTT_PASS ""
 
 // Mẫu cấu hình Telegram Bot (Điền Token và Chat ID của bạn vào file secrets.h)
 #define TELEGRAM_BOT_TOKEN "YOUR_TELEGRAM_BOT_TOKEN"
-#define TELEGRAM_CHAT_ID   "YOUR_TELEGRAM_CHAT_ID"
+#define TELEGRAM_CHAT_ID "YOUR_TELEGRAM_CHAT_ID"
 
 #endif // SECRETS_EXAMPLE_H
