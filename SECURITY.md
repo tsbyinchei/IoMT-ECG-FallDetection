@@ -34,4 +34,5 @@ Nếu bạn phát hiện bất kỳ lỗ hổng bảo mật nào về phần m�
 * Hãy liên hệ trực tiếp với tác giả:
   * **Tác giả:** Nguyễn Văn Tuấn Sỹ
   * **GitHub:** [@tsbyinchei](https://github.com/tsbyinchei)
+  * **Email:** [contact@tsbyin.dev](mailto:contact@tsbyin.dev) • [tsbyinchei@gmail.com](mailto:tsbyinchei@gmail.com)
 * Chúng tôi sẽ tiếp nhận, kiểm tra và phát hành bản vá lỗi trong thời gian sớm nhất.
