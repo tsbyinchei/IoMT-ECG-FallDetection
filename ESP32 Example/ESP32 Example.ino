@@ -9,7 +9,7 @@
 // Cấu hình Telegram Bot bảo mật (ưu tiên đọc secrets.h)
 #if __has_include("secrets.h")
 #include "secrets.h"
-#else
+#elif __has_include("secrets_example.h")
 #include "secrets_example.h"
 #endif
 
@@ -32,10 +32,10 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE,
 
 // 1. Wi-Fi Router kết nối ra Internet / Mạng nội bộ tới Ubuntu Server
 #ifndef SECRET_ROUTER_SSID
-#define SECRET_ROUTER_SSID "IoT"
+#define SECRET_ROUTER_SSID "YOUR_WIFI_SSID"
 #endif
 #ifndef SECRET_ROUTER_PASS
-#define SECRET_ROUTER_PASS "1234567888"
+#define SECRET_ROUTER_PASS "YOUR_WIFI_PASSWORD"
 #endif
 const char *ROUTER_SSID = SECRET_ROUTER_SSID;
 const char *ROUTER_PASS = SECRET_ROUTER_PASS;
@@ -46,13 +46,13 @@ const unsigned int UDP_PORT = 4210;
 
 // 3. MQTT Broker qua Cloudflare Tunnel (Toàn cầu) hoặc IP LAN
 #ifndef SECRET_MQTT_URI
-#define SECRET_MQTT_URI "wss://mqtt.tsbyin.dev/mqtt"
+#define SECRET_MQTT_URI "wss://mqtt.yourdomain.com/mqtt"
 #endif
 #ifndef SECRET_MQTT_USER
-#define SECRET_MQTT_USER ""
+#define SECRET_MQTT_USER "YOUR_MQTT_USERNAME"
 #endif
 #ifndef SECRET_MQTT_PASS
-#define SECRET_MQTT_PASS ""
+#define SECRET_MQTT_PASS "YOUR_MQTT_PASSWORD"
 #endif
 
 const char *MQTT_URI = SECRET_MQTT_URI;
@@ -64,6 +64,14 @@ const char *TOPIC_DATA =
     "biomed/patient/data"; // Dữ liệu đo đạc (ECG, Temp, SMV, BPM)
 const char *TOPIC_ALERT =
     "biomed/patient/alert"; // Cảnh báo khẩn (Fall, LeadOff)
+
+// 4. Telegram Bot API
+#ifndef TELEGRAM_BOT_TOKEN
+#define TELEGRAM_BOT_TOKEN "YOUR_TELEGRAM_BOT_TOKEN"
+#endif
+#ifndef TELEGRAM_CHAT_ID
+#define TELEGRAM_CHAT_ID "YOUR_TELEGRAM_CHAT_ID"
+#endif
 
 // ==================== ĐỊNH NGHĨA GÓI TIN ĐỒNG BỘ TỪ ESP32-C3
 // ====================
@@ -572,31 +580,34 @@ void outputSerialForMatlab() {
 // ==================== SETUP ====================
 void setup() {
   Serial.begin(115200);
+  delay(500);
 
-  // Cấu hình chân còi chíp Buzzer và nút nhấn chuyển trang BOOT (GPIO 0)
+  Serial.println("\n==========================================");
+  Serial.println("  ESP32 BIOMEDICAL GATEWAY DANG KHOI DONG");
+  Serial.println("==========================================");
+
   pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, LOW);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+  digitalWrite(BUZZER_PIN, LOW);
 
-  // Khởi tạo màn hình OLED SH1106
-  Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
+  // Khởi động màn hình OLED SH1106
   u8g2.begin();
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_7x14B_tf);
-  u8g2.drawStr(15, 25, "BIOMED GATEWAY");
+  u8g2.drawStr(10, 25, "BIOMED GATEWAY");
   u8g2.setFont(u8g2_font_6x10_tf);
   u8g2.drawStr(10, 45, "Khoi dong he thong...");
   u8g2.sendBuffer();
 
-  // Khởi tạo bộ đệm đồ thị sóng ở đường đẳng điện giữa màn hình (y = 36)
+  // Khởi tạo bộ đệm đồ thị sóng ECG
   for (int i = 0; i < WAVE_WIDTH; i++) {
     waveBuffer[i] = 36;
   }
 
-  // Cấu hình chế độ Wi-Fi
+  // Cấu hình Wi-Fi kép (WIFI_AP_STA): vừa thu UDP vừa đẩy Internet
 #if ENABLE_MQTT
   WiFi.mode(WIFI_AP_STA);
-  Serial.printf("\n[WiFi] Dang ket noi Router: %s", ROUTER_SSID);
+  Serial.printf("[WiFi] Dang ket noi vao Router: %s...\n", ROUTER_SSID);
   WiFi.begin(ROUTER_SSID, ROUTER_PASS);
   int retry = 0;
   while (WiFi.status() != WL_CONNECTED && retry < 15) {
