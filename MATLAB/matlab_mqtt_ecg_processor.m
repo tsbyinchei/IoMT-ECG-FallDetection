@@ -11,11 +11,29 @@
 clear; clc; close all;
 
 %% 1. CẤU HÌNH THÔNG SỐ MQTT & MẠNG
+% Tự động nạp cấu hình bảo mật (Token Telegram & IP Broker)
+if exist('config_private.m', 'file') == 2
+    run('config_private.m');
+elseif exist('config_example.m', 'file') == 2
+    run('config_example.m');
+end
+
 % THAY ĐỔI ĐỊA CHỈ IP HOẶC TÊN MIỀN CỦA UBUNTU SERVER 1PANEL TẠI ĐÂY:
-brokerAddress = "tcp://192.168.1.100"; % Thay bằng IP máy chủ 1Panel của bạn
-brokerPort    = 1883;
+if exist('mqtt_broker_ip', 'var') && ~isempty(mqtt_broker_ip)
+    brokerAddress = "tcp://" + string(mqtt_broker_ip);
+else
+    brokerAddress = "tcp://192.168.1.36"; % IP Ubuntu Server 1Panel
+end
+
+if exist('mqtt_broker_port', 'var') && ~isempty(mqtt_broker_port)
+    brokerPort = mqtt_broker_port;
+else
+    brokerPort = 1883;
+end
+
 clientTopic   = "biomed/patient/data";
 clientID      = "MATLAB_Biomed_Client_" + string(randi(10000));
+last_telegram_fall_time = -100;
 
 % Thông số y sinh
 Fs = 250;               % Tần số lấy mẫu (Hz)
@@ -178,10 +196,31 @@ while isvalid(fig) && getappdata(fig, 'is_running')
         time_new = current_time_sec + (1:N_new) * dt;
         current_time_sec = time_new(end);
 
-        % Ghi nhận cảnh báo ngã
-        if new_fall == 1 || new_smv >= FALL_THRESHOLD
+        % Ghi nhận cảnh báo ngã & gửi tin nhắn Telegram khẩn cấp
+        if (new_fall == 1 || new_smv >= FALL_THRESHOLD) && (current_time_sec - last_telegram_fall_time > 8)
+            last_telegram_fall_time = current_time_sec;
             fall_timestamps(end+1) = current_time_sec; %#ok<AGROW>
             fprintf('[CẢNH BÁO TÉ NGÃ] Thời điểm: %.2fs | SMV = %.2fg\n', current_time_sec, new_smv);
+            
+            % Tự động gửi tin nhắn Telegram khẩn cấp tới điện thoại qua bot
+            if exist('telegram_bot_token', 'var') && ~contains(telegram_bot_token, 'YOUR_')
+                try
+                    msg_text = sprintf(['🚨 [CẢNH BÁO TÉ NGÃ - IoMT MQTT CLOUD]\n' ...
+                                        'Thời điểm: %.1fs\n' ...
+                                        'Lực va đập SMV: %.2fg\n' ...
+                                        'Nhịp tim: %.0f BPM\n' ...
+                                        'Thân nhiệt: %.1f°C\n' ...
+                                        'Kênh truyền: MQTT (192.168.1.36)\n' ...
+                                        '👉 Cần kiểm tra người bệnh ngay!'], ...
+                                       current_time_sec, new_smv, current_bpm, new_temp);
+                    api_url = sprintf('https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s', ...
+                                      telegram_bot_token, telegram_chat_id, urlencode(msg_text));
+                    webread(api_url);
+                    fprintf('[TELEGRAM] >>> Đã gửi tin nhắn cảnh báo khẩn cấp tới điện thoại thành công! <<<\n');
+                catch ME
+                    fprintf('[TELEGRAM] Lỗi gửi tin nhắn: %s\n', ME.message);
+                end
+            end
         end
 
         % ==================== THUẬT TOÁN PAN-TOMPKINS ====================

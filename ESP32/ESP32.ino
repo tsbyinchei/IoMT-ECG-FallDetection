@@ -23,22 +23,41 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* c
 
 // ==================== CẤU HÌNH CHẾ ĐỘ HOẠT ĐỘNG ====================
 // Đặt 'false' khi test Local tại bàn (không cần kết nối máy chủ 1Panel, tránh báo lỗi rc=-2)
-// Đặt 'true' khi chạy chính thức đẩy dữ liệu lên Ubuntu Server (1Panel)
-#define ENABLE_MQTT     false 
+// Đặt 'true' khi chạy chính thức đẩy dữ liệu lên Ubuntu Server (1Panel: EMQX Broker)
+#define ENABLE_MQTT     true 
 
 // 1. Wi-Fi Router kết nối ra Internet / Mạng nội bộ tới Ubuntu Server
-const char* ROUTER_SSID = "IoT";
-const char* ROUTER_PASS = "1234567888";
+#ifndef SECRET_ROUTER_SSID
+  #define SECRET_ROUTER_SSID "IoT"
+#endif
+#ifndef SECRET_ROUTER_PASS
+  #define SECRET_ROUTER_PASS "1234567888"
+#endif
+const char* ROUTER_SSID = SECRET_ROUTER_SSID;
+const char* ROUTER_PASS = SECRET_ROUTER_PASS;
 
 // 2. Mạng SoftAP phát riêng cho Node cảm biến ESP32-C3
 const char* AP_SSID = "BIOMED_GW";
 const unsigned int UDP_PORT = 4210;
 
 // 3. MQTT Broker trên Ubuntu Server (1Panel: EMQX / Eclipse Mosquitto)
-const char* MQTT_SERVER     = "192.168.1.36";  // IP Ubuntu Server của bạn
-const int   MQTT_PORT       = 1883;
-const char* MQTT_USER       = "";               // Điền nếu broker yêu cầu xác thực
-const char* MQTT_PASS       = "";               // Điền mật khẩu nếu có
+#ifndef SECRET_MQTT_SERVER
+  #define SECRET_MQTT_SERVER "192.168.1.36"
+#endif
+#ifndef SECRET_MQTT_PORT
+  #define SECRET_MQTT_PORT 1883
+#endif
+#ifndef SECRET_MQTT_USER
+  #define SECRET_MQTT_USER ""
+#endif
+#ifndef SECRET_MQTT_PASS
+  #define SECRET_MQTT_PASS ""
+#endif
+
+const char* MQTT_SERVER     = SECRET_MQTT_SERVER;  // IP Ubuntu Server (192.168.1.36)
+const int   MQTT_PORT       = SECRET_MQTT_PORT;
+const char* MQTT_USER       = SECRET_MQTT_USER;    // Điền nếu broker yêu cầu xác thực
+const char* MQTT_PASS       = SECRET_MQTT_PASS;    // Điền mật khẩu nếu có
 const char* MQTT_CLIENT_ID  = "ESP32_Biomed_Gateway";
 
 const char* TOPIC_DATA      = "biomed/patient/data";   // Dữ liệu đo đạc (ECG, Temp, SMV, BPM)
