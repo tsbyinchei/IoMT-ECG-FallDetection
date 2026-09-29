@@ -83,3 +83,10 @@ $$SMV[n] = \sqrt{a_x[n]^2 + a_y[n]^2 + a_z[n]^2}$$
    * *Đổi tư thế:* Góc nghiêng thân mình so với phương thẳng đứng trước khi ngã lệch $> 60^\circ$:
      $$\theta_{tilt} = \arccos\left( \frac{\mathbf{g}_{pre} \cdot \mathbf{g}_{post}}{\|\mathbf{g}_{pre}\| \|\mathbf{g}_{post}\|} \right) > 60^\circ$$
    * Nhờ đó loại bỏ hoàn toàn các trường hợp ngồi nhanh hoặc nhảy lên đệm.
+
+---
+
+## 📚 TÀI LIỆU THAM KHẢO (REFERENCES)
+1. **Pan, J., & Tompkins, W. J. (1985).** A real-time QRS detection algorithm. *IEEE Transactions on Biomedical Engineering*, (3), 230-236.
+2. **Circuit Digest (2024).** IoT Elderly Fall Detection System with WhatsApp Alert.  
+   Mã nguồn mở: [https://github.com/Circuit-Digest/Elderly-Fall-Detection-System](https://github.com/Circuit-Digest/Elderly-Fall-Detection-System) (Cơ chế tính góc nghiêng `Tilt Angle` và kiểm tra bất động qua `Gyroscope`).

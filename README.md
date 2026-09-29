@@ -256,3 +256,14 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 * **Đề tài:** Hệ thống IoMT Đeo người Giám sát Điện tim & Cảnh báo Té ngã Đa tầng.
 * **Môn học:** Thiết kế Hệ thống IoT & Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP).
 * **Giấy phép:** Toàn bộ mã nguồn và tài liệu được phát hành theo giấy phép mã nguồn mở **[MIT License](LICENSE)** (Copyright © 2026 Nguyễn Văn Tuấn Sỹ).
+
+---
+
+## 📚 TÀI LIỆU THAM KHẢO & LỜI CẢM ƠN (ACKNOWLEDGEMENTS & REFERENCES)
+1. **Thuật toán Pan-Tompkins QRS Detection:**
+   * J. Pan and W. J. Tompkins, *"A Real-Time QRS Detection Algorithm,"* IEEE Transactions on Biomedical Engineering, vol. BME-32, no. 3, pp. 230-236, 1985.
+2. **Thuật toán Phát hiện Té ngã & Góc nghiêng MPU-6050:**
+   * Tham khảo kiến trúc kiểm định động học té ngã (Góc nghiêng Tilt Angle và độ bất động sau ngã Gyroscope) từ dự án nguồn mở: [Circuit-Digest/Elderly-Fall-Detection-System](https://github.com/Circuit-Digest/Elderly-Fall-Detection-System).
+3. **Tiêu chuẩn Kiến trúc Mạng IoMT:**
+   * ITU-T Recommendation Y.2060, *"Overview of the Internet of Things,"* International Telecommunication Union.
+   * ANSI/AAMI EC13:2002, *"Cardiac monitors, heart rate meters, and alarms,"* Association for the Advancement of Medical Instrumentation.
