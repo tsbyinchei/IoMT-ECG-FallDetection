@@ -23,8 +23,8 @@
 | 🛡️ **SECURITY.md** | **Chính sách An toàn** | Khuyến cáo an toàn điện học y sinh IEC 60601-1, cách ly nguồn pin và bảo mật dữ liệu MQTT. | 👉 **[Xem tài liệu SECURITY.md](SECURITY.md)** |
 | 🤝 **CONTRIBUTING.md** | **Hướng dẫn Đóng góp** | Quy chuẩn đóng gói code Arduino, tiêu chuẩn xử lý tín hiệu MATLAB và quy trình Pull Request. | 👉 **[Xem tài liệu CONTRIBUTING.md](CONTRIBUTING.md)** |
 | 📜 **CODE_OF_CONDUCT.md** | **Quy tắc Ứng xử** | Bộ quy tắc ứng xử chuẩn Contributor Covenant v2.1 cho cộng đồng nghiên cứu khoa học. | 👉 **[Xem tài liệu CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** |
-| 💻 **ESP32C3.ino** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 60-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3/ESP32C3.ino)** |
-| 📟 **ESP32.ino** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32/ESP32.ino)** |
+| 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 60-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
+| 📟 **ESP32 Example** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32%20Example/ESP32%20Example.ino)** |
 | 📊 **MATLAB Scripts** | **Trạm Xử lý Tín hiệu** | Pan-Tompkins thời gian thực với chấm đỏ đỉnh R, bộ lọc trung vị Median, xuất file .MAT và phân tích HRV. | 👉 **[Xem thư mục MATLAB](MATLAB/)** |
 
 ---
@@ -226,10 +226,10 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 1. Mở Arduino IDE, cắm ESP32-C3 vào cổng COM.
 2. Chọn Board: **ESP32C3 Dev Module** (hoặc ESP32-C3 SuperMini).
 3. Cấu hình Tools: `USB CDC On Boot: Enabled`.
-4. Mở file [ESP32C3/ESP32C3.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32C3/ESP32C3.ino) và nhấn **Upload**.
+4. Mở file [ESP32C3 Example/ESP32C3 Example.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32C3%20Example/ESP32C3%20Example.ino) (hoặc thư mục nạp trực tiếp `ESP32C3/ESP32C3.ino` trên máy phát triển) và nhấn **Upload**.
 
 ### Bước 2: Nạp Gateway Trung Tâm (ESP32)
-1. Tạo file cấu hình bảo mật `ESP32/secrets.h` từ file mẫu [ESP32/secrets_example.h](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32/secrets_example.h):
+1. Mở file [ESP32 Example/ESP32 Example.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32%20Example/ESP32%20Example.ino) (hoặc cấu hình `secrets.h` từ file mẫu [ESP32 Example/secrets_example.h](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32%20Example/secrets_example.h)):
    ```c
    #define SECRET_ROUTER_SSID "Tên_WiFi_Nhà_Bạn"
    #define SECRET_ROUTER_PASS "Mật_Khẩu_WiFi"
@@ -242,7 +242,7 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 2. Cắm kit ESP32 Gateway vào cổng COM (ví dụ COM10).
 3. Chọn Board: **ESP32 Dev Module**.
 4. Cài đặt thư viện: `U8g2` (Thư viện `esp_mqtt_client` đã tích hợp sẵn trong ESP32 Core).
-5. Mở file [ESP32/ESP32.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32/ESP32.ino) và nhấn **Upload**.
+5. Nhấn **Upload** để nạp code vào Gateway (Thư mục nạp đầy đủ thông tin chuẩn `ESP32/` đã được `.gitignore` bảo vệ độc lập).
 6. Màn hình OLED sẽ sáng lên, phát SoftAP `BIOMED_GW`, kết nối Wi-Fi Router, đồng bộ WSS với Cloudflare Tunnel và gửi cảnh báo Telegram tự động khi phát hiện té ngã.
 
 ### Bước 3: Chạy MATLAB Giám Sát & Phân Tích Thực Nghiệm
