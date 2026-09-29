@@ -5,9 +5,10 @@
 #define SECRET_ROUTER_SSID "YOUR_WIFI_SSID"
 #define SECRET_ROUTER_PASS "YOUR_WIFI_PASSWORD"
 
-// Mẫu cấu hình MQTT Broker (1Panel Ubuntu Server: EMQX / Mosquitto)
-#define SECRET_MQTT_SERVER "192.168.1.36"
-#define SECRET_MQTT_PORT   1883
+// Mẫu cấu hình MQTT Broker qua Cloudflare Tunnel (Toàn cầu)
+#define SECRET_MQTT_URI    "wss://mqtt.tsbyin.dev/mqtt"
+#define SECRET_MQTT_SERVER "mqtt.tsbyin.dev"
+#define SECRET_MQTT_PORT   443
 #define SECRET_MQTT_USER   ""
 #define SECRET_MQTT_PASS   ""
 
