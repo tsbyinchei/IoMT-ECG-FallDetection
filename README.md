@@ -9,6 +9,21 @@
 
 ---
 
+## 📑 HỆ THỐNG TÀI LIỆU DỰ ÁN (DOCUMENTATION DIRECTORY)
+
+> 💡 **Khám phá tài liệu chuyên sâu:** Bấm vào các liên kết bên dưới để xem trực tiếp các tài liệu kỹ thuật, thuật toán và hướng dẫn làm báo cáo của dự án:
+
+| Tài liệu | Phân loại | Mô tả nội dung chính | Liên kết trực tiếp |
+| :--- | :--- | :--- | :--- |
+| 📋 **PEC.md** | **Đặc tả Kỹ thuật & Lâm sàng** | Tiêu chuẩn ITU-T Y.2060, ANSI/AAMI EC13, bảng thông số ADC/Fs, giao thức UDP/MQTT, dự toán nguồn pin Li-Po. | 👉 **[Xem tài liệu PEC.md](PEC.md)** |
+| 📐 **ALGORITHM.md** | **Cơ sở Toán học & Thuật toán** | Chi tiết giải thuật Pan-Tompkins 1985 (hàm Z, vi phân, bình phương, MWI) & Động lực học kiểm định té ngã 3 pha. | 👉 **[Xem tài liệu ALGORITHM.md](ALGORITHM.md)** |
+| 📖 **REPORT_GUIDE.md** | **Khung Báo cáo Môn học** | Khung sườn 6 chương chuẩn hóa cho bài báo cáo 25–30 trang môn Thiết kế IoT & Xử lý tín hiệu Y sinh (BDSP). | 👉 **[Xem tài liệu REPORT_GUIDE.md](REPORT_GUIDE.md)** |
+| 💻 **ESP32C3.ino** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 60-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3/ESP32C3.ino)** |
+| 📟 **ESP32.ino** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32/ESP32.ino)** |
+| 📊 **MATLAB Scripts** | **Trạm Xử lý Tín hiệu** | Pan-Tompkins thời gian thực với chấm đỏ đỉnh R, bộ lọc trung vị Median, xuất file .MAT và phân tích HRV. | 👉 **[Xem thư mục MATLAB](MATLAB/)** |
+
+---
+
 ## 📌 1. TỔNG QUAN HỆ THỐNG (SYSTEM OVERVIEW)
 
 Hệ thống được thiết kế theo chuẩn kiến trúc **Internet of Medical Things (IoMT)** và **Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP)**, phục vụ theo dõi sức khỏe liên tục cho bệnh nhân tim mạch và người cao tuổi có nguy cơ đột quỵ / té ngã:
