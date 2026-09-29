@@ -246,7 +246,9 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 
 ---
 
-## 👥 THÀNH VIÊN VÀ BẢN QUYỀN
-* **Đề tài:** Hệ thống IoMT Giám sát Điện tim & Cảnh báo Té ngã Đa tầng.
+## 👥 TÁC GIẢ VÀ BẢN QUYỀN (AUTHOR & COPYRIGHT)
+* **Tác giả / Nghiên cứu phát triển:** **Nguyễn Văn Tuấn Sỹ**
+* **GitHub:** [@tsbyinchei](https://github.com/tsbyinchei)
+* **Đề tài:** Hệ thống IoMT Đeo người Giám sát Điện tim & Cảnh báo Té ngã Đa tầng.
 * **Môn học:** Thiết kế Hệ thống IoT & Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP).
-* **Mã nguồn mở theo giấy phép MIT License.**
+* **Giấy phép:** Toàn bộ mã nguồn và tài liệu được phát hành theo giấy phép mã nguồn mở **[MIT License](LICENSE)** (Copyright © 2026 Nguyễn Văn Tuấn Sỹ).
