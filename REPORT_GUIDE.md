@@ -102,3 +102,4 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
 1. J. Pan and W. J. Tompkins, "A Real-Time QRS Detection Algorithm," *IEEE Transactions on Biomedical Engineering*, vol. BME-32, no. 3, pp. 230-236, 1985.
 2. ITU-T Recommendation Y.2060, "Overview of the Internet of things," International Telecommunication Union, 2012.
 3. ANSI/AAMI EC13:2002, "Cardiac monitors, heart rate meters, and alarms," Association for the Advancement of Medical Instrumentation, 2002.
+4. Circuit Digest, "IoT Elderly Fall Detection System with WhatsApp Alert," GitHub Repository: https://github.com/Circuit-Digest/Elderly-Fall-Detection-System, 2024.

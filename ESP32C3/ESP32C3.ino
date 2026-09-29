@@ -133,6 +133,7 @@ bool initMPU6050() {
 }
 
 // ── Thuật toán Kiểm định Té ngã 3 pha (3-Phase Fall Dynamic Verification) ──
+// Tham khảo mô hình kiểm định Tilt Angle & Gyroscope từ: https://github.com/Circuit-Digest/Elderly-Fall-Detection-System
 bool candidateFall = false;
 unsigned long candidateFallTime = 0;
 float candidatePeakSMV = 1.0f;
