@@ -17,6 +17,14 @@ clear; clc; close all;
 comPort = "COM10";  
 baudRate = 115200;
 
+% Tự động nạp cấu hình Telegram Bot bảo mật
+if exist('config_private.m', 'file') == 2
+    run('config_private.m');
+elseif exist('config_example.m', 'file') == 2
+    run('config_example.m');
+end
+last_telegram_fall_time = -100;
+
 availablePorts = serialportlist("available");
 disp('Danh sách cổng COM đang rảnh trên máy:');
 disp(availablePorts);
@@ -164,9 +172,30 @@ while isvalid(fig) && getappdata(fig, 'is_running')
     time_new = current_time_sec + (1:N_new) * dt;
     current_time_sec = time_new(end);
 
-    if new_fall == 1 || new_smv >= FALL_THRESHOLD
+    if (new_fall == 1 || new_smv >= FALL_THRESHOLD) && (current_time_sec - last_telegram_fall_time > 8)
+        last_telegram_fall_time = current_time_sec;
         fall_timestamps(end+1) = current_time_sec; %#ok<AGROW>
         fprintf('[CẢNH BÁO TÉ NGÃ] Thời điểm: %.2fs | SMV = %.2fg\n', current_time_sec, new_smv);
+        
+        % Tự động gửi tin nhắn Telegram khẩn cấp tới điện thoại qua bot
+        if exist('telegram_bot_token', 'var') && ~contains(telegram_bot_token, 'YOUR_')
+            try
+                msg_text = sprintf(['🚨 [CẢNH BÁO TÉ NGÃ - IoMT SYSTEM]\n' ...
+                                    'Thời điểm: %.1fs\n' ...
+                                    'Lực va đập SMV: %.2fg\n' ...
+                                    'Nhịp tim: %.0f BPM\n' ...
+                                    'Thân nhiệt: %.1f°C\n' ...
+                                    'Tình trạng: Bất động sau ngã\n' ...
+                                    '👉 Cần kiểm tra người bệnh ngay!'], ...
+                                   current_time_sec, new_smv, current_bpm, new_temp);
+                api_url = sprintf('https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s', ...
+                                  telegram_bot_token, telegram_chat_id, urlencode(msg_text));
+                webread(api_url);
+                fprintf('[TELEGRAM] >>> Đã gửi tin nhắn cảnh báo khẩn cấp tới điện thoại thành công! <<<\n');
+            catch ME
+                fprintf('[TELEGRAM] Lỗi gửi tin nhắn: %s\n', ME.message);
+            end
+        end
     end
 
     % Pan-Tompkins với bộ nhớ trạng thái z_bp liên tục không rung nhiễu

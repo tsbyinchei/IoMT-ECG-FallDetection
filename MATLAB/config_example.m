@@ -1,0 +1,3 @@
+% Mẫu cấu hình Telegram Bot cho MATLAB
+telegram_bot_token = 'YOUR_TELEGRAM_BOT_TOKEN';
+telegram_chat_id   = 'YOUR_TELEGRAM_CHAT_ID';

@@ -132,27 +132,76 @@ bool initMPU6050() {
   return false;
 }
 
+// ── Thuật toán Kiểm định Té ngã 3 pha (3-Phase Fall Dynamic Verification) ──
+bool candidateFall = false;
+unsigned long candidateFallTime = 0;
+float candidatePeakSMV = 1.0f;
+float lastTiltAngle = 0.0f;
+float lastTotalGyro = 0.0f;
+
 void sampleMPU6050() {
   if (!mpuFound) return;
 
   Wire.beginTransmission(mpuAddr);
   Wire.write(0x3B);
-  if (Wire.endTransmission(true) != 0) return;
+  if (Wire.endTransmission(false) != 0 && Wire.endTransmission(true) != 0) return;
 
-  if (Wire.requestFrom((uint8_t)mpuAddr, (size_t)6, true) == 6) {
+  // Đọc trọn vẹn 14 thanh ghi: Accel (6B) + Temp (2B) + Gyro (6B)
+  if (Wire.requestFrom((uint8_t)mpuAddr, (size_t)14, true) == 14) {
     int16_t ax_raw = (Wire.read() << 8) | Wire.read();
     int16_t ay_raw = (Wire.read() << 8) | Wire.read();
     int16_t az_raw = (Wire.read() << 8) | Wire.read();
+    (void)((Wire.read() << 8) | Wire.read()); // Bỏ qua nhiệt độ nội MPU
+    int16_t gx_raw = (Wire.read() << 8) | Wire.read();
+    int16_t gy_raw = (Wire.read() << 8) | Wire.read();
+    int16_t gz_raw = (Wire.read() << 8) | Wire.read();
 
     lastAx = (float)ax_raw / 16384.0f;
     lastAy = (float)ay_raw / 16384.0f;
     lastAz = (float)az_raw / 16384.0f;
 
+    // Chuyển đổi vận tốc góc Gyroscope (đơn vị: độ/giây - dps)
+    float gx_dps = (float)gx_raw / 131.0f;
+    float gy_dps = (float)gy_raw / 131.0f;
+    float gz_dps = (float)gz_raw / 131.0f;
+    lastTotalGyro = fabsf(gx_dps) + fabsf(gy_dps) + fabsf(gz_dps);
+
     float instantSMV = sqrtf(lastAx * lastAx + lastAy * lastAy + lastAz * lastAz);
     sensorData.smv = instantSMV;
 
-    if (instantSMV >= FALL_THRESHOLD) {
-      fallHoldCounter = 20;
+    // Tính góc nghiêng cơ thể (Tilt Angle) so với phương thẳng đứng
+    if (instantSMV > 0.1f) {
+      float ratio = fabsf(lastAz) / instantSMV;
+      if (ratio > 1.0f) ratio = 1.0f;
+      lastTiltAngle = acosf(ratio) * (180.0f / (float)M_PI);
+    }
+
+    // Pha 1: Va đập (Impact Phase) - Phát hiện xung gia tốc >= 2.5g
+    if (instantSMV >= FALL_THRESHOLD && !candidateFall && fallHoldCounter == 0) {
+      candidateFall = true;
+      candidateFallTime = millis();
+      candidatePeakSMV = instantSMV;
+      Serial.printf("[NGÃ TIỀM NĂNG] Xung va đập: %.2fg | Góc nghiêng: %.1f°\n", instantSMV, lastTiltAngle);
+    }
+
+    // Pha 2 & 3: Kiểm định động học sau ngã (Post-Fall Immobility & Tilt Verification)
+    if (candidateFall) {
+      if (instantSMV > candidatePeakSMV) candidatePeakSMV = instantSMV;
+
+      // Nếu cử động mạnh ngay sau va đập (ngồi xuống ghế cựa quậy, đứng dậy: Gyro > 120°/s) -> Hủy báo động giả
+      if (lastTotalGyro > 120.0f && (millis() - candidateFallTime < 1500)) {
+        candidateFall = false;
+        Serial.println("[TỰ HỦY BÁO ĐỘNG GIẢ] Phát hiện cử động bình thường sau va đập!");
+      }
+      // Sau 1.8 giây kiểm định: Nếu góc nghiêng nằm sàn (Tilt >= 50°) hoặc nằm im bất động (Gyro < 65°/s)
+      else if (millis() - candidateFallTime >= 1800) {
+        if (lastTiltAngle >= 50.0f || lastTotalGyro < 65.0f) {
+          fallHoldCounter = 30; // Chốt giữ cảnh báo té ngã trong 3 giây (30 gói tin 100ms)
+          Serial.printf(">>> [XÁC NHẬN TÉ NGÃ THẬT] Lực: %.2fg | Góc nằm: %.1f° | Bất động Gyro: %.1f°/s <<<\n",
+                        candidatePeakSMV, lastTiltAngle, lastTotalGyro);
+        }
+        candidateFall = false;
+      }
     }
   }
 }

@@ -22,3 +22,13 @@ desktop.ini
 .idea/
 *.swp
 *~
+
+# Sensitive credentials & API Tokens
+*secrets.h
+!*secrets_example.h
+config_private.m
+!config_example.m
+
+# External reference archives
+Elderly-Fall-Detection-System-main/
+*.zip
