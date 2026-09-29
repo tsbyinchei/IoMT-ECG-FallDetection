@@ -144,7 +144,12 @@ disp('   Đang đăng ký lắng nghe Topic: ' + clientTopic);
 disp('================================================================');
 
 try
-    mqClient = mqttclient(brokerAddress, 'Port', brokerPort, 'ClientID', clientID);
+    if exist('mqtt_username', 'var') && ~isempty(mqtt_username)
+        mqClient = mqttclient(brokerAddress, 'Port', brokerPort, 'ClientID', clientID, ...
+                              'Username', string(mqtt_username), 'Password', string(mqtt_password));
+    else
+        mqClient = mqttclient(brokerAddress, 'Port', brokerPort, 'ClientID', clientID);
+    end
     subscribe(mqClient, clientTopic);
     disp('[OK] Đã kết nối MQTT Broker thành công! Đang đợi dữ liệu từ Gateway...');
 catch ME

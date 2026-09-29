@@ -5,3 +5,5 @@ telegram_chat_id   = 'YOUR_TELEGRAM_CHAT_ID';
 % Cấu hình máy chủ 1Panel Ubuntu Server
 mqtt_broker_ip     = '192.168.1.36';
 mqtt_broker_port   = 1883;
+mqtt_username      = '';
+mqtt_password      = '';
