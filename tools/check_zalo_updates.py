@@ -43,12 +43,14 @@ def poll_updates(timeout_sec=30):
             data = json.loads(response.read().decode())
             print("[INFO] Ket qua getUpdates:\n", json.dumps(data, indent=2, ensure_ascii=False))
             if data.get("ok") and data.get("result"):
-                for update in data["result"]:
-                    # Co the co dang message.chat.id hoac message.from.id
+                results = data["result"]
+                if isinstance(results, dict):
+                    results = [results]
+                for update in results:
                     msg = update.get("message", {})
                     chat = msg.get("chat", {})
                     chat_id = chat.get("id") or msg.get("from", {}).get("id")
-                    user_name = msg.get("from", {}).get("first_name", "") or chat.get("title", "")
+                    user_name = msg.get("from", {}).get("display_name", "") or chat.get("title", "")
                     text = msg.get("text", "")
                     print(f"\n>>> TIM THAY CHAT_ID: {chat_id} (Tu: {user_name}, Noi dung: '{text}') <<<")
                     return chat_id
