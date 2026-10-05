@@ -40,3 +40,4 @@ ESP32C3/
 # Python cache
 __pycache__/
 *.pyc
+*.py
