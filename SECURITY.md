@@ -26,13 +26,13 @@ Tài liệu này xác định các chính sách bảo mật mạng và khuyến 
    * Ngăn chặn hoàn toàn các cuộc tấn công trung gian (Man-in-the-Middle - MITM), nghe lén hoặc chèn sửa đổi gói tin điện tim ECG trên mạng công cộng.
    * Kích hoạt cơ chế xác thực dựa trên mật khẩu (Password-based Authentication) trên EMQX để chỉ các thiết bị được cấp phép mới được quyền Publish / Subscribe.
 3. **Quản lý Thông tin Bí mật & API Token (Secrets Management):**
-   * Toàn bộ Token Telegram Bot (`TELEGRAM_BOT_TOKEN`), Chat ID và mật khẩu Wi-Fi/MQTT được lưu riêng biệt trong các file cục bộ:
+   * Toàn bộ Token Telegram Bot (`TELEGRAM_BOT_TOKEN`), Token Zalo Bot (`ZALO_BOT_TOKEN`), Chat ID và mật khẩu Wi-Fi/MQTT được lưu riêng biệt trong các file cục bộ:
      * `ESP32/secrets.h`
      * `MATLAB/config_private.m`
    * Các file này đã được đưa vào `.gitignore` để **tuyệt đối không bao giờ bị đẩy lên GitHub hoặc rò rỉ ra ngoài**.
    * Dự án cung cấp các file mẫu công khai `secrets_example.h` và `config_example.m` với các giá trị placeholder để người dùng tham khảo cấu hình.
-4. **Bảo mật kênh Cảnh báo Telegram:**
-   * Giao tiếp giữa Gateway ESP32/MATLAB với máy chủ Telegram API được thực hiện qua giao thức HTTPS (TLS Port 443) an toàn.
+4. **Bảo mật kênh Cảnh báo Khẩn cấp (Telegram & Zalo):**
+   * Giao tiếp giữa Gateway ESP32/MATLAB với máy chủ Telegram API và Zalo Bot Platform API được thực hiện qua giao thức HTTPS (TLS Port 443) an toàn.
 
 ---
 

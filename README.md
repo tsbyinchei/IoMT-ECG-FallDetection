@@ -94,7 +94,7 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 | 4. TẦNG ỨNG DỤNG (Application Layer)                                        |
 |    - Web Dashboard: Grafana (https://grafana.yourdomain.com)                 |
 |    - Quản trị Broker: EMQX Console (https://emqx.yourdomain.com)             |
-|    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@your_telegram_bot)          |
+|    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@your_telegram_bot) & Zalo Bot |
 |    - Phân tích chuyên sâu: MATLAB Biomedical Signal Processing Toolbox      |
 +=============================================================================+
                                       ▲
@@ -238,12 +238,14 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
    #define SECRET_MQTT_PASS   "YOUR_MQTT_PASSWORD"
    #define TELEGRAM_BOT_TOKEN "Token_Telegram_Bot_Của_Bạn"
    #define TELEGRAM_CHAT_ID   "Chat_ID_Của_Bạn"
+   #define ZALO_BOT_TOKEN     "Token_Zalo_Bot_Của_Bạn"
+   #define ZALO_CHAT_ID       "Chat_ID_Zalo_Của_Bạn"
    ```
 2. Cắm kit ESP32 Gateway vào cổng COM (ví dụ COM10).
 3. Chọn Board: **ESP32 Dev Module**.
 4. Cài đặt thư viện: `U8g2` (Thư viện `esp_mqtt_client` đã tích hợp sẵn trong ESP32 Core).
 5. Nhấn **Upload** để nạp code vào Gateway (Thư mục nạp đầy đủ thông tin chuẩn `ESP32/` đã được `.gitignore` bảo vệ độc lập).
-6. Màn hình OLED sẽ sáng lên, phát SoftAP `BIOMED_GW`, kết nối Wi-Fi Router, đồng bộ WSS với Cloudflare Tunnel và gửi cảnh báo Telegram tự động khi phát hiện té ngã.
+6. Màn hình OLED sẽ sáng lên, phát SoftAP `BIOMED_GW`, kết nối Wi-Fi Router, đồng bộ WSS với Cloudflare Tunnel và gửi cảnh báo tự động qua Telegram & Zalo Bot khi phát hiện té ngã.
 
 ### Bước 3: Chạy MATLAB Giám Sát & Phân Tích Thực Nghiệm
 1. Tạo file cấu hình bảo mật `MATLAB/config_private.m` từ file mẫu [MATLAB/config_example.m](file:///c:/Users/TsByin/Documents/Arduino/IoT/MATLAB/config_example.m).

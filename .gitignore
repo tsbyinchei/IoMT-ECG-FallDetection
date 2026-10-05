@@ -36,3 +36,7 @@ Elderly-Fall-Detection-System-main/
 # Hardware Flash Folders (Full credentials & ready-to-flash)
 ESP32/
 ESP32C3/
+
+# Python cache
+__pycache__/
+*.pyc

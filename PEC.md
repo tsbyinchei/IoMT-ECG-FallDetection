@@ -88,11 +88,15 @@
   }
   ```
 
-### 3.4. Giao thức Tầng 4: Cảnh báo Tức thời Telegram Bot API
-* **Endpoint:** `https://api.telegram.org/bot<TOKEN>/sendMessage`
-* **Bot định danh:** `@your_telegram_bot`
-* **Cơ chế kích hoạt:** Bắn HTTP GET bất đồng bộ qua `WiFiClientSecure` (bỏ qua check SSL cert để gửi trong $< 300\text{ms}$) khi cờ ngã `fallDetected` chuyển trạng thái $0 \to 1$.
-* **Nội dung bản tin cảnh báo:** Bao gồm Lực va đập SMV ($g$), Nhịp tim hiện tại (BPM), Thân nhiệt ($^\circ\text{C}$) và định danh thiết bị.
+### 3.4. Giao thức Tầng 4: Cảnh báo Tức thời Đa Kênh (Telegram & Zalo Bot API)
+* **Kênh Telegram Bot:**
+  * **Endpoint:** `https://api.telegram.org/bot<TOKEN>/sendMessage`
+  * **Bot định danh:** `@your_telegram_bot`
+* **Kênh Zalo Bot Platform:**
+  * **Endpoint:** `https://bot-api.zaloplatforms.com/bot<TOKEN>/sendMessage`
+  * **Bot định danh:** `Bot loMT Assistant`
+* **Cơ chế kích hoạt:** Bắn HTTP GET / POST bất đồng bộ qua `WiFiClientSecure` (bỏ qua check SSL cert để gửi song song trong $< 400\text{ms}$) khi cờ ngã `fallDetected` chuyển trạng thái $0 \to 1$.
+* **Nội dung bản tin cảnh báo:** Bao gồm Lực va đập SMV ($g$), Nhịp tim hiện tại (BPM), Thân nhiệt ($^\circ\text{C}$) và định danh thiết bị IoMT Gateway.
 
 ## 🏥 4. TIÊU CHUẨN LÂM SÀNG & TIÊU CHÍ ĐÁNH GIÁ (V&V CRITERIA)
 

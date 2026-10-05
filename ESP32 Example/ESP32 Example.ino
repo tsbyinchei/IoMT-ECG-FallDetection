@@ -73,6 +73,14 @@ const char *TOPIC_ALERT =
 #define TELEGRAM_CHAT_ID "YOUR_TELEGRAM_CHAT_ID"
 #endif
 
+// 5. Zalo Bot API (Zalo Bot Platform HTTP API)
+#ifndef ZALO_BOT_TOKEN
+#define ZALO_BOT_TOKEN "YOUR_ZALO_BOT_TOKEN"
+#endif
+#ifndef ZALO_CHAT_ID
+#define ZALO_CHAT_ID "YOUR_ZALO_CHAT_ID"
+#endif
+
 // ==================== ĐỊNH NGHĨA GÓI TIN ĐỒNG BỘ TỪ ESP32-C3
 // ====================
 typedef struct __attribute__((packed)) struct_message {
@@ -557,6 +565,46 @@ void sendTelegramFallAlert(float smv, float temp, int bpm) {
   client.stop();
 }
 
+void sendZaloFallAlert(float smv, float temp, int bpm) {
+  // Chỉ gửi qua Internet nếu kit Gateway đang kết nối Router Wi-Fi
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+  if (strlen(ZALO_BOT_TOKEN) == 0 || strlen(ZALO_CHAT_ID) == 0 ||
+      strcmp(ZALO_BOT_TOKEN, "YOUR_ZALO_BOT_TOKEN") == 0) {
+    return;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure(); // Bỏ qua chứng chỉ SSL để gửi tin nhắn nhanh không trễ
+  client.setTimeout(4000);
+
+  if (!client.connect("bot-api.zaloplatforms.com", 443)) {
+    Serial.println("[ZALO] Khong the ket noi bot-api.zaloplatforms.com");
+    return;
+  }
+
+  char textBuf[256];
+  snprintf(textBuf, sizeof(textBuf),
+           "🚨 [CẢNH BÁO TÉ NGÃ KHẨN CẤP - GATEWAY ESP32]!\n"
+           "Bệnh nhân vừa bị té ngã!\n"
+           "- Lực va đập SMV: %.2fg\n"
+           "- Nhịp tim hiện tại: %d BPM\n"
+           "- Thân nhiệt: %.1f*C\n"
+           "- Thiết bị: IoMT Gateway\n"
+           "Cần kiểm tra người bệnh ngay lập tức!",
+           smv, bpm, temp);
+
+  String url = "/bot" + String(ZALO_BOT_TOKEN) +
+               "/sendMessage?chat_id=" + String(ZALO_CHAT_ID) +
+               "&text=" + urlEncodeString(textBuf);
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: bot-api.zaloplatforms.com\r\n" +
+               "Connection: close\r\n\r\n");
+
+  Serial.println("[ZALO] >>> Da gui tin nhan canh bao te nga qua Zalo Bot! <<<");
+  client.stop();
+}
+
 // ==================== IN DỮ LIỆU SERIAL (CHO MATLAB OFFLINE & DEBUG)
 // ====================
 void outputSerialForMatlab() {
@@ -663,6 +711,7 @@ void loop() {
     if (incomingData.fallDetected && !prevFallState) {
       totalFallsCount++;
       sendTelegramFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
+      sendZaloFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
     }
     prevFallState = incomingData.fallDetected;
 
