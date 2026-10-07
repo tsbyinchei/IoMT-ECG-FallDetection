@@ -551,7 +551,7 @@ void sendTelegramFallAlert(float smv, float temp, int bpm) {
            "- Nhịp tim hiện tại: %d BPM\n"
            "- Thân nhiệt: %.1f*C\n"
            "- Thiết bị: IoMT Gateway\n"
-           "Cần kiểm tra người bệnh ngay lập tức!",
+           "Cần kiểm tra ngay lập tức!",
            smv, bpm, temp);
 
   String url = "/bot" + String(TELEGRAM_BOT_TOKEN) +
@@ -591,7 +591,7 @@ void sendZaloFallAlert(float smv, float temp, int bpm) {
            "- Nhịp tim hiện tại: %d BPM\n"
            "- Thân nhiệt: %.1f*C\n"
            "- Thiết bị: IoMT Gateway\n"
-           "Cần kiểm tra người bệnh ngay lập tức!",
+           "Cần kiểm tra ngay lập tức!",
            smv, bpm, temp);
 
   String url = "/bot" + String(ZALO_BOT_TOKEN) +
