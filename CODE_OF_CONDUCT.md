@@ -23,4 +23,4 @@ Các hành vi thúc đẩy môi trường nghiên cứu tích cực bao gồm:
 ---
 
 ### 🛡️ 4. Trách nhiệm & Thực thi
-Người quản trị dự án (**Nguyễn Văn Tuấn Sỹ - [@tsbyinchei](https://github.com/tsbyinchei)**) có trách nhiệm làm rõ và duy trì các chuẩn mực ứng xử này. Mọi trường hợp vi phạm có thể được báo cáo trực tiếp qua GitHub Issues hoặc liên hệ với tác giả để được xử lý công bằng.
+Người quản trị dự án (**TsByinChei - [@tsbyinchei](https://github.com/tsbyinchei)**) có trách nhiệm làm rõ và duy trì các chuẩn mực ứng xử này. Mọi trường hợp vi phạm có thể được báo cáo trực tiếp qua GitHub Issues hoặc liên hệ với tác giả để được xử lý công bằng.

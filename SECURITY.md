@@ -41,7 +41,7 @@ Tài liệu này xác định các chính sách bảo mật mạng và khuyến 
 Nếu bạn phát hiện bất kỳ lỗ hổng bảo mật nào về phần mềm, giao thức truyền thông hoặc nguy cơ phần cứng:
 * Vui lòng **không đăng công khai** lên GitHub Issues.
 * Hãy liên hệ trực tiếp với tác giả:
-  * **Tác giả:** Nguyễn Văn Tuấn Sỹ
+  * **Tác giả:** TsByinChei
   * **GitHub:** [@tsbyinchei](https://github.com/tsbyinchei)
   * **Email:** [contact@tsbyin.dev](mailto:contact@tsbyin.dev) • [tsbyinchei@gmail.com](mailto:tsbyinchei@gmail.com)
 * Chúng tôi sẽ tiếp nhận, kiểm tra và phát hành bản vá lỗi trong thời gian sớm nhất.

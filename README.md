@@ -297,12 +297,12 @@ Toàn bộ dữ liệu thực nghiệm đã được ghi nhận trong file chu�
 ---
 
 ## 👥 TÁC GIẢ VÀ BẢN QUYỀN (AUTHOR & COPYRIGHT)
-* **Tác giả / Nghiên cứu phát triển:** **Nguyễn Văn Tuấn Sỹ**
+* **Tác giả / Nghiên cứu phát triển:** **TsByinChei**
 * **GitHub:** [@tsbyinchei](https://github.com/tsbyinchei)
 * **Email liên hệ:** [contact@tsbyin.dev](mailto:contact@tsbyin.dev) • [tsbyinchei@gmail.com](mailto:tsbyinchei@gmail.com)
 * **Đề tài:** Hệ thống IoMT Đeo người Giám sát Điện tim & Cảnh báo Té ngã Đa tầng.
 * **Môn học:** Thiết kế Hệ thống IoT & Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP).
-* **Giấy phép:** Toàn bộ mã nguồn và tài liệu được phát hành theo giấy phép mã nguồn mở **[MIT License](LICENSE)** (Copyright © 2026 Nguyễn Văn Tuấn Sỹ).
+* **Giấy phép:** Toàn bộ mã nguồn và tài liệu được phát hành theo giấy phép mã nguồn mở **[MIT License](LICENSE)** (Copyright © 2026 TsByinChei).
 
 ---
 

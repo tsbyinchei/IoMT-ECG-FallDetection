@@ -1,6 +1,6 @@
 # 📖 KHUNG SƯỜN BÁO CÁO MÔN HỌC (25–30 TRANG)
 ## Academic Project Report Guide for IoT & BDSP
-**Tác giả:** Nguyễn Văn Tuấn Sỹ ([@tsbyinchei](https://github.com/tsbyinchei)) • [contact@tsbyin.dev](mailto:contact@tsbyin.dev)  
+**Tác giả:** TsByinChei ([@tsbyinchei](https://github.com/tsbyinchei)) • [contact@tsbyin.dev](mailto:contact@tsbyin.dev)  
 
 Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và các bảng số liệu, biểu đồ thực nghiệm cần đưa vào để hoàn thiện bài báo cáo môn học **Thiết kế Hệ thống IoT** và **Xử lý Tín hiệu Y sinh (BDSP)** đạt điểm tối đa (A/A+).
 

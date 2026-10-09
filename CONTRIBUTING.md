@@ -1,6 +1,6 @@
 # 🤝 HƯỚNG DẪN ĐÓNG GÓP PHÁT TRIỂN (CONTRIBUTING GUIDE)
 ## Dual-MCU IoMT Wearable ECG Monitoring & Fall Detection System
-**Quản lý dự án (Maintainer):** Nguyễn Văn Tuấn Sỹ ([@tsbyinchei](https://github.com/tsbyinchei)) • [contact@tsbyin.dev](mailto:contact@tsbyin.dev)  
+**Quản lý dự án (Maintainer):** TsByinChei ([@tsbyinchei](https://github.com/tsbyinchei)) • [contact@tsbyin.dev](mailto:contact@tsbyin.dev)  
 
 Cảm ơn bạn đã quan tâm và muốn đóng góp cho dự án thiết bị y tế đeo người IoMT! Dưới đây là các hướng dẫn và quy chuẩn kỹ thuật nhằm đảm bảo chất lượng mã nguồn và tính chính xác sinh học của hệ thống.
 
