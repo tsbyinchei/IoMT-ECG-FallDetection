@@ -390,7 +390,7 @@ function handleDataPacket(data) {
     const pct = Math.min(Math.max((smv / 4.0) * 100, 2), 100);
     elements.smvGauge.style.width = pct + '%';
 
-    if (smv >= 2.5) {
+    if (smv >= 2.2) {
       elements.smvVal.className = 'vital-number mono text-danger';
     } else {
       elements.smvVal.className = 'vital-number mono';
@@ -418,7 +418,7 @@ function handleDataPacket(data) {
   if (fall) {
     elements.fallStatus.textContent = '🚨 Giai đoạn 2: XÁC NHẬN NGÃ THẬT (Bất động & Nằm sàn)!';
     elements.fallStatus.className = 'vital-status text-danger';
-  } else if (data.smv >= 2.5) {
+  } else if (data.smv >= 2.2) {
     elements.fallStatus.textContent = '⏳ Giai đoạn 1: Va đập mạnh - Đang thẩm định bất động...';
     elements.fallStatus.className = 'vital-status text-warning';
   } else {
@@ -464,7 +464,7 @@ function triggerHeartBeat(bpm) {
 function triggerFallEmergency(smv, bpm, temp) {
   elements.emergencyBanner.classList.remove('hidden');
   elements.alertTitle.textContent = `🚨 CẢNH BÁO TÉ NGÃ 2 GIAI ĐOẠN (SMV: ${Number(smv).toFixed(2)}g)!`;
-  elements.alertDesc.textContent = `Xác thực thành công 2 giai đoạn (Va đập ${Number(smv).toFixed(2)}g > 2.5g kèm bất động & nằm sàn). Đã phát còi và gửi tin khẩn cấp Telegram & Zalo!`;
+  elements.alertDesc.textContent = `Xác thực thành công 2 giai đoạn (Va đập ${Number(smv).toFixed(2)}g > 2.2g kèm bất động & nằm sàn). Đã phát còi và gửi tin khẩn cấp Telegram & Zalo!`;
   
   if (!isBuzzerMuted) {
     playAlarmSiren();

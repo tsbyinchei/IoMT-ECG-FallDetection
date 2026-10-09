@@ -185,6 +185,7 @@ unsigned long totalPacketsReceived = 0;
 uint16_t totalFallsCount = 0;
 bool prevFallState = false;
 bool buzzerMuted = false; // Cờ tắt còi báo động từ xa hoặc tại chỗ
+bool fallAlarmActive = false; // Chốt giữ cảnh báo ngã khẩn cấp: Hú liên tục cho đến khi người dùng bấm tắt
 
 // ==================== QUẢN LÝ CHUYỂN TRANG MÀN HÌNH ====================
 #define TOTAL_PAGES 4
@@ -202,11 +203,15 @@ void handleButton() {
   if (reading == LOW && lastButtonState == HIGH) {
     if (millis() - lastDebounceTime > 200) {
       lastDebounceTime = millis();
-      // Nếu đang báo động mà bấm nút BOOT -> Tắt còi tại chỗ (Local Mute)
-      if ((incomingData.fallDetected || incomingData.leadsOff) && !buzzerMuted) {
+      // Nếu đang trong trạng thái báo động ngã hoặc còi đang kêu -> Bấm nút BOOT để tắt còi tại chỗ
+      if (fallAlarmActive || (!buzzerMuted && (incomingData.fallDetected || incomingData.leadsOff))) {
+        fallAlarmActive = false;
         buzzerMuted = true;
         digitalWrite(BUZZER_PIN, LOW);
-        Serial.println("[LOCAL] Bam nut BOOT de tat coi tai cho!");
+        Serial.println("\n[LOCAL] >>> Da bam nut BOOT xac nhan bien co & tat coi bao dong tai cho! <<<");
+        if (mqtt_connected) {
+          esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, "{\"status\":\"ok\",\"buzzer\":\"muted\"}", 0, 1, 0);
+        }
       } else {
         currentPage = (currentPage + 1) % TOTAL_PAGES;
         Serial.printf("[OLED] Chuyen sang Trang %d/%d\n", currentPage + 1,
@@ -408,13 +413,13 @@ void drawOLED() {
         map(constrain((int)(incomingData.smv * 100), 0, 400), 0, 400, 0, 116);
     u8g2.drawBox(6, 29, barWidth, 8);
 
-    // Vạch đánh dấu ngưỡng ngã 2.5g
-    int threshX = 6 + (int)(116.0 * 2.5 / 4.0);
+    // Vạch đánh dấu ngưỡng ngã 2.2g
+    int threshX = 6 + (int)(116.0 * 2.2 / 4.0);
     u8g2.drawVLine(threshX, 26, 14);
 
     u8g2.setFont(u8g2_font_4x6_tf);
     u8g2.drawStr(5, 45, "0g");
-    u8g2.drawStr(threshX - 8, 45, "2.5g (Nga)");
+    u8g2.drawStr(threshX - 8, 45, "2.2g (Nga)");
     u8g2.drawStr(108, 45, "4.0g");
 
     // Thống kê số lần ngã
@@ -457,14 +462,16 @@ void drawOLED() {
 
   // ==================== POPUP CẢNH BÁO KHẨN CẤP (HIỂN THỊ TRÊN MỌI TRANG)
   // ====================
-  if (incomingData.fallDetected) {
+  if (fallAlarmActive || incomingData.fallDetected) {
     u8g2.setDrawColor(0);
-    u8g2.drawBox(4, 18, 120, 28);
+    u8g2.drawBox(4, 14, 120, 36);
     u8g2.setDrawColor(1);
-    u8g2.drawFrame(4, 18, 120, 28);
-    u8g2.drawFrame(6, 20, 116, 24);
+    u8g2.drawFrame(4, 14, 120, 36);
+    u8g2.drawFrame(6, 16, 116, 32);
     u8g2.setFont(u8g2_font_7x14B_tf);
-    u8g2.drawStr(10, 36, "! FALL DETECTED !");
+    u8g2.drawStr(12, 30, "! CANH BAO NGA !");
+    u8g2.setFont(u8g2_font_5x8_tf);
+    u8g2.drawStr(16, 42, "Bam BOOT de tat coi");
   }
 
   u8g2.sendBuffer();
@@ -473,41 +480,42 @@ void drawOLED() {
 // ==================== ĐIỀU KHIỂN CÒI BÁO ĐỘNG BUZZER (GPIO 23)
 // ====================
 void handleBuzzer() {
-  static unsigned long lastBeep = 0;
-  static bool beepState = false;
-
-  // Nếu người dùng đã kích hoạt tắt còi từ xa hoặc tại chỗ -> Im lặng
+  // Nếu người dùng đã kích hoạt tắt còi (tại chỗ qua BOOT hoặc từ xa qua Web) -> Im lặng
   if (buzzerMuted) {
     digitalWrite(BUZZER_PIN, LOW);
     return;
   }
 
-  if (incomingData.fallDetected) {
-    // Báo động ngã khẩn cấp: Kêu dồn dập (100ms ON / 100ms OFF)
-    if (millis() - lastBeep >= 100) {
-      lastBeep = millis();
-      beepState = !beepState;
-      digitalWrite(BUZZER_PIN, beepState ? HIGH : LOW);
-    }
-  } else if (incomingData.leadsOff) {
-    // Cảnh báo tuột điện cực: Bíp ngắt quãng nhẹ (80ms ON mỗi 1.2s)
-    unsigned long cycle = millis() % 1200;
-    if (cycle < 80) {
-      digitalWrite(BUZZER_PIN, HIGH);
-    } else {
-      digitalWrite(BUZZER_PIN, LOW);
-    }
-  } else if (edgeBpm > 0 && (edgeBpm > 125 || edgeBpm < 45)) {
-    // Cảnh báo nhịp tim bất thường: Bíp kép chu kỳ 1s
+  // 1. CẢNH BÁO TÉ NGÃ KHẨN CẤP (ƯU TIÊN CAO NHẤT): HÚ LIÊN TỤC KHÔNG DỪNG CHO ĐẾN KHI BẤM NÚT
+  if (fallAlarmActive || incomingData.fallDetected) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    return;
+  }
+
+  // 2. CẢNH BÁO NHỊP TIM BẤT THƯỜNG: Bíp kép chu kỳ 1s
+  if (edgeBpm > 0 && (edgeBpm > 125 || edgeBpm < 45)) {
     unsigned long cycle = millis() % 1000;
     if (cycle < 100 || (cycle > 200 && cycle < 300)) {
       digitalWrite(BUZZER_PIN, HIGH);
     } else {
       digitalWrite(BUZZER_PIN, LOW);
     }
-  } else {
-    digitalWrite(BUZZER_PIN, LOW);
+    return;
   }
+
+  // 3. CẢNH BÁO TUỘT ĐIỆN CỰC: Bíp ngắt quãng nhẹ (80ms ON mỗi 1.5s)
+  if (incomingData.leadsOff) {
+    unsigned long cycle = millis() % 1500;
+    if (cycle < 80) {
+      digitalWrite(BUZZER_PIN, HIGH);
+    } else {
+      digitalWrite(BUZZER_PIN, LOW);
+    }
+    return;
+  }
+
+  // Bình thường: Tắt còi
+  digitalWrite(BUZZER_PIN, LOW);
 }
 
 // ==================== KẾT NỐI VÀ XỬ LÝ SỰ KIỆN MQTT CLOUD (WSS)
@@ -545,6 +553,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     Serial.printf("\n[MQTT CMD] Nhan lenh dieu khien tai [%s]: %s\n", topicBuf, dataBuf);
 
     if (strstr(dataBuf, "mute") != NULL && strstr(dataBuf, "unmute") == NULL) {
+      fallAlarmActive = false;
       buzzerMuted = true;
       digitalWrite(BUZZER_PIN, LOW);
       Serial.println("[REMOTE] >>> DA TAT COI BAO DONG (BUZZER MUTED) TU XA! <<<");
