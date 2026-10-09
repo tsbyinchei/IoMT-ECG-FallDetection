@@ -64,8 +64,9 @@ const unsigned int UDP_PORT = 4210;
 const char *MQTT_URI = SECRET_MQTT_URI;
 const char *MQTT_USER = SECRET_MQTT_USER; // Điền nếu broker yêu cầu xác thực
 const char *MQTT_PASS = SECRET_MQTT_PASS; // Điền mật khẩu nếu có
-// Chứng chỉ gốc ISRG Root X1 (Let's Encrypt Root CA) dùng cho Cloudflare WSS (mqtt.yourdomain.com)
-static const char *ISRG_ROOT_X1_CA =
+// Chứng chỉ gốc Let's Encrypt (ISRG Root X1 & X2) dùng cho Cloudflare WSS (mqtt.yourdomain.com)
+static const char *ISRG_ROOT_CA =
+// ISRG Root X1 (RSA)
 "-----BEGIN CERTIFICATE-----\n"
 "MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw\n"
 "TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh\n"
@@ -96,6 +97,33 @@ static const char *ISRG_ROOT_X1_CA =
 "4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA\n"
 "mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d\n"
 "emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=\n"
+"-----END CERTIFICATE-----\n"
+// ISRG Root X2 (ECDSA)
+"-----BEGIN CERTIFICATE-----\n"
+"MIIEcDCCAligAwIBAgIQbI8dxyfHEX97r4U6yYD5zTANBgkqhkiG9w0BAQsFADBP\n"
+"MQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJuZXQgU2VjdXJpdHkgUmVzZWFy\n"
+"Y2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBYMTAeFw0yNjA1MTMwMDAwMDBa\n"
+"Fw0zMjA5MDIyMzU5NTlaME8xCzAJBgNVBAYTAlVTMSkwJwYDVQQKEyBJbnRlcm5l\n"
+"dCBTZWN1cml0eSBSZXNlYXJjaCBHcm91cDEVMBMGA1UEAxMMSVNSRyBSb290IFgy\n"
+"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEzZvVn4CDCuwJSvMWSj5cz3es3mcFDR0H\n"
+"ttwW+1qLFNvicWDEukWVEYmO6gbf9yoWHKS5xcUy4APgHoIYOIvXRdgKam7mAHf7\n"
+"AlF9ItgKbppbd9/w+kHsOdx1ymgHDB/qo4H1MIHyMA4GA1UdDwEB/wQEAwIBBjAd\n"
+"BgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDwYDVR0TAQH/BAUwAwEB/zAd\n"
+"BgNVHQ4EFgQUfEKWrt5LSDv6kviejM9ti6lyN5UwHwYDVR0jBBgwFoAUebRZ5nu2\n"
+"5eQBc4AIiMgaWPbpm24wMgYIKwYBBQUHAQEEJjAkMCIGCCsGAQUFBzAChhZodHRw\n"
+"Oi8veDEuaS5sZW5jci5vcmcvMBMGA1UdIAQMMAowCAYGZ4EMAQIBMCcGA1UdHwQg\n"
+"MB4wHKAaoBiGFmh0dHA6Ly94MS5jLmxlbmNyLm9yZy8wDQYJKoZIhvcNAQELBQAD\n"
+"ggIBAD2/e9frmMxNpCV03qUHegg+MV2wz9644YoXdqtH8RyWYcBO7xfjjGEXdU1e\n"
+"/o0OkEFiynUCOSIk/vLLo7ttz6CPAeNlWfC0XNkoGeWgK6jjXvozBaGuGH5n0Ufo\n"
+"shMeWTuURqNN5G00sSXDTBrpp2+mgvdZQjb8K11TYMA25QA+YHNfbIEL0BniAhKS\n"
+"2gsnJjSzrdZLI+EZ7SEyqdR2rkjd1KutLDU+n3TFyxjniZVGur4YlhMP3mY/dV95\n"
+"IruAkkjOZier6hGBdEgZXXvaCz9u9iVEadsIE75pAGL8oHV5vxdARDiotRpul1IN\n"
+"/UZwzAbrfUFcw1HkAcYD/mlZfnQ2ieCF2MS7j3Vhv7JPDKp45fmykmzYNSrumRW0\n"
+"upFFKDBOoF7hsOb7oLyHS+Uft6jOUfOrogj8YUx38hKb2K20r42OgsSdDdxdeYWc\n"
+"MS3Sb6mwJeSZEYxJ2gaXnDSPaKhhrNkYwljyVQyr4Nq+MEJytXNTnHqaAcrNwZlV\n"
+"pcJL1KBnMrMjP7eanvUwL3FYj3cF17jtboLt7gLoi4+2rWZFvn+w54jmd/FIuhhZ\n"
+"cEaU/wvU6BUNMtcVquVGHp7itQeDth5j+XL3j4WJ2SABwzUl6OeYdgpIt/ITZa+p\n"
+"TT0mQ/r5XyA4MEAiabn7XJjvCERlF2dcn2wqJw+CreTkkQ2R\n"
 "-----END CERTIFICATE-----\n";
 
 const char *MQTT_CLIENT_ID = "ESP32_Biomed_Gateway";
@@ -554,8 +582,12 @@ void initAndStartMQTT() {
   esp_mqtt_client_config_t mqtt_cfg = {};
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   mqtt_cfg.broker.address.uri = MQTT_URI;
-  mqtt_cfg.broker.verification.certificate = ISRG_ROOT_X1_CA;
-  mqtt_cfg.broker.verification.skip_cert_common_name_check = true;
+#if HAS_ESP_CRT_BUNDLE
+  mqtt_cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
+#endif
+  mqtt_cfg.broker.verification.certificate = ISRG_ROOT_CA;
+  mqtt_cfg.broker.verification.common_name = "mqtt.tsbyin.dev";
+  mqtt_cfg.broker.verification.skip_cert_common_name_check = false;
   if (strlen(MQTT_USER) > 0) {
     mqtt_cfg.credentials.username = MQTT_USER;
     mqtt_cfg.credentials.authentication.password = MQTT_PASS;
@@ -567,8 +599,11 @@ void initAndStartMQTT() {
   mqtt_cfg.buffer.out_size = 2048;
 #else
   mqtt_cfg.uri = MQTT_URI;
-  mqtt_cfg.cert_pem = ISRG_ROOT_X1_CA;
-  mqtt_cfg.skip_cert_common_name_check = true;
+#if HAS_ESP_CRT_BUNDLE
+  mqtt_cfg.crt_bundle_attach = esp_crt_bundle_attach;
+#endif
+  mqtt_cfg.cert_pem = ISRG_ROOT_CA;
+  mqtt_cfg.skip_cert_common_name_check = false;
   if (strlen(MQTT_USER) > 0) {
     mqtt_cfg.username = MQTT_USER;
     mqtt_cfg.password = MQTT_PASS;
