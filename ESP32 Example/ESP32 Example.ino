@@ -563,11 +563,24 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     break;
   }
   case MQTT_EVENT_ERROR:
-    Serial.printf("\n[MQTT ERROR] type: %d | conn_code: %d | tls_err: 0x%x | sock_errno: %d\n",
-                  event->error_handle ? event->error_handle->error_type : -1,
-                  event->error_handle ? event->error_handle->connect_return_code : -1,
-                  event->error_handle ? event->error_handle->esp_tls_last_esp_err : -1,
-                  event->error_handle ? event->error_handle->esp_transport_sock_errno : -1);
+    Serial.println("\n----------------- [MQTT CHI TIET LOI] -----------------");
+    if (event->error_handle) {
+      Serial.printf(" - Error Type: %d (1: TCP/TLS Transport, 2: Refused, 3: Protocol, 4: Connack)\n", event->error_handle->error_type);
+      Serial.printf(" - Connect Return Code: %d\n", event->error_handle->connect_return_code);
+      Serial.printf(" - ESP-TLS Last Error: 0x%x\n", event->error_handle->esp_tls_last_esp_err);
+      Serial.printf(" - TLS Stack Error: 0x%x\n", event->error_handle->esp_tls_stack_err);
+      Serial.printf(" - TLS Cert Verify Flags: 0x%x\n", event->error_handle->esp_tls_cert_verify_flags);
+      Serial.printf(" - Socket Errno: %d\n", event->error_handle->esp_transport_sock_errno);
+      if (event->error_handle->esp_tls_cert_verify_flags != 0) {
+        Serial.println("   [GIAI MA LOI CHUNG CHI TLS]:");
+        if (event->error_handle->esp_tls_cert_verify_flags & 0x01) Serial.println("    * MBEDTLS_X509_BADCERT_EXPIRED: Chung chi het han");
+        if (event->error_handle->esp_tls_cert_verify_flags & 0x02) Serial.println("    * MBEDTLS_X509_BADCERT_REVOKED: Chung chi bi thu hoi");
+        if (event->error_handle->esp_tls_cert_verify_flags & 0x04) Serial.println("    * MBEDTLS_X509_BADCERT_CN_MISMATCH: Ten mien SNI khong khop");
+        if (event->error_handle->esp_tls_cert_verify_flags & 0x08) Serial.println("    * MBEDTLS_X509_BADCERT_NOT_TRUSTED: Root CA khong tin cay");
+        if (event->error_handle->esp_tls_cert_verify_flags & 0x20) Serial.println("    * MBEDTLS_X509_BADCERT_FUTURE: Gio he thong ESP32 nho hon ngay cap chung chi!");
+      }
+    }
+    Serial.println("-------------------------------------------------------");
     break;
   default:
     break;
@@ -579,12 +592,14 @@ void initAndStartMQTT() {
   if (mqtt_client != NULL)
     return; // Đã khởi chạy rồi
 
+  Serial.println("\n[MQTT DIAGNOSTIC] Bat dau khoi tao client...");
+  Serial.printf(" - Free Heap: %d bytes (Max Alloc: %d bytes)\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+  time_t now = time(nullptr);
+  Serial.printf(" - System Time Epoch: %ld\n", (long)now);
+
   esp_mqtt_client_config_t mqtt_cfg = {};
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   mqtt_cfg.broker.address.uri = MQTT_URI;
-#if HAS_ESP_CRT_BUNDLE
-  mqtt_cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
-#endif
   mqtt_cfg.broker.verification.certificate = ISRG_ROOT_CA;
   mqtt_cfg.broker.verification.common_name = "mqtt.tsbyin.dev";
   mqtt_cfg.broker.verification.skip_cert_common_name_check = false;
@@ -599,9 +614,6 @@ void initAndStartMQTT() {
   mqtt_cfg.buffer.out_size = 2048;
 #else
   mqtt_cfg.uri = MQTT_URI;
-#if HAS_ESP_CRT_BUNDLE
-  mqtt_cfg.crt_bundle_attach = esp_crt_bundle_attach;
-#endif
   mqtt_cfg.cert_pem = ISRG_ROOT_CA;
   mqtt_cfg.skip_cert_common_name_check = false;
   if (strlen(MQTT_USER) > 0) {
@@ -624,7 +636,7 @@ void initAndStartMQTT() {
                                  MQTT_EVENT_ANY,
                                  mqtt_event_handler, NULL);
   esp_err_t startErr = esp_mqtt_client_start(mqtt_client);
-  Serial.printf("\n[MQTT] Khoi chay client ket noi Cloud Broker: %s (Status: %d)\n", MQTT_URI, startErr);
+  Serial.printf("[MQTT] Khoi chay tien trinh ket noi Cloud Broker: %s (Status: %d)\n", MQTT_URI, startErr);
 #endif
 }
 
@@ -775,8 +787,21 @@ void sendZaloFallAlert(float smv, float temp, int bpm) {
 }
 
 // ==================== IN DỮ LIỆU SERIAL (CHO MATLAB OFFLINE & DEBUG)
-// ====================
+// ==================== IN DỮ LIỆU SERIAL (CHO MATLAB OFFLINE & DEBUG) ====================
 void outputSerialForMatlab() {
+#if DEBUG_MUTE_DATA_STREAM
+  // Tắt 10 dòng $DATA/giây để Serial Monitor không bị tràn trôi log
+  // Chỉ in 1 dòng tóm tắt trạng thái cảm biến mỗi 5 giây
+  static unsigned long lastSensorLog = 0;
+  if (millis() - lastSensorLog >= 5000) {
+    lastSensorLog = millis();
+    Serial.printf("[C3 SENSOR OK] Temp=%.1f*C | HR=%d bpm | SMV=%.2fg | Fall=%d | LeadsOff=%d (Goi #%lu)\n",
+                  incomingData.bodyTemp, edgeBpm, incomingData.smv,
+                  incomingData.fallDetected, incomingData.leadsOff, totalPacketsReceived);
+  }
+  return;
+#endif
+
   Serial.print("$DATA,");
   Serial.print(incomingData.bodyTemp, 1);
   Serial.print(",");
@@ -798,6 +823,14 @@ void outputSerialForMatlab() {
 void setup() {
   Serial.begin(115200);
   delay(500);
+
+  // Thiết lập mức độ log ESP-IDF chi tiết để hiển thị chi tiết tiến trình bắt tay TLS/MQTT
+  esp_log_level_set("*", ESP_LOG_INFO);
+  esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
+  esp_log_level_set("TRANSPORT_BASE", ESP_LOG_VERBOSE);
+  esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
+  esp_log_level_set("esp-tls-mbedtls", ESP_LOG_VERBOSE);
+  esp_log_level_set("mbedtls", ESP_LOG_VERBOSE);
 
   Serial.println("\n==========================================");
   Serial.println("  ESP32 BIOMEDICAL GATEWAY DANG KHOI DONG");
@@ -842,11 +875,21 @@ void setup() {
     } else {
       Serial.println("[DNS CANH BAO] Chua giai ma duoc domain mqtt.tsbyin.dev");
     }
-    // Cài đặt mốc thời gian hệ thống (>2025) để mbedTLS không báo lỗi ngày chứng chỉ
-    struct timeval tv = { .tv_sec = 1770000000 };
+    // Cài đặt mốc thời gian hệ thống chuẩn xác (Tháng 10/2026 ~ 1791558000)
+    // Chứng chỉ SSL của domain có hiệu lực từ 21/08/2026 đến 19/11/2026.
+    struct timeval tv = { .tv_sec = 1791558000 };
     settimeofday(&tv, NULL);
     configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
-    Serial.println("[TIME] Da thiet lap moc thoi gian he thong cho ket noi SSL/TLS.");
+    Serial.print("[TIME] Dang dong bo thoi gian thuc tu NTP");
+    time_t now = time(nullptr);
+    int ntpWait = 0;
+    while (now < 1791500000 && ntpWait < 10) {
+      delay(200);
+      Serial.print(".");
+      now = time(nullptr);
+      ntpWait++;
+    }
+    Serial.printf("\n[TIME] Thoi gian he thong hien tai Epoch: %ld\n", (long)now);
     initAndStartMQTT();
   } else {
     Serial.printf("\n[WiFi CANH BAO] Chua ket noi duoc Router '%s'. Gateway se tiep tuc thu lai tu dong trong loop()!\n", ROUTER_SSID);
@@ -892,7 +935,7 @@ void loop() {
     if (mqtt_client == NULL) {
       Serial.printf("[WiFi] Da ket noi Router! IP: %s. Bat dau khoi chay MQTT...\n",
                     WiFi.localIP().toString().c_str());
-      struct timeval tv = { .tv_sec = 1770000000 };
+      struct timeval tv = { .tv_sec = 1791558000 };
       settimeofday(&tv, NULL);
       configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
       initAndStartMQTT();
