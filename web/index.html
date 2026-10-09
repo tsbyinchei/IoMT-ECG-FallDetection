@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="IoMT Biomedical Telehealth System - Hệ thống giám sát điện tim ECG thời gian thực & cảnh báo té ngã từ xa chuẩn ITU-T Y.2060.">
+  <title>IoMT Patient Monitor | Giám Sát Điện Tim & Té Ngã Realtime</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- MQTT.js qua CDN an toàn -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+  <!-- Header / Navigation Bar -->
+  <header class="top-nav">
+    <div class="brand">
+      <div class="brand-pulse">
+        <span class="pulse-ring"></span>
+        <span class="pulse-dot"></span>
+      </div>
+      <div>
+        <h1 class="brand-title">IoMT Telehealth Monitor</h1>
+        <p class="brand-subtitle">Internet of Medical Things • Realtime ECG & Fall Detection</p>
+      </div>
+    </div>
+
+    <div class="nav-controls">
+      <div id="connectionStatus" class="status-badge disconnected">
+        <span class="status-indicator"></span>
+        <span id="statusText">Chưa kết nối Broker</span>
+      </div>
+
+      <button id="audioToggleBtn" class="btn btn-icon" title="Bật/Tắt âm thanh nhịp tim và báo động">
+        <span id="audioIcon">🔇</span>
+        <span id="audioLabel">Âm thanh: Tắt</span>
+      </button>
+
+      <button id="simToggleBtn" class="btn btn-secondary" title="Bật chế độ dữ liệu mô phỏng khi không có phần cứng">
+        <span>🧪 Chế độ Demo</span>
+      </button>
+
+      <button id="configModalBtn" class="btn btn-primary" title="Cấu hình kết nối MQTT Broker">
+        <span>⚙️ Cấu hình</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Banner Cảnh Báo Khẩn Cấp (Hiện ra khi có té ngã hoặc hở điện cực) -->
+  <aside id="emergencyBanner" class="alert-banner hidden" role="alert">
+    <div class="alert-content">
+      <span class="alert-icon">🚨</span>
+      <div class="alert-text">
+        <strong id="alertTitle">CẢNH BÁO TÉ NGÃ KHẨN CẤP!</strong>
+        <p id="alertDesc">Phát hiện xung va đập mạnh và bất động sau ngã. Đã gửi tin nhắn tới Telegram & Zalo!</p>
+      </div>
+    </div>
+    <div class="alert-actions">
+      <button id="dismissAlertBtn" class="btn btn-danger">Tắt còi báo động</button>
+    </div>
+  </aside>
+
+  <!-- Main Dashboard Container -->
+  <main class="dashboard-grid">
+    <!-- CỘT 1: Sóng ECG Lớn (ICU Sweep Oscilloscope) -->
+    <section class="card ecg-card">
+      <div class="card-header">
+        <div class="header-left">
+          <span class="card-icon">📈</span>
+          <div>
+            <h2 class="card-title">Điện Tim Đồ Realtime (ECG Lead I / AD8232)</h2>
+            <span class="card-sub">Lấy mẫu 250 Hz • Dải quét phosphor 4.0 giây</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <span id="leadsOffBadge" class="tag tag-ok">Điện cực: Tiếp xúc tốt</span>
+          <span class="tag tag-dim">Tần số: 250 Sps</span>
+        </div>
+      </div>
+
+      <div class="oscilloscope-wrapper">
+        <canvas id="ecgCanvas" width="960" height="340"></canvas>
+        <div class="oscilloscope-grid-overlay"></div>
+        <div class="lead-marker">LEAD I • 10mm/mV • 25mm/s</div>
+        <div class="sweep-marker" id="sweepTimeDisplay">00:00:00</div>
+      </div>
+
+      <div class="card-footer ecg-footer">
+        <div class="metric-item">
+          <span class="metric-label">Biên độ R-Peak:</span>
+          <span id="rPeakVal" class="metric-val mono">-- mV</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Chu kỳ RR:</span>
+          <span id="rrIntervalVal" class="metric-val mono">-- ms</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Trạng thái lọc:</span>
+          <span class="metric-val text-cyan">Pan-Tompkins 5-15Hz</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CỘT 2: Thông Số Sinh Hiệu & Trạng Thái Bệnh Nhân (Vitals Grid) -->
+    <section class="vitals-column">
+      <!-- Thẻ Nhịp Tim -->
+      <article class="card vital-card">
+        <div class="vital-header">
+          <span class="vital-label">NHỊP TIM (HR)</span>
+          <span class="heart-pulse-icon" id="heartPulse">❤️</span>
+        </div>
+        <div class="vital-body">
+          <span id="bpmVal" class="vital-number mono">--</span>
+          <span class="vital-unit">BPM</span>
+        </div>
+        <div class="vital-status" id="bpmStatus">Đang chờ tín hiệu...</div>
+        <div class="vital-range">Chuẩn AHA: 60 - 100 BPM</div>
+      </article>
+
+      <!-- Thẻ Thân Nhiệt -->
+      <article class="card vital-card">
+        <div class="vital-header">
+          <span class="vital-label">THÂN NHIỆT (DS18B20)</span>
+          <span class="vital-icon">🌡️</span>
+        </div>
+        <div class="vital-body">
+          <span id="tempVal" class="vital-number mono">--.-</span>
+          <span class="vital-unit">°C</span>
+        </div>
+        <div class="vital-status" id="tempStatus">Nhiệt độ bình thường</div>
+        <div class="vital-range">Chuẩn bề mặt da: 31.5 - 34.5°C</div>
+      </article>
+
+      <!-- Thẻ Gia Tốc SMV & Té Ngã -->
+      <article class="card vital-card">
+        <div class="vital-header">
+          <span class="vital-label">GIA TỐC VA ĐẬP (SMV)</span>
+          <span class="vital-icon">🏃</span>
+        </div>
+        <div class="vital-body">
+          <span id="smvVal" class="vital-number mono">1.00</span>
+          <span class="vital-unit">g</span>
+        </div>
+        <!-- Thanh đo lực SMV -->
+        <div class="gauge-container">
+          <div class="gauge-bar" id="smvGauge" style="width: 25%;"></div>
+          <div class="gauge-threshold" style="left: 62.5%;" title="Ngưỡng té ngã 2.5g"></div>
+        </div>
+        <div class="gauge-labels">
+          <span>0g</span>
+          <span class="text-warning">Ngưỡng ngã: 2.5g</span>
+          <span>4.0g</span>
+        </div>
+        <div class="vital-status text-ok" id="fallStatus">Tư thế ổn định (Bình thường)</div>
+      </article>
+
+      <!-- Thẻ Đếm Sự Kiện & Thống Kê -->
+      <article class="card vital-card stats-card">
+        <div class="vital-header">
+          <span class="vital-label">THỐNG KÊ HỆ THỐNG</span>
+          <span class="vital-icon">📊</span>
+        </div>
+        <div class="stats-list">
+          <div class="stat-row">
+            <span>Số lần ngã ghi nhận:</span>
+            <strong id="fallCountVal" class="mono text-danger">0 lần</strong>
+          </div>
+          <div class="stat-row">
+            <span>Gói tin IoT nhận được:</span>
+            <strong id="packetCountVal" class="mono">0</strong>
+          </div>
+          <div class="stat-row">
+            <span>Kênh cảnh báo tự động:</span>
+            <strong class="text-success">Telegram & Zalo</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- HÀNG DƯỚI: Nhật Ký Sự Kiện Khẩn Cấp (Event Log) -->
+    <section class="card log-card">
+      <div class="card-header">
+        <div class="header-left">
+          <span class="card-icon">📋</span>
+          <div>
+            <h2 class="card-title">Nhật Ký Sự Kiện Lâm Sàng (Audit Trail)</h2>
+            <span class="card-sub">Ghi nhận tự động các biến cố té ngã, hở điện cực và nhịp tim bất thường</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <button id="clearLogBtn" class="btn btn-sm btn-ghost">Xóa nhật ký</button>
+        </div>
+      </div>
+      <div class="log-table-wrapper">
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Loại sự kiện</th>
+              <th>Lực va đập (SMV)</th>
+              <th>Nhịp tim</th>
+              <th>Thân nhiệt</th>
+              <th>Kênh đẩy</th>
+              <th>Mức độ</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr>
+              <td colspan="7" class="text-center text-dim">Chưa có sự kiện bất thường nào được ghi nhận</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Cấu hình MQTT Broker -->
+  <div id="configModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">⚙️ Cấu Hình Kết Nối MQTT Broker</h3>
+        <button id="closeModalBtn" class="modal-close">&times;</button>
+      </div>
+      <form id="configForm" class="modal-body">
+        <div class="form-group">
+          <label for="cfgUri">WebSocket URI Broker (WSS):</label>
+          <input type="text" id="cfgUri" placeholder="wss://mqtt.yourdomain.com/mqtt" required>
+          <small class="form-tip">Cloudflare Tunnel: cổng 443 WSS (Ví dụ: <code>wss://mqtt.tsbyin.dev/mqtt</code>)</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cfgUser">Tài khoản EMQX:</label>
+            <input type="text" id="cfgUser" placeholder="Tài khoản (nếu có)">
+          </div>
+          <div class="form-group">
+            <label for="cfgPass">Mật khẩu EMQX:</label>
+            <input type="password" id="cfgPass" placeholder="Mật khẩu (nếu có)">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cfgTopicData">Topic Dữ liệu Sinh hiệu:</label>
+            <input type="text" id="cfgTopicData" value="biomed/patient/data" required>
+          </div>
+          <div class="form-group">
+            <label for="cfgTopicAlert">Topic Cảnh báo Khẩn:</label>
+            <input type="text" id="cfgTopicAlert" value="biomed/patient/alert" required>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="resetConfigBtn" class="btn btn-ghost">Mặc định</button>
+          <button type="submit" class="btn btn-primary">Lưu & Kết Nối</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bottom-footer">
+    <p>
+      Hệ thống IoMT Giám Sát Điện Tim & Té Ngã • Tác giả: <strong>Nguyễn Văn Tuấn Sỹ</strong> 
+      (<a href="https://github.com/tsbyinchei" target="_blank" rel="noopener">@tsbyinchei</a>) • 
+      Chuẩn ITU-T Rec. Y.2060 & Pan-Tompkins 1985
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -26,6 +26,7 @@
 | 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 60-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
 | 📟 **ESP32 Example** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32%20Example/ESP32%20Example.ino)** |
 | 📊 **MATLAB Scripts** | **Trạm Xử lý Tín hiệu** | Pan-Tompkins thời gian thực với chấm đỏ đỉnh R, bộ lọc trung vị Median, xuất file .MAT và phân tích HRV. | 👉 **[Xem thư mục MATLAB](MATLAB/)** |
+| 🌐 **Web Dashboard** | **Giao diện Telehealth Realtime** | Màn hình ICU Monitor 60 FPS, sóng quét phosphor, nhịp tim BPM, thân nhiệt, lực va đập SMV & còi hú Web Audio API. | 👉 **[Xem Web Dashboard](web/)** |
 
 ---
 
@@ -92,7 +93,7 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 ```
 +=============================================================================+
 | 4. TẦNG ỨNG DỤNG (Application Layer)                                        |
-|    - Web Dashboard: Grafana (https://grafana.yourdomain.com)                 |
+|    - Web Dashboard: IoMT Telehealth Monitor (https://iomt.yourdomain.com)    |
 |    - Quản trị Broker: EMQX Console (https://emqx.yourdomain.com)             |
 |    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@your_telegram_bot) & Zalo Bot |
 |    - Phân tích chuyên sâu: MATLAB Biomedical Signal Processing Toolbox      |
