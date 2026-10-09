@@ -69,8 +69,14 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
    - Chỉ số miền thời gian: Mean RR, SDNN, RMSSD.
    - Đồ thị Poincaré Plot: Phân tích phân tán $SD_1$, $SD_2$ và tỷ số $SD_1 / SD_2$.
    - Phổ mật độ công suất PSD (Welch Method): Phân tích phân bố công suất dải tần $0 - 65\text{Hz}$, chứng minh triệt tiêu nhiễu lưới $50\text{Hz}$ và trôi baseline.
-4.4. Thuật toán phân biệt Té ngã thật sự với Ngồi nhanh / Nằm xuống:
-   - 3 pha: Rơi tự do ($<0.6g$) $\to$ Va đập ($>2.5g$) $\to$ Bất động góc nghiêng ($>50^\circ$, gyro $<65^\circ/\text{s}$).
+4.4. Thuật toán xác thực té ngã 2 giai đoạn (2-Stage Fall Detection with Post-Fall Inactivity Verification):
+   - **Giai đoạn 1 (Xung va đập):** Phát hiện xung gia tốc $SMV = \sqrt{a_x^2 + a_y^2 + a_z^2} \ge 2.5g$ $\to$ Kích hoạt ứng viên ngã và mở cửa sổ thẩm định $2.0\text{s}$.
+   - **Giai đoạn 2 (Thẩm định bất động & tư thế nằm):**
+     - *Tự hủy báo động giả:* Nếu người dùng đứng thẳng ($Tilt < 35^\circ$) và vận động bình thường ($Gyro > 80^\circ/\text{s}$) trong vòng $2\text{s}$ $\to$ Hủy ứng viên ngã.
+     - *Xác nhận ngã thật (Confirmed Fall):* Khi hết cửa sổ $2.0\text{s}$, nếu thỏa mãn đồng thời:
+       + Góc nghiêng cơ thể $Tilt \ge 50^\circ$ (tư thế nằm sàn).
+       + Trạng thái bất động: Vận tốc góc $Gyro < 65^\circ/\text{s}$ và gia tốc tĩnh ổn định ($|SMV - 1.0g| < 0.45g$).
+       + Kích hoạt chốt giữ cảnh báo trong $3\text{ giây}$ gửi UDP $\to$ Gateway $\to$ còi hú $\to$ Telegram/Zalo $\to$ Web.
 
 ---
 

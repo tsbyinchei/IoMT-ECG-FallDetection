@@ -132,13 +132,16 @@ bool initMPU6050() {
   return false;
 }
 
-// ── Thuật toán Kiểm định Té ngã 3 pha (3-Phase Fall Dynamic Verification) ──
-// Tham khảo mô hình kiểm định Tilt Angle & Gyroscope từ: https://github.com/Circuit-Digest/Elderly-Fall-Detection-System
+// ── Thuật toán Kiểm định Té ngã 2 giai đoạn (Post-Fall Inactivity Verification) ──
 bool candidateFall = false;
 unsigned long candidateFallTime = 0;
 float candidatePeakSMV = 1.0f;
 float lastTiltAngle = 0.0f;
 float lastTotalGyro = 0.0f;
+
+// Vector trọng trường tham chiếu thích ứng động (Cho phép đặt MPU ở BẤT KỲ GÓC NÀO)
+float baseGx = 0.0f, baseGy = 0.0f, baseGz = 1.0f;
+bool baseGInitialized = false;
 
 void sampleMPU6050() {
   if (!mpuFound) return;
@@ -170,36 +173,79 @@ void sampleMPU6050() {
     float instantSMV = sqrtf(lastAx * lastAx + lastAy * lastAy + lastAz * lastAz);
     sensorData.smv = instantSMV;
 
-    // Tính góc nghiêng cơ thể (Tilt Angle) so với phương thẳng đứng
-    if (instantSMV > 0.1f) {
-      float ratio = fabsf(lastAz) / instantSMV;
-      if (ratio > 1.0f) ratio = 1.0f;
-      lastTiltAngle = acosf(ratio) * (180.0f / (float)M_PI);
+    // Tự động nhận diện tư thế ban đầu bất kể hướng đặt MPU-6050
+    if (!baseGInitialized && instantSMV > 0.5f) {
+      baseGx = lastAx / instantSMV;
+      baseGy = lastAy / instantSMV;
+      baseGz = lastAz / instantSMV;
+      baseGInitialized = true;
     }
 
-    // Pha 1: Va đập (Impact Phase) - Phát hiện xung gia tốc >= 2.5g
+    // Tự động cập nhật thích nghi trọng trường khi cơ thể ở trạng thái tĩnh ổn định (0.85g - 1.15g)
+    if (!candidateFall && fallHoldCounter == 0 && instantSMV >= 0.85f && instantSMV <= 1.15f && lastTotalGyro < 45.0f) {
+      baseGx = 0.98f * baseGx + 0.02f * (lastAx / instantSMV);
+      baseGy = 0.98f * baseGy + 0.02f * (lastAy / instantSMV);
+      baseGz = 0.98f * baseGz + 0.02f * (lastAz / instantSMV);
+      float baseLen = sqrtf(baseGx * baseGx + baseGy * baseGy + baseGz * baseGz);
+      if (baseLen > 0.01f) {
+        baseGx /= baseLen;
+        baseGy /= baseLen;
+        baseGz /= baseLen;
+      }
+    }
+
+    // Tính góc biến thiên tư thế (Tilt Angle) so với tư thế ban đầu (Tự thích ứng mọi hướng gắn)
+    if (instantSMV > 0.2f) {
+      float dotProd = (lastAx * baseGx + lastAy * baseGy + lastAz * baseGz) / instantSMV;
+      if (dotProd > 1.0f) dotProd = 1.0f;
+      if (dotProd < -1.0f) dotProd = -1.0f;
+      lastTiltAngle = acosf(fabsf(dotProd)) * (180.0f / (float)M_PI);
+    }
+
+    // ── GIAI ĐOẠN 1: PHÁT HIỆN XUNG VA ĐẬP (Stage 1: Impact Acceleration Peak) ──
     if (instantSMV >= FALL_THRESHOLD && !candidateFall && fallHoldCounter == 0) {
       candidateFall = true;
       candidateFallTime = millis();
       candidatePeakSMV = instantSMV;
-      Serial.printf("[NGÃ TIỀM NĂNG] Xung va đập: %.2fg | Góc nghiêng: %.1f°\n", instantSMV, lastTiltAngle);
+      Serial.printf("[STAGE 1: VA ĐẬP] SMV Đỉnh: %.2fg >= %.1fg -> Bắt đầu thẩm định bất động 2.0s...\n",
+                    instantSMV, FALL_THRESHOLD);
     }
 
-    // Pha 2 & 3: Kiểm định động học sau ngã (Post-Fall Immobility & Tilt Verification)
+    // ── GIAI ĐOẠN 2: THẨM ĐỊNH BẤT ĐỘNG & TƯ THẾ NẰM (Stage 2: Post-Fall Inactivity & Posture Verification) ──
     if (candidateFall) {
-      if (instantSMV > candidatePeakSMV) candidatePeakSMV = instantSMV;
-
-      // Nếu cử động mạnh ngay sau va đập (ngồi xuống ghế cựa quậy, đứng dậy: Gyro > 120°/s) -> Hủy báo động giả
-      if (lastTotalGyro > 120.0f && (millis() - candidateFallTime < 1500)) {
-        candidateFall = false;
-        Serial.println("[TỰ HỦY BÁO ĐỘNG GIẢ] Phát hiện cử động bình thường sau va đập!");
+      if (instantSMV > candidatePeakSMV) {
+        candidatePeakSMV = instantSMV;
       }
-      // Sau 1.8 giây kiểm định: Nếu góc nghiêng nằm sàn (Tilt >= 50°) hoặc nằm im bất động (Gyro < 65°/s)
-      else if (millis() - candidateFallTime >= 1800) {
-        if (lastTiltAngle >= 50.0f || lastTotalGyro < 65.0f) {
-          fallHoldCounter = 30; // Chốt giữ cảnh báo té ngã trong 3 giây (30 gói tin 100ms)
-          Serial.printf(">>> [XÁC NHẬN TÉ NGÃ THẬT] Lực: %.2fg | Góc nằm: %.1f° | Bất động Gyro: %.1f°/s <<<\n",
-                        candidatePeakSMV, lastTiltAngle, lastTotalGyro);
+
+      unsigned long elapsed = millis() - candidateFallTime;
+
+      // Kịch bản A - Tự phục hồi / Báo động giả (Self-Recovery):
+      // Người dùng vẫn đứng thẳng (Tilt < 35°) và tiếp tục vận động (Gyro > 80°/s) -> Hủy báo động
+      if (elapsed < 2000) {
+        if (lastTiltAngle < 35.0f && lastTotalGyro > 80.0f) {
+          candidateFall = false;
+          Serial.println("[TỰ HỦY BÁO ĐỘNG] Người dùng đã đứng thẳng và di chuyển bình thường!");
+        }
+      }
+      // Kịch bản B - Hết cửa sổ thẩm định (>= 2.0s):
+      // Kiểm tra 2 tiêu chí y sinh bắt buộc:
+      // 1. Tư thế nằm sàn: Góc nghiêng cơ thể Tilt >= 50° (nằm bẹp dưới sàn)
+      // 2. Trạng thái bất động: Vận tốc góc Gyro < 65°/s và độ biến thiên gia tốc tĩnh ổn định
+      else if (elapsed >= 2000) {
+        bool isLyingDown = (lastTiltAngle >= 50.0f);
+        bool isImmobile  = (lastTotalGyro < 65.0f && fabsf(instantSMV - 1.0f) < 0.45f);
+
+        if (isLyingDown && isImmobile) {
+          fallHoldCounter = 30; // Chốt giữ cảnh báo ngã trong 3 giây (30 gói tin UDP 100ms)
+          Serial.println("\n***************************************************");
+          Serial.printf(">>> [XÁC NHẬN TÉ NGÃ 2 GIAI ĐOẠN (POST-FALL VERIFIED)] <<<\n");
+          Serial.printf("    - Va đập SMV cực đại: %.2fg (Ngưỡng: %.1fg)\n", candidatePeakSMV, FALL_THRESHOLD);
+          Serial.printf("    - Góc nghiêng nằm sàn: %.1f° (Chuẩn >= 50°)\n", lastTiltAngle);
+          Serial.printf("    - Độ bất động sau ngã: Gyro = %.1f°/s (< 65°/s)\n", lastTotalGyro);
+          Serial.println("***************************************************\n");
+        } else {
+          Serial.printf("[HỦY BÁO ĐỘNG] Không thỏa mãn tiêu chuẩn ngã thật: Góc=%.1f° (cần >=50°), Gyro=%.1f°/s\n",
+                        lastTiltAngle, lastTotalGyro);
         }
         candidateFall = false;
       }
