@@ -64,6 +64,10 @@ const char *TOPIC_DATA =
     "biomed/patient/data"; // Dữ liệu đo đạc (ECG, Temp, SMV, BPM)
 const char *TOPIC_ALERT =
     "biomed/patient/alert"; // Cảnh báo khẩn (Fall, LeadOff)
+const char *TOPIC_CMD =
+    "biomed/gateway/cmd";   // Lệnh điều khiển Gateway từ xa (Mute/Unmute/Test)
+const char *TOPIC_STATUS =
+    "biomed/gateway/status"; // Trạng thái Gateway (Online/Muted/Active)
 
 // 4. Telegram Bot API
 #ifndef TELEGRAM_BOT_TOKEN
@@ -112,6 +116,7 @@ unsigned long lastMqttReconnectAttempt = 0;
 unsigned long totalPacketsReceived = 0;
 uint16_t totalFallsCount = 0;
 bool prevFallState = false;
+bool buzzerMuted = false; // Cờ tắt còi báo động từ xa hoặc tại chỗ
 
 // ==================== QUẢN LÝ CHUYỂN TRANG MÀN HÌNH ====================
 #define TOTAL_PAGES 4
@@ -129,9 +134,16 @@ void handleButton() {
   if (reading == LOW && lastButtonState == HIGH) {
     if (millis() - lastDebounceTime > 200) {
       lastDebounceTime = millis();
-      currentPage = (currentPage + 1) % TOTAL_PAGES;
-      Serial.printf("[OLED] Chuyen sang Trang %d/%d\n", currentPage + 1,
-                    TOTAL_PAGES);
+      // Nếu đang báo động mà bấm nút BOOT -> Tắt còi tại chỗ (Local Mute)
+      if ((incomingData.fallDetected || incomingData.leadsOff) && !buzzerMuted) {
+        buzzerMuted = true;
+        digitalWrite(BUZZER_PIN, LOW);
+        Serial.println("[LOCAL] Bam nut BOOT de tat coi tai cho!");
+      } else {
+        currentPage = (currentPage + 1) % TOTAL_PAGES;
+        Serial.printf("[OLED] Chuyen sang Trang %d/%d\n", currentPage + 1,
+                      TOTAL_PAGES);
+      }
     }
   }
   lastButtonState = reading;
@@ -388,6 +400,12 @@ void handleBuzzer() {
   static unsigned long lastBeep = 0;
   static bool beepState = false;
 
+  // Nếu người dùng đã kích hoạt tắt còi từ xa hoặc tại chỗ -> Im lặng
+  if (buzzerMuted) {
+    digitalWrite(BUZZER_PIN, LOW);
+    return;
+  }
+
   if (incomingData.fallDetected) {
     // Báo động ngã khẩn cấp: Kêu dồn dập (100ms ON / 100ms OFF)
     if (millis() - lastBeep >= 100) {
@@ -426,13 +444,44 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     mqtt_connected = true;
     Serial.println(
         "\n[MQTT] >>> KET NOI THANH CONG TOI BROKER CLOUD (WSS)! <<<");
-    esp_mqtt_client_publish(mqtt_client, "biomed/status",
-                            "ESP32 Gateway Online", 0, 1, 0);
+    esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS,
+                            "{\"status\":\"online\",\"buzzer\":\"active\"}", 0, 1, 0);
+    esp_mqtt_client_subscribe(mqtt_client, TOPIC_CMD, 1);
+    Serial.printf("[MQTT] Da subscribe lang nghe lenh Gateway tai: %s\n", TOPIC_CMD);
     break;
   case MQTT_EVENT_DISCONNECTED:
     mqtt_connected = false;
     Serial.println("[MQTT] Mat ket noi Broker. Dang tu dong ket noi lai...");
     break;
+  case MQTT_EVENT_DATA: {
+    char topicBuf[64] = {0};
+    int tLen = event->topic_len < (int)sizeof(topicBuf) - 1 ? event->topic_len : (int)sizeof(topicBuf) - 1;
+    strncpy(topicBuf, event->topic, tLen);
+
+    char dataBuf[128] = {0};
+    int dLen = event->data_len < (int)sizeof(dataBuf) - 1 ? event->data_len : (int)sizeof(dataBuf) - 1;
+    strncpy(dataBuf, event->data, dLen);
+
+    Serial.printf("[MQTT CMD] Nhan lenh dieu khien tai [%s]: %s\n", topicBuf, dataBuf);
+
+    if (strstr(dataBuf, "mute") != NULL && strstr(dataBuf, "unmute") == NULL) {
+      buzzerMuted = true;
+      digitalWrite(BUZZER_PIN, LOW);
+      Serial.println("[REMOTE] >>> DA TAT COI BAO DONG (BUZZER MUTED) TU XA! <<<");
+      esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, "{\"status\":\"ok\",\"buzzer\":\"muted\"}", 0, 1, 0);
+    } else if (strstr(dataBuf, "unmute") != NULL) {
+      buzzerMuted = false;
+      Serial.println("[REMOTE] >>> DA BAT LAI COI BAO DONG (BUZZER ACTIVE)! <<<");
+      esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, "{\"status\":\"ok\",\"buzzer\":\"active\"}", 0, 1, 0);
+    } else if (strstr(dataBuf, "beep") != NULL || strstr(dataBuf, "test") != NULL) {
+      Serial.println("[REMOTE] >>> TEST COI CHIP 150ms! <<<");
+      digitalWrite(BUZZER_PIN, HIGH);
+      delay(150);
+      digitalWrite(BUZZER_PIN, LOW);
+      esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, "{\"status\":\"ok\",\"buzzer\":\"tested\"}", 0, 1, 0);
+    }
+    break;
+  }
   case MQTT_EVENT_ERROR:
     Serial.println("[MQTT] Bao loi ket noi MQTT WSS");
     break;
@@ -712,6 +761,16 @@ void loop() {
       totalFallsCount++;
       sendTelegramFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
       sendZaloFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
+    }
+
+    // Khi người bệnh đã ổn định (hết ngã), tự động nhả cờ buzzerMuted để sẵn sàng cho lần sau
+    if (!incomingData.fallDetected && prevFallState && buzzerMuted) {
+      buzzerMuted = false;
+      Serial.println("[BUZZER] Tu dong tai kich hoat coi sau khi ket thuc bien co.");
+      if (mqtt_connected) {
+        esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS,
+                                "{\"status\":\"ok\",\"buzzer\":\"active\"}", 0, 1, 0);
+      }
     }
     prevFallState = incomingData.fallDetected;
 
