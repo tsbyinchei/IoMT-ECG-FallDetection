@@ -3,7 +3,7 @@
  * Cache Shell Assets and handle offline capabilities.
  */
 
-const CACHE_NAME = 'iomt-monitor-v1.1';
+const CACHE_NAME = 'iomt-monitor-v1.2';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -52,8 +52,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
-  // Bỏ qua các yêu cầu WebSocket (wss://) hoặc không phải HTTP GET
-  if (request.method !== 'GET' || request.url.startsWith('ws://') || request.url.startsWith('wss://')) {
+  // Chỉ xử lý các yêu cầu HTTP/HTTPS GET, bỏ qua chrome-extension://, ws://, wss://, data:
+  if (request.method !== 'GET' || !request.url.startsWith('http')) {
     return;
   }
 
