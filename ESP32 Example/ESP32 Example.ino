@@ -554,13 +554,8 @@ void initAndStartMQTT() {
   esp_mqtt_client_config_t mqtt_cfg = {};
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   mqtt_cfg.broker.address.uri = MQTT_URI;
-  mqtt_cfg.broker.address.transport = MQTT_TRANSPORT_OVER_WSS;
-  mqtt_cfg.broker.address.hostname = "mqtt.tsbyin.dev";
-  mqtt_cfg.broker.address.port = 443;
-  mqtt_cfg.broker.address.path = "/mqtt";
   mqtt_cfg.broker.verification.certificate = ISRG_ROOT_X1_CA;
   mqtt_cfg.broker.verification.skip_cert_common_name_check = true;
-  mqtt_cfg.session.protocol_ver = MQTT_PROTOCOL_V_3_1_1;
   if (strlen(MQTT_USER) > 0) {
     mqtt_cfg.credentials.username = MQTT_USER;
     mqtt_cfg.credentials.authentication.password = MQTT_PASS;
@@ -568,7 +563,6 @@ void initAndStartMQTT() {
   mqtt_cfg.credentials.client_id = MQTT_CLIENT_ID;
   mqtt_cfg.network.disable_auto_reconnect = false;
   mqtt_cfg.network.timeout_ms = 15000;
-  mqtt_cfg.task.stack_size = 10240;
   mqtt_cfg.buffer.size = 2048;
   mqtt_cfg.buffer.out_size = 2048;
 #else
