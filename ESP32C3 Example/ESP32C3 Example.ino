@@ -14,7 +14,7 @@
 #define I2C_SCL_PIN     7    // Chân SCL giao tiếp MPU-6050
 
 #define MPU6050_ADDR    0x68 // Địa chỉ I2C mặc định của MPU-6050
-#define FALL_THRESHOLD  2.5f // Ngưỡng SMV cảnh báo té ngã (đơn vị: g)
+#define FALL_THRESHOLD  2.2f // Ngưỡng SMV cảnh báo va đập té ngã (đơn vị: g, dải đo ±8g)
 
 // ==================== THÔNG TIN MẠNG UDP ====================
 const char* AP_SSID = "BIOMED_GW";
@@ -88,18 +88,19 @@ float currentMaxSMV = 1.0f;
 uint8_t mpuAddr = 0x68;
 bool mpuFound = false;
 float lastAx = 0, lastAy = 0, lastAz = 1.0f;
+float windowPeakSMV = 1.0f;
 
 // ==================== KHỞI TẠO VÀ ĐỌC MPU-6050 ====================
 bool initMPU6050() {
   pinMode(I2C_SDA_PIN, INPUT_PULLUP);
   pinMode(I2C_SCL_PIN, INPUT_PULLUP);
-  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 100000);
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 400000); // 400kHz Fast-mode I2C
   Wire.setTimeOut(20); // Giới hạn 20ms, tuyệt đối không treo CPU nếu dây I2C lỏng
 
   Serial.print("[I2C] Dang kiem tra MPU-6050 tai 0x68...");
   Wire.beginTransmission(0x68);
-  Wire.write(0x6B);
-  Wire.write(0x00);
+  Wire.write(0x6B); // PWR_MGMT_1
+  Wire.write(0x00); // Đánh thức MPU-6050
   if (Wire.endTransmission(true) == 0) {
     mpuAddr = 0x68;
     mpuFound = true;
@@ -120,10 +121,20 @@ bool initMPU6050() {
   }
 
   if (mpuFound) {
+    // 1. Cấu hình dải đo gia tốc: ±8g (AFS_SEL = 2, độ nhạy 4096 LSB/g)
+    // Tham khảo từ Elderly-Fall-Detection-System để không bị bão hòa trần ở mức 2.0g
     Wire.beginTransmission(mpuAddr);
-    Wire.write(0x1C);
-    Wire.write(0x00);
+    Wire.write(0x1C); // ACCEL_CONFIG
+    Wire.write(0x10); // 0x10 = AFS_SEL 2 (±8g)
     Wire.endTransmission(true);
+
+    // 2. Cấu hình bộ lọc DLPF = 260Hz để bắt trọn xung va đập tức thời
+    Wire.beginTransmission(mpuAddr);
+    Wire.write(0x1A); // CONFIG
+    Wire.write(0x00); // DLPF_CFG = 0 (260Hz bandwidth)
+    Wire.endTransmission(true);
+
+    Serial.println("[MPU] Da cau hinh dai do Gia toc: +/-8G (4096 LSB/g), DLPF: 260Hz");
     return true;
   }
 
@@ -160,9 +171,10 @@ void sampleMPU6050() {
     int16_t gy_raw = (Wire.read() << 8) | Wire.read();
     int16_t gz_raw = (Wire.read() << 8) | Wire.read();
 
-    lastAx = (float)ax_raw / 16384.0f;
-    lastAy = (float)ay_raw / 16384.0f;
-    lastAz = (float)az_raw / 16384.0f;
+    // Với dải ±8g, hệ số quy đổi độ nhạy là 4096 LSB/g
+    lastAx = (float)ax_raw / 4096.0f;
+    lastAy = (float)ay_raw / 4096.0f;
+    lastAz = (float)az_raw / 4096.0f;
 
     // Chuyển đổi vận tốc góc Gyroscope (đơn vị: độ/giây - dps)
     float gx_dps = (float)gx_raw / 131.0f;
@@ -171,7 +183,12 @@ void sampleMPU6050() {
     lastTotalGyro = fabsf(gx_dps) + fabsf(gy_dps) + fabsf(gz_dps);
 
     float instantSMV = sqrtf(lastAx * lastAx + lastAy * lastAy + lastAz * lastAz);
-    sensorData.smv = instantSMV;
+
+    // Chốt giữ đỉnh va đập trong cửa sổ 100ms gửi UDP
+    if (instantSMV > windowPeakSMV) {
+      windowPeakSMV = instantSMV;
+    }
+    sensorData.smv = windowPeakSMV;
 
     // Tự động nhận diện tư thế ban đầu bất kể hướng đặt MPU-6050
     if (!baseGInitialized && instantSMV > 0.5f) {
@@ -220,31 +237,31 @@ void sampleMPU6050() {
       unsigned long elapsed = millis() - candidateFallTime;
 
       // Kịch bản A - Tự phục hồi / Báo động giả (Self-Recovery):
-      // Người dùng vẫn đứng thẳng (Tilt < 35°) và tiếp tục vận động (Gyro > 80°/s) -> Hủy báo động
+      // Người dùng vẫn đứng thẳng (Tilt < 30°) và tiếp tục vận động (Gyro > 80°/s) -> Hủy báo động
       if (elapsed < 2000) {
-        if (lastTiltAngle < 35.0f && lastTotalGyro > 80.0f) {
+        if (lastTiltAngle < 30.0f && lastTotalGyro > 80.0f) {
           candidateFall = false;
           Serial.println("[TỰ HỦY BÁO ĐỘNG] Người dùng đã đứng thẳng và di chuyển bình thường!");
         }
       }
       // Kịch bản B - Hết cửa sổ thẩm định (>= 2.0s):
       // Kiểm tra 2 tiêu chí y sinh bắt buộc:
-      // 1. Tư thế nằm sàn: Góc nghiêng cơ thể Tilt >= 50° (nằm bẹp dưới sàn)
-      // 2. Trạng thái bất động: Vận tốc góc Gyro < 65°/s và độ biến thiên gia tốc tĩnh ổn định
+      // 1. Tư thế nằm sàn: Góc nghiêng cơ thể Tilt >= 40°
+      // 2. Trạng thái bất động: Vận tốc góc Gyro < 70°/s và độ biến thiên gia tốc tĩnh ổn định
       else if (elapsed >= 2000) {
-        bool isLyingDown = (lastTiltAngle >= 50.0f);
-        bool isImmobile  = (lastTotalGyro < 65.0f && fabsf(instantSMV - 1.0f) < 0.45f);
+        bool isLyingDown = (lastTiltAngle >= 40.0f);
+        bool isImmobile  = (lastTotalGyro < 70.0f && fabsf(instantSMV - 1.0f) < 0.50f);
 
         if (isLyingDown && isImmobile) {
           fallHoldCounter = 30; // Chốt giữ cảnh báo ngã trong 3 giây (30 gói tin UDP 100ms)
           Serial.println("\n***************************************************");
           Serial.printf(">>> [XÁC NHẬN TÉ NGÃ 2 GIAI ĐOẠN (POST-FALL VERIFIED)] <<<\n");
           Serial.printf("    - Va đập SMV cực đại: %.2fg (Ngưỡng: %.1fg)\n", candidatePeakSMV, FALL_THRESHOLD);
-          Serial.printf("    - Góc nghiêng nằm sàn: %.1f° (Chuẩn >= 50°)\n", lastTiltAngle);
-          Serial.printf("    - Độ bất động sau ngã: Gyro = %.1f°/s (< 65°/s)\n", lastTotalGyro);
+          Serial.printf("    - Góc nghiêng nằm sàn: %.1f° (Chuẩn >= 40°)\n", lastTiltAngle);
+          Serial.printf("    - Độ bất động sau ngã: Gyro = %.1f°/s (< 70°/s)\n", lastTotalGyro);
           Serial.println("***************************************************\n");
         } else {
-          Serial.printf("[HỦY BÁO ĐỘNG] Không thỏa mãn tiêu chuẩn ngã thật: Góc=%.1f° (cần >=50°), Gyro=%.1f°/s\n",
+          Serial.printf("[HỦY BÁO ĐỘNG] Không thỏa mãn tiêu chuẩn ngã thật: Góc=%.1f° (cần >=40°), Gyro=%.1f°/s\n",
                         lastTiltAngle, lastTotalGyro);
         }
         candidateFall = false;
@@ -329,8 +346,8 @@ void loop() {
     // Đọc mẫu Analog từ chân ECG (12-bit ADC: 0 -> 4095)
     sensorData.ecgSamples[sampleIndex] = analogRead(ECG_PIN);
 
-    // Lấy mẫu gia tốc MPU-6050 mỗi 20ms (cứ mỗi 5 mẫu ECG) để bắt trọn xung va đập ngã
-    if (sampleIndex % 5 == 0) {
+    // Lấy mẫu gia tốc MPU-6050 mỗi 8ms (cứ mỗi 2 mẫu ECG) để bắt trọn xung va đập ngã
+    if (sampleIndex % 2 == 0) {
       sampleMPU6050();
     }
 
@@ -372,6 +389,9 @@ void loop() {
       udp.beginPacket(GATEWAY_IP, UDP_PORT);
       udp.write((uint8_t*)&sensorData, sizeof(sensorData));
       udp.endPacket();
+
+      // Đặt lại đỉnh va chạm cho cửa sổ 100ms tiếp theo về mức gia tốc hiện tại
+      windowPeakSMV = sqrtf(lastAx * lastAx + lastAy * lastAy + lastAz * lastAz);
     }
   }
 
