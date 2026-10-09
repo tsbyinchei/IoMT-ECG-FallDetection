@@ -1,5 +1,11 @@
 #include "esp_idf_version.h"
 #include "mqtt_client.h"
+#if __has_include("esp_crt_bundle.h")
+#include "esp_crt_bundle.h"
+#define HAS_ESP_CRT_BUNDLE 1
+#else
+#define HAS_ESP_CRT_BUNDLE 0
+#endif
 #include <U8g2lib.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -361,22 +367,30 @@ void drawOLED() {
   else if (currentPage == 3) {
     u8g2.setFont(u8g2_font_6x10_tf);
     u8g2.drawStr(0, 9, "SYSTEM DIAG [P4/4]");
-    u8g2.drawHLine(0, 12, 128);
+    u8g2.drawHLine(0, 11, 128);
 
-    u8g2.setFont(u8g2_font_6x10_tf);
+    u8g2.setFont(u8g2_font_5x8_tf);
+    char wifiBuf[32];
+    if (WiFi.status() == WL_CONNECTED) {
+      snprintf(wifiBuf, sizeof(wifiBuf), "WiFi: %s (%s)", ROUTER_SSID, WiFi.localIP().toString().c_str());
+    } else {
+      snprintf(wifiBuf, sizeof(wifiBuf), "WiFi: MAT KET NOI (%s)", ROUTER_SSID);
+    }
+    u8g2.drawStr(0, 22, wifiBuf);
+
 #if ENABLE_MQTT
-    u8g2.drawStr(0, 24,
-                 mqtt_connected ? "Cloud: WSS ONLINE" : "Cloud: CONNECTING...");
+    u8g2.drawStr(0, 33,
+                 mqtt_connected ? "Cloud: WSS ONLINE [OK]" : "Cloud: CONNECTING...");
 #else
-    u8g2.drawStr(0, 24, "Che do: LOCAL OFFLINE");
+    u8g2.drawStr(0, 33, "Cloud: LOCAL OFFLINE");
 #endif
 
-    char pkgStr[30];
-    snprintf(pkgStr, sizeof(pkgStr), "Goi tin RX: %lu", totalPacketsReceived);
-    u8g2.drawStr(0, 37, pkgStr);
+    char pkgStr[32];
+    snprintf(pkgStr, sizeof(pkgStr), "RX: %lu | Nga: %u lan", totalPacketsReceived, totalFallsCount);
+    u8g2.drawStr(0, 44, pkgStr);
 
-    u8g2.drawStr(0, 50, "SoftAP: BIOMED_GW");
-    u8g2.drawStr(0, 63, "Node C3: 192.168.4.2");
+    u8g2.drawStr(0, 55, "SoftAP: BIOMED_GW:4210");
+    u8g2.drawStr(0, 64, "Node C3: 192.168.4.2");
   }
 
   // ==================== POPUP CẢNH BÁO KHẨN CẤP (HIỂN THỊ TRÊN MỌI TRANG)
@@ -499,21 +513,33 @@ void initAndStartMQTT() {
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   mqtt_cfg.broker.address.uri = MQTT_URI;
   mqtt_cfg.broker.verification.skip_cert_common_name_check = true;
+#if HAS_ESP_CRT_BUNDLE
+  mqtt_cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
+#endif
   if (strlen(MQTT_USER) > 0) {
     mqtt_cfg.credentials.username = MQTT_USER;
     mqtt_cfg.credentials.authentication.password = MQTT_PASS;
   }
   mqtt_cfg.credentials.client_id = MQTT_CLIENT_ID;
   mqtt_cfg.network.disable_auto_reconnect = false;
+  mqtt_cfg.network.timeout_ms = 10000;
+  mqtt_cfg.buffer.size = 2048;
+  mqtt_cfg.buffer.out_size = 2048;
 #else
   mqtt_cfg.uri = MQTT_URI;
   mqtt_cfg.skip_cert_common_name_check = true;
+#if HAS_ESP_CRT_BUNDLE
+  mqtt_cfg.crt_bundle_attach = esp_crt_bundle_attach;
+#endif
   if (strlen(MQTT_USER) > 0) {
     mqtt_cfg.username = MQTT_USER;
     mqtt_cfg.password = MQTT_PASS;
   }
   mqtt_cfg.client_id = MQTT_CLIENT_ID;
   mqtt_cfg.disable_auto_reconnect = false;
+  mqtt_cfg.network_timeout_ms = 10000;
+  mqtt_cfg.buffer_size = 2048;
+  mqtt_cfg.out_buffer_size = 2048;
 #endif
 
   mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
@@ -521,15 +547,26 @@ void initAndStartMQTT() {
                                  (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID,
                                  mqtt_event_handler, NULL);
   esp_mqtt_client_start(mqtt_client);
-  Serial.printf("[MQTT] Khoi chay client ket noi Cloud: %s\n", MQTT_URI);
+  Serial.printf("[MQTT] Khoi chay client ket noi Cloud Broker: %s\n", MQTT_URI);
 #endif
 }
 
 // ==================== XUẤT BẢN DỮ LIỆU SANG MQTT ====================
 void publishDataMQTT() {
 #if ENABLE_MQTT
-  if (!mqtt_client || !mqtt_connected)
+  static unsigned long lastWarnTime = 0;
+  if (!mqtt_client || !mqtt_connected) {
+    if (millis() - lastWarnTime >= 5000) {
+      lastWarnTime = millis();
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.printf("[MQTT CHUA DAY] Wi-Fi chua ket noi Router '%s' (Trang thai: %d). Dang doi...\n", ROUTER_SSID, WiFi.status());
+      } else {
+        Serial.printf("[MQTT CHUA DAY] Wi-Fi da ket noi (IP: %s) nhung Broker Cloud (%s) chua Connected! Dang ket noi...\n",
+                      WiFi.localIP().toString().c_str(), MQTT_URI);
+      }
+    }
     return;
+  }
 
   char jsonBuffer[512];
   int offset =
@@ -546,6 +583,12 @@ void publishDataMQTT() {
   snprintf(jsonBuffer + offset, sizeof(jsonBuffer) - offset, "]}");
 
   esp_mqtt_client_publish(mqtt_client, TOPIC_DATA, jsonBuffer, 0, 0, 0);
+
+  static unsigned long totalPubCount = 0;
+  totalPubCount++;
+  if (totalPubCount % 100 == 0) {
+    Serial.printf("[MQTT] >>> Da day thanh cong %lu goi tin sinh hieu len Web Dashboard Cloud! <<<\n", totalPubCount);
+  }
 
   if (incomingData.fallDetected || incomingData.leadsOff) {
     char alertBuf[128];
@@ -704,18 +747,20 @@ void setup() {
   // Cấu hình Wi-Fi kép (WIFI_AP_STA): vừa thu UDP vừa đẩy Internet
 #if ENABLE_MQTT
   WiFi.mode(WIFI_AP_STA);
-  Serial.printf("[WiFi] Dang ket noi vao Router: %s...\n", ROUTER_SSID);
+  Serial.printf("\n[WiFi] Dang ket noi Router: %s", ROUTER_SSID);
   WiFi.begin(ROUTER_SSID, ROUTER_PASS);
   int retry = 0;
-  while (WiFi.status() != WL_CONNECTED && retry < 15) {
+  while (WiFi.status() != WL_CONNECTED && retry < 25) {
     delay(300);
     Serial.print(".");
     retry++;
   }
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("\n[WiFi] Da ket noi Router! IP: %s\n",
-                  WiFi.localIP().toString().c_str());
+    Serial.printf("\n[WiFi] Da ket noi Router! IP: %s (Kenh: %d | RSSI: %d dBm)\n",
+                  WiFi.localIP().toString().c_str(), WiFi.channel(), WiFi.RSSI());
     initAndStartMQTT();
+  } else {
+    Serial.printf("\n[WiFi CANH BAO] Chua ket noi duoc Router '%s'. Gateway se tiep tuc thu lai tu dong trong loop()!\n", ROUTER_SSID);
   }
 #else
   // Chế độ Local: Chỉ phát SoftAP, không mất thời gian tìm Router
@@ -725,8 +770,11 @@ void setup() {
 #endif
 
   // Phát SoftAP cho Node ESP32-C3
-  WiFi.softAP(AP_SSID);
-  Serial.printf("[AP] Gateway phat AP: %s (IP: 192.168.4.1)\n", AP_SSID);
+  // Dùng kênh sóng của Router nếu đã kết nối để tránh xung đột RF radio
+  int apChannel = (WiFi.status() == WL_CONNECTED) ? WiFi.channel() : 1;
+  WiFi.softAP(AP_SSID, NULL, apChannel);
+  Serial.printf("[AP] Gateway phat SoftAP: %s (Kenh: %d | IP: %s)\n",
+                AP_SSID, apChannel, WiFi.softAPIP().toString().c_str());
 
   // Mở cổng UDP lắng nghe gói tin từ ESP32-C3
   udp.begin(UDP_PORT);
@@ -742,10 +790,21 @@ void loop() {
   // 1. Kiểm tra nút nhấn BOOT để chuyển trang OLED
   handleButton();
 
-  // 2. Quản lý MQTT (chỉ kích hoạt khi ENABLE_MQTT = true)
+  // 2. Quản lý kết nối Wi-Fi & MQTT (chỉ kích hoạt khi ENABLE_MQTT = true)
 #if ENABLE_MQTT
-  if (WiFi.status() == WL_CONNECTED && mqtt_client == NULL) {
-    initAndStartMQTT();
+  static unsigned long lastWifiRetry = 0;
+  if (WiFi.status() != WL_CONNECTED) {
+    if (millis() - lastWifiRetry >= 10000) {
+      lastWifiRetry = millis();
+      Serial.printf("[WiFi RETRY] Dang ket noi lai Router Wi-Fi '%s' ...\n", ROUTER_SSID);
+      WiFi.begin(ROUTER_SSID, ROUTER_PASS);
+    }
+  } else {
+    if (mqtt_client == NULL) {
+      Serial.printf("[WiFi] Da ket noi Router! IP: %s. Bat dau khoi chay MQTT...\n",
+                    WiFi.localIP().toString().c_str());
+      initAndStartMQTT();
+    }
   }
 #endif
 

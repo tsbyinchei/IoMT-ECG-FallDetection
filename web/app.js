@@ -242,9 +242,11 @@ function connectMQTT() {
 
   const options = {
     clean: true,
-    connectTimeout: 8000,
+    connectTimeout: 20000, // 20s cho WSS qua Cloudflare Tunnel & EMQX
     reconnectPeriod: 4000,
-    clientId: 'IoMT_Web_Monitor_' + Math.random().toString(16).substr(2, 8)
+    keepalive: 60,
+    protocolVersion: 4,    // Chuẩn MQTT 3.1.1 ổn định và tương thích cao nhất
+    clientId: 'IoMT_Web_' + Math.random().toString(16).substr(2, 8)
   };
 
   if (config.user) options.username = config.user;
@@ -254,6 +256,7 @@ function connectMQTT() {
     mqttClient = mqtt.connect(config.uri, options);
 
     mqttClient.on('connect', () => {
+      console.log('[MQTT] Kết nối thành công tới broker:', config.uri);
       updateConnectionStatus('connected', 'Cloud WSS Online');
       const subTopics = [
         config.topicData,
@@ -264,6 +267,8 @@ function connectMQTT() {
       mqttClient.subscribe(subTopics, (err) => {
         if (!err) {
           addEventLog('KẾT NỐI HỆ THỐNG', 1.0, '--', '--', 'WSS Port 443', 'INFO');
+        } else {
+          console.warn('[MQTT] Lỗi subscribe topics:', err);
         }
       });
     });
@@ -283,9 +288,16 @@ function connectMQTT() {
       }
     });
 
+    mqttClient.on('reconnect', () => {
+      console.log('[MQTT] Đang tự động kết nối lại Broker...');
+      updateConnectionStatus('connecting', 'Đang kết nối lại Broker...');
+    });
+
     mqttClient.on('error', (err) => {
-      console.error('[MQTT Error]', err);
-      updateConnectionStatus('disconnected', 'Lỗi kết nối Broker');
+      console.warn('[MQTT Event Error]', err.message || err);
+      if (!mqttClient.connected) {
+        updateConnectionStatus('disconnected', 'Lỗi kết nối Broker');
+      }
     });
 
     mqttClient.on('offline', () => {
@@ -293,7 +305,9 @@ function connectMQTT() {
     });
 
     mqttClient.on('close', () => {
-      if (!isDemoMode) updateConnectionStatus('disconnected', 'Đã đóng kết nối');
+      if (!isDemoMode && !mqttClient.connected) {
+        updateConnectionStatus('disconnected', 'Đã đóng kết nối');
+      }
     });
   } catch (e) {
     console.error('Không thể khởi tạo MQTT client:', e);
