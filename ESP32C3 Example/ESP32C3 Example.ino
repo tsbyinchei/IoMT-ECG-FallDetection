@@ -16,14 +16,29 @@
 #define MPU6050_ADDR    0x68 // Địa chỉ I2C mặc định của MPU-6050
 #define FALL_THRESHOLD  2.2f // Ngưỡng SMV cảnh báo va đập té ngã (đơn vị: g, dải đo ±8g)
 
-// ==================== THÔNG TIN MẠNG UDP ====================
+// ==================== THÔNG TIN MẠNG UDP & MULTI-WIFI ROAMING ====================
+// 1. Mạng Gateway SoftAP (Mặc định khi ở gần Gateway bàn làm việc)
 const char* AP_SSID = "BIOMED_GW";
-const char* GATEWAY_IP = "192.168.4.1";
+const char* AP_PASS = NULL;
+
+// 2. Mạng Router Wi-Fi gia đình (Phủ sóng toàn bộ ngôi nhà khi đi xa khỏi Gateway)
+#ifndef SECRET_ROUTER_SSID
+#define SECRET_ROUTER_SSID "YOUR_WIFI_SSID"
+#endif
+#ifndef SECRET_ROUTER_PASS
+#define SECRET_ROUTER_PASS "YOUR_WIFI_PASSWORD"
+#endif
+const char* HOME_SSID = SECRET_ROUTER_SSID;
+const char* HOME_PASS = SECRET_ROUTER_PASS;
+
 const unsigned int UDP_PORT = 4210;
 
-IPAddress local_IP(192, 168, 4, 2);
-IPAddress gateway(192, 168, 4, 1);
-IPAddress subnet(255, 255, 255, 0);
+// Trạng thái mạng đang kết nối:
+enum WifiNetType { NET_NONE, NET_GATEWAY_AP, NET_HOME_WIFI };
+WifiNetType currentNet = NET_NONE;
+
+IPAddress gwDirectIP(192, 168, 4, 1);
+IPAddress currentTargetIP(192, 168, 4, 1);
 
 // ==================== GÓI DỮ LIỆU ĐÓNG GÓI ====================
 // Gom 25 mẫu ECG @ 250Hz (chu kỳ 4ms/mẫu, 25 mẫu = 100ms)
@@ -224,7 +239,9 @@ void sampleMPU6050() {
       candidateFall = true;
       candidateFallTime = millis();
       candidatePeakSMV = instantSMV;
-      Serial.printf("[STAGE 1: VA ĐẬP] SMV Đỉnh: %.2fg >= %.1fg -> Bắt đầu thẩm định bất động 2.0s...\n",
+      fallHoldCounter = 30; // Kích hoạt chốt giữ cảnh báo ngã 3 giây (30 gói UDP) ngay lập tức!
+      sensorData.fallDetected = 1;
+      Serial.printf("[STAGE 1: VA ĐẬP] SMV Đỉnh: %.2fg >= %.1fg -> KÍCH HOẠT CÒI HÚ LIÊN TỤC & Bắt đầu thẩm định 2.0s...\n",
                     instantSMV, FALL_THRESHOLD);
     }
 
@@ -302,37 +319,130 @@ void setup() {
   sensorData.leadsOff = 0;
   sensorData.fallDetected = 0;
 
-  // Cấu hình WiFi kết nối nhanh tới Gateway
-  Serial.printf("[WiFi] Dang ket noi vao Gateway AP: %s...\n", AP_SSID);
+// ==================== HÀM QUẢN LÝ KẾT NỐI VÀ CHUYỂN VÙNG WI-FI (ROAMING) ====================
+void connectToNetwork(WifiNetType target) {
+  WiFi.disconnect();
+  delay(100);
   WiFi.mode(WIFI_STA);
-  WiFi.config(local_IP, gateway, subnet);
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
-  WiFi.setAutoReconnect(true);
   WiFi.setSleep(false);
-  WiFi.begin(AP_SSID);
+  WiFi.setAutoReconnect(true);
+
+  if (target == NET_GATEWAY_AP) {
+    Serial.printf("[WiFi] Dang ket noi truc tiep vao Gateway AP '%s'...\n", AP_SSID);
+    IPAddress local_IP(192, 168, 4, 2);
+    IPAddress gateway(192, 168, 4, 1);
+    IPAddress subnet(255, 255, 255, 0);
+    WiFi.config(local_IP, gateway, subnet);
+    WiFi.begin(AP_SSID);
+    currentNet = NET_GATEWAY_AP;
+    currentTargetIP = gwDirectIP;
+  } else if (target == NET_HOME_WIFI) {
+    Serial.printf("[WiFi] Dang ket noi vao Router Wi-Fi gia dinh '%s'...\n", HOME_SSID);
+    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Dùng DHCP của Router gia đình
+    WiFi.begin(HOME_SSID, HOME_PASS);
+    currentNet = NET_HOME_WIFI;
+    currentTargetIP = IPAddress(255, 255, 255, 255); // Broadcast LAN để Gateway ở bất kỳ tầng nào cũng nhận được
+  }
+}
+
+void selectBestNetwork() {
+  Serial.println("\n[WiFi ROAMING] Dang quet cac mang kha dung...");
+  int n = WiFi.scanNetworks(false, true); // Quét nhanh mạng xung quanh
+  bool hasGW = false;
+  int gwRssi = -100;
+  bool hasHome = false;
+  int homeRssi = -100;
+
+  for (int i = 0; i < n; i++) {
+    if (WiFi.SSID(i) == AP_SSID) {
+      hasGW = true;
+      gwRssi = WiFi.RSSI(i);
+    } else if (WiFi.SSID(i) == HOME_SSID) {
+      hasHome = true;
+      homeRssi = WiFi.RSSI(i);
+    }
+  }
+  WiFi.scanDelete();
+
+  // Chiến lược ưu tiên:
+  // 1. Ở gần bàn Gateway (sóng AP >= -78 dBm) -> Bắt thẳng Gateway AP không cần qua Router
+  // 2. Đi xa khỏi Gateway (sóng AP < -78 dBm hoặc mất sóng) -> Tự động chuyển sang Wi-Fi nhà phủ khắp nhà
+  // 3. Nếu chỉ có một trong hai mạng -> Tự động kết nối mạng đang có
+  if (hasGW && gwRssi >= -78) {
+    Serial.printf("[WiFi] Gateway AP song manh (%d dBm >= -78 dBm) -> Chon BIOMED_GW\n", gwRssi);
+    connectToNetwork(NET_GATEWAY_AP);
+  } else if (hasHome) {
+    Serial.printf("[WiFi] Gateway AP yeu (%d dBm) hoac xa -> Chuyen vung sang Wi-Fi nha '%s' (%d dBm)\n",
+                  gwRssi, HOME_SSID, homeRssi);
+    connectToNetwork(NET_HOME_WIFI);
+  } else if (hasGW) {
+    Serial.printf("[WiFi] Chi tim thay Gateway AP (%d dBm) -> Chon BIOMED_GW\n", gwRssi);
+    connectToNetwork(NET_GATEWAY_AP);
+  } else {
+    Serial.println("[WiFi] Khong tim thay mang nao, thu lai voi Gateway AP...");
+    connectToNetwork(NET_GATEWAY_AP);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(500); // Chờ cổng USB CDC ổn định
+
+  Serial.println("\n==========================================");
+  Serial.println("  ESP32-C3 BIOMEDICAL SENSOR NODE DANG KHOI DONG");
+  Serial.println("  Tan so lay mau ECG: 250 Hz (4ms/sample)");
+  Serial.println("  Che do mang: Multi-WiFi Smart Roaming");
+  Serial.println("==========================================");
+
+  // Cấu hình ADC độ phân giải 12-bit (0-4095) cho tín hiệu ECG AD8232
+  analogReadResolution(12);
+  analogSetAttenuation(ADC_11db);
+
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(ECG_PIN, INPUT);
+  pinMode(LO_MINUS_PIN, INPUT_PULLDOWN);
+  pinMode(LO_PLUS_PIN, INPUT_PULLDOWN);
+
+  // Khởi tạo MPU-6050
+  initMPU6050();
+
+  // Khởi tạo giá trị mặc định cho cấu trúc dữ liệu
+  sensorData.bodyTemp = 36.5f;
+  sensorData.smv = 1.0f;
+  sensorData.leadsOff = 0;
+  sensorData.fallDetected = 0;
+
+  // Lựa chọn mạng tốt nhất để kết nối (Gateway AP hoặc Wi-Fi nhà)
+  selectBestNetwork();
 
   lastSampleMicros = micros();
 }
 
 void loop() {
-  // Tự động kết nối lại định kỳ mỗi 3s nếu mất sóng hoặc Gateway khởi động sau (không cần bấm RST)
+  // Quản lý kết nối Wi-Fi & Tự động chuyển vùng Roaming
+  static unsigned long lastWifiCheck = 0;
   if (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-    static unsigned long lastWifiRetry = 0;
-    if (millis() - lastWifiRetry >= 3000) {
-      lastWifiRetry = millis();
-      Serial.println("[WiFi] Dang thu ket noi lai AP 'BIOMED_GW'...");
-      WiFi.disconnect();
-      WiFi.begin(AP_SSID);
+    digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Nháy LED khi mất mạng
+    static unsigned long lastRetry = 0;
+    if (millis() - lastRetry >= 3000) {
+      lastRetry = millis();
+      selectBestNetwork();
     }
-    if (millis() - lastDiagLog >= 1000) {
-      lastDiagLog = millis();
-      Serial.println("[WiFi] Dang cho Gateway phat AP 'BIOMED_GW' de ket noi...");
-    }
-    delay(100);
+    delay(10);
     return;
   } else {
-    digitalWrite(LED_PIN, HIGH); // Bật sáng liên tục khi đã kết nối ổn định
+    digitalWrite(LED_PIN, HIGH); // Sáng liên tục khi đã kết nối ổn định
+    
+    // Kiểm tra chất lượng sóng định kỳ mỗi 5 giây để tự động chuyển vùng nếu đi xa:
+    if (millis() - lastWifiCheck >= 5000) {
+      lastWifiCheck = millis();
+      int rssi = WiFi.RSSI();
+      // Nếu đang nối với Gateway AP nhưng sóng tụt dưới -82 dBm (bệnh nhân đi xa khỏi bàn):
+      if (currentNet == NET_GATEWAY_AP && rssi < -82) {
+        Serial.printf("[WiFi ROAMING] Song Gateway yeu (%d dBm < -82 dBm), dang tim Wi-Fi nha de chuyen vung...\n", rssi);
+        selectBestNetwork();
+      }
+    }
   }
 
   // 1. Máy trạng thái cập nhật nhiệt độ nền (không block CPU)
@@ -385,8 +495,8 @@ void loop() {
         sensorData.leadsOff = (loMinus || loPlus || sample0 >= 4080 || sample0 <= 50) ? 1 : 0;
       }
 
-      // Đóng gói và gửi UDP broadcast sang Gateway
-      udp.beginPacket(GATEWAY_IP, UDP_PORT);
+      // Đóng gói và gửi UDP sang Gateway (Unicast 192.168.4.1 hoặc Broadcast LAN 255.255.255.255)
+      udp.beginPacket(currentTargetIP, UDP_PORT);
       udp.write((uint8_t*)&sensorData, sizeof(sensorData));
       udp.endPacket();
 

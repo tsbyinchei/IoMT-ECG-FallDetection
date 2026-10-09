@@ -543,15 +543,20 @@ void drawOLED() {
 // ==================== ĐIỀU KHIỂN CÒI BÁO ĐỘNG BUZZER (GPIO 23)
 // ====================
 void handleBuzzer() {
-  // Nếu người dùng đã kích hoạt tắt còi (tại chỗ qua BOOT hoặc từ xa qua Web) -> Im lặng
-  if (buzzerMuted) {
-    digitalWrite(BUZZER_PIN, LOW);
+  // 1. CẢNH BÁO TÉ NGÃ KHẨN CẤP (ƯU TIÊN CAO NHẤT):
+  // Chốt giữ hú liên tục không dừng cho đến khi người dùng bấm nút BOOT hoặc gửi lệnh Tắt từ xa!
+  if (fallAlarmActive || incomingData.fallDetected) {
+    if (!buzzerMuted) {
+      digitalWrite(BUZZER_PIN, HIGH);
+    } else {
+      digitalWrite(BUZZER_PIN, LOW);
+    }
     return;
   }
 
-  // 1. CẢNH BÁO TÉ NGÃ KHẨN CẤP (ƯU TIÊN CAO NHẤT): HÚ LIÊN TỤC KHÔNG DỪNG CHO ĐẾN KHI BẤM NÚT
-  if (fallAlarmActive || incomingData.fallDetected) {
-    digitalWrite(BUZZER_PIN, HIGH);
+  // Nếu người dùng đã kích hoạt tắt còi (cho các cảnh báo phụ như nhịp tim, hở điện cực) -> Im lặng
+  if (buzzerMuted) {
+    digitalWrite(BUZZER_PIN, LOW);
     return;
   }
 
@@ -1021,13 +1026,22 @@ void loop() {
     udp.read((char *)&incomingData, sizeof(incomingData));
     totalPacketsReceived++;
 
-    // Đếm số lần ngã và gửi cảnh báo Telegram khẩn cấp (chỉ tăng khi cờ chuyển
-    // từ 0 lên 1)
-    if (incomingData.fallDetected && !prevFallState) {
+    // Đếm số lần ngã và kích hoạt còi báo động khẩn cấp (khi có cờ ngã từ C3 hoặc xung va chạm cực đại >= 2.5g)
+    bool isCurrentFall = (incomingData.fallDetected == 1) || (incomingData.smv >= 2.5f);
+    if (isCurrentFall && !prevFallState) {
       totalFallsCount++;
+      fallAlarmActive = true; // Kích hoạt còi hú liên tục không ngừng cho đến khi bấm tắt!
+      buzzerMuted = false;    // Tự động mở còi ngay cả khi trước đó người dùng bấm tắt
+      digitalWrite(BUZZER_PIN, HIGH);
+      Serial.println("\n🚨 >>> [CẢNH BÁO TÉ NGÃ KHẨN CẤP] CÒI BÁO ĐỘNG HÚ LIÊN TỤC! <<< 🚨");
       sendTelegramFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
       sendZaloFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
+      if (mqtt_connected) {
+        esp_mqtt_client_publish(mqtt_client, TOPIC_ALERT,
+                                "{\"alert\":\"fall\",\"status\":\"alarming\"}", 0, 1, 0);
+      }
     }
+    prevFallState = isCurrentFall;
 
     // Khi người bệnh đã ổn định (hết ngã), tự động nhả cờ buzzerMuted để sẵn sàng cho lần sau
     if (!incomingData.fallDetected && prevFallState && buzzerMuted) {
