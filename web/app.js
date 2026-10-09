@@ -27,131 +27,205 @@ let totalFalls = 0;
 let prevFallState = 0;
 let lastHeartBeatTime = 0;
 
-// ==================== BỘ LỌC TÍN HIỆU ECG CHUẨN Y TẾ ====================
+// ==================== BỘ LỌC TÍN HIỆU ECG CHUẨN MATLAB & PAN-TOMPKINS ====================
 /**
- * Chuỗi lọc số thời gian thực chuẩn sinh y:
- * 1. 2nd-order IIR Biquad 50Hz Notch Filter (Fs = 250Hz, Q = 7.0): Triệt tiêu triệt để nhiễu điện lưới 50Hz.
- * 2. High-pass Filter (0.5Hz Baseline Detrending): Loại bỏ trôi đường đẳng điện do thở và dịch chuyển điện cực.
- * 3. Low-pass Filter (35Hz Muscle Tremor Rejection): Làm mịn gai nhiễu ADC và co cơ EMG.
- * 4. Pan-Tompkins QRS Derivative + Moving Window Integration: Nhận diện R-Peak và đo chu kỳ RR thực tế.
+ * Mô hình xử lý tín hiệu điện tim chuẩn y sinh tương thích 100% với file MATLAB
+ * ('matlab_mqtt_ecg_processor.m' & 'matlab_serial_ecg_processor.m'):
+ * 
+ * 1. Bước 1 - Bộ lọc thông dải Butterworth 5 - 15 Hz bậc 2 [butter(2, [5 15]/(Fs/2), 'bandpass')]
+ *    thực thi qua cấu trúc Direct Form II Transposed bảo toàn trạng thái trễ liên tục z_bp.
+ * 2. Bước 2 - Bộ vi phân 5 điểm Pan-Tompkins: (2*x[n] + x[n-1] - x[n-3] - 2*x[n-4]) * (Fs/8)
+ * 3. Bước 3 - Hàm bình phương phi tuyến: y[n] = (x[n])^2
+ * 4. Bước 4 - Tích phân cửa sổ trượt (MWI): Cửa sổ 150ms = 38 mẫu @ 250Hz
+ * 5. Bước 5 - Bóc tách đỉnh R thích nghi ngưỡng (Dual Adaptive SPKI & NPKI Thresholds)
+ *    kèm thời gian trơ sinh lý 380ms (95 mẫu) loại bỏ sóng T và Median Filter cho nhịp tim.
  */
 class MedicalEcgProcessor {
-  constructor(fs = 250, mainsHz = 50) {
+  constructor(fs = 250) {
     this.fs = fs;
-    // Biquad 50Hz Notch Filter (@ 250Hz sample rate, f0 = 50Hz, Q = 7.0)
-    const w0 = (2.0 * Math.PI * mainsHz) / fs;
+
+    // 1. Hệ số bộ lọc IIR Butterworth Bandpass (5 - 15 Hz) bậc 2 tính từ MATLAB butter(2, [5 15]/125)
+    this.b = [0.013359200027856493, 0.0, -0.026718400055712986, 0.0, 0.013359200027856493];
+    this.a = [1.0, -3.5609474528307348, 4.838863973685882, -2.976929615384225, 0.7008967811884026];
+    // Vector trạng thái trễ z_bp tương đương MATLAB filter(b, a, x, z)
+    this.z = [0.0, 0.0, 0.0, 0.0];
+
+    // Biquad 50Hz Notch Filter (Q = 7.0 @ 250Hz) để triệt tiêu phụ tải 50Hz rò từ nguồn điện
+    const w0 = (2.0 * Math.PI * 50.0) / fs;
     const c = Math.cos(w0);
     const s = Math.sin(w0);
     const alpha = s / (2.0 * 7.0);
     const a0 = 1.0 + alpha;
-    this.b0 = 1.0 / a0;
-    this.b1 = (-2.0 * c) / a0;
-    this.b2 = 1.0 / a0;
-    this.a1 = (-2.0 * c) / a0;
-    this.a2 = (1.0 - alpha) / a0;
+    this.nb0 = 1.0 / a0;
+    this.nb1 = (-2.0 * c) / a0;
+    this.nb2 = 1.0 / a0;
+    this.na1 = (-2.0 * c) / a0;
+    this.na2 = (1.0 - alpha) / a0;
+    this.nx1 = 2048; this.nx2 = 2048;
+    this.ny1 = 2048; this.ny2 = 2048;
 
-    this.x1 = 2048; this.x2 = 2048;
-    this.y1 = 2048; this.y2 = 2048;
+    // 2. Bộ đệm vi phân 5 điểm
+    this.d_buf = [0, 0, 0, 0, 0];
 
-    this.baseline = 2048;
-    this.lp = 0;
-
-    // Pan-Tompkins QRS Detector
-    this.hp1 = 0; this.hp2 = 0; this.hp3 = 0; this.hp4 = 0;
-    this.mwiWindow = 30; // 120ms @ 250Hz
-    this.mwiBuf = new Float32Array(this.mwiWindow).fill(0);
+    // 3. Tích phân cửa sổ trượt (MWI): 150ms = 38 mẫu
+    this.windowSize = Math.round(0.150 * fs); // 38
+    this.mwiBuf = new Float32Array(this.windowSize).fill(0);
     this.mwiIdx = 0;
     this.mwiSum = 0;
-    this.mwiPeak = 300;
-    this.lastBeatSample = 0;
+
+    // 4. Ngưỡng thích ứng kép SPKI & NPKI theo MATLAB
+    this.spki = 0.5;
+    this.npki = 0.1;
+    this.peakThreshold = 0.2;
+    this.lastRSampleIdx = 0;
     this.sampleCount = 0;
-    this.refractorySamples = Math.round(fs * 0.24); // 240ms refractory (~250 BPM max)
-    this.above = false;
+    this.refractorySamples = Math.round(0.380 * fs); // 95 mẫu = 380ms
+
+    // Bộ nhớ đệm +-12 mẫu để dò đỉnh R cục bộ
+    this.recentFilt = new Float32Array(32).fill(0);
+    this.recentFiltIdx = 0;
+
     this.recentRR = [];
     this.lastRRMs = 0;
     this.lastRPeakMv = 0;
+    this.stableBpm = 0;
+    this.leadsOffCount = 0;
   }
 
   reset() {
-    this.x1 = 2048; this.x2 = 2048;
-    this.y1 = 2048; this.y2 = 2048;
-    this.baseline = 2048;
-    this.lp = 0;
-    this.hp1 = 0; this.hp2 = 0; this.hp3 = 0; this.hp4 = 0;
+    this.z.fill(0);
+    this.nx1 = 2048; this.nx2 = 2048; this.ny1 = 2048; this.ny2 = 2048;
+    this.d_buf.fill(0);
     this.mwiBuf.fill(0);
     this.mwiSum = 0;
-    this.mwiPeak = 300;
-    this.above = false;
+    this.spki = 0.5;
+    this.npki = 0.1;
+    this.peakThreshold = 0.2;
+    this.lastRSampleIdx = 0;
+    this.recentFilt.fill(0);
+    this.recentRR = [];
+    this.stableBpm = 0;
   }
 
   process(rawSample, isLeadsOff) {
     this.sampleCount++;
-    if (isLeadsOff || rawSample <= 20 || rawSample >= 4080) {
-      this.reset();
+
+    // Xử lý hở điện cực an toàn: chỉ reset bộ lọc khi mất hẳn tiếp xúc liên tục
+    if (isLeadsOff) {
+      this.leadsOffCount++;
+      if (this.leadsOffCount > 15) {
+        this.reset();
+      }
       return { filtered: 0, beat: false, rrMs: 0, rMv: '0.00' };
+    } else {
+      this.leadsOffCount = 0;
     }
 
-    // 1. Biquad Notch Filter 50Hz (Triệt tiêu hoàn toàn nhiễu sóng xoay chiều 220V/50Hz)
-    const notch = this.b0 * rawSample + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
-    this.x2 = this.x1; this.x1 = rawSample;
-    this.y2 = this.y1; this.y1 = notch;
+    // Chặn bão hòa ADC (Clamping) thay vì reset bộ lọc đột ngột làm rung dải sóng IIR
+    const clampedRaw = Math.max(80, Math.min(4015, rawSample));
 
-    // 2. High-pass Filter (0.5Hz Baseline Tracker): Khử trôi baseline do hô hấp
-    this.baseline += (notch - this.baseline) * 0.005;
-    const hp = notch - this.baseline;
+    // Tiền xử lý Notch 50Hz trước khi vào Bandpass
+    const notchIn = clampedRaw;
+    const notchOut = this.nb0 * notchIn + this.nb1 * this.nx1 + this.nb2 * this.nx2 - this.na1 * this.ny1 - this.na2 * this.ny2;
+    this.nx2 = this.nx1; this.nx1 = notchIn;
+    this.ny2 = this.ny1; this.ny1 = notchOut;
 
-    // 3. Low-pass Filter (~35Hz): Khử nhiễu rung cơ EMG & gai ADC
-    this.lp += (hp - this.lp) * 0.38;
+    // Bước 1 (MATLAB): [new_filt, z_bp] = filter(b_bp, a_bp, new_ecg, z_bp)
+    // Direct Form II Transposed:
+    const x = notchOut;
+    const y = this.b[0] * x + this.z[0];
+    this.z[0] = this.b[1] * x + this.z[1] - this.a[1] * y;
+    this.z[1] = this.b[2] * x + this.z[2] - this.a[2] * y;
+    this.z[2] = this.b[3] * x + this.z[3] - this.a[3] * y;
+    this.z[3] = this.b[4] * x             - this.a[4] * y;
 
-    // 4. Pan-Tompkins 5-point derivative
-    const deriv = (2.0 * hp + this.hp1 - this.hp3 - 2.0 * this.hp4) * 0.125;
-    this.hp4 = this.hp3; this.hp3 = this.hp2; this.hp2 = this.hp1; this.hp1 = hp;
-    const dsq = deriv * deriv;
+    // Lưu vào buffer ngắn để tìm cực đại cục bộ đỉnh R
+    this.recentFilt[this.recentFiltIdx] = y;
+    this.recentFiltIdx = (this.recentFiltIdx + 1) % 32;
 
-    this.mwiSum += dsq - this.mwiBuf[this.mwiIdx];
-    this.mwiBuf[this.mwiIdx] = dsq;
-    this.mwiIdx = (this.mwiIdx + 1) % this.mwiWindow;
-    const mwi = this.mwiSum / this.mwiWindow;
+    // Bước 2 (MATLAB): Bộ vi phân 5 điểm
+    // new_deriv(n) = (2*new_filt(n) + new_filt(n-1) - new_filt(n-3) - 2*new_filt(n-4)) * (Fs / 8)
+    this.d_buf.shift();
+    this.d_buf.push(y);
+    const deriv = (2 * this.d_buf[4] + this.d_buf[3] - this.d_buf[1] - 2 * this.d_buf[0]) * (this.fs / 8);
 
-    this.mwiPeak *= 0.9985;
-    if (mwi > this.mwiPeak) this.mwiPeak = mwi;
+    // Bước 3 (MATLAB): Hàm bình phương phi tuyến
+    // new_sq = new_deriv .^ 2
+    const sq = deriv * deriv;
 
-    const threshold = this.mwiPeak * 0.35;
-    const isAbove = mwi > threshold;
-    const rising = isAbove && !this.above;
-    this.above = isAbove;
+    // Bước 4 (MATLAB): Tích phân cửa sổ trượt MWI (150ms = 38 mẫu)
+    // new_mwi = conv(new_sq, kernel_mwi, 'same')
+    this.mwiSum += sq - this.mwiBuf[this.mwiIdx];
+    this.mwiBuf[this.mwiIdx] = sq;
+    this.mwiIdx = (this.mwiIdx + 1) % this.windowSize;
+    const mwi = this.mwiSum / this.windowSize;
 
+    // Bước 5 (MATLAB): Bóc tách đỉnh R thích nghi ngưỡng (Thời gian trơ sinh lý 380ms = 95 mẫu)
     let beat = false;
     let rrMs = this.lastRRMs;
     let rMv = this.lastRPeakMv;
 
-    if (rising && (this.sampleCount - this.lastBeatSample > this.refractorySamples) && this.sampleCount > this.fs) {
-      const prevBeat = this.lastBeatSample;
-      const rrSamples = this.sampleCount - prevBeat;
-      this.lastBeatSample = this.sampleCount;
+    if (mwi > this.peakThreshold && (this.sampleCount - this.lastRSampleIdx > this.refractorySamples) && this.sampleCount > this.fs) {
+      // Tìm cực đại biên độ cục bộ trong phạm vi +-12 mẫu
+      let localMaxAmp = y;
+      for (let k = 0; k < 32; k++) {
+        if (this.recentFilt[k] > localMaxAmp) localMaxAmp = this.recentFilt[k];
+      }
 
-      if (prevBeat !== 0) {
+      const rrSamples = this.sampleCount - this.lastRSampleIdx;
+      this.lastRSampleIdx = this.sampleCount;
+
+      if (rrSamples > 0 && rrSamples < 500) {
         const measuredRRMs = Math.round(rrSamples * (1000 / this.fs));
-        // Giới hạn dải nhịp tim sinh học hợp lý: 35 BPM (1714ms) đến 200 BPM (300ms)
-        if (measuredRRMs >= 300 && measuredRRMs <= 1714) {
-          this.recentRR.push(measuredRRMs);
-          if (this.recentRR.length > 5) this.recentRR.shift();
+        // Lọc dải sinh lý chuẩn MATLAB: 0.40s - 1.40s (43 - 150 BPM)
+        if (measuredRRMs >= 400 && measuredRRMs <= 1400) {
+          // Chống nhảy vọt (Outlier Rejection): Nếu lệch quá 35% so với nhịp nền trung vị -> loại bỏ nhiễu co cơ
+          if (this.recentRR.length >= 3) {
+            const tempSorted = [...this.recentRR].sort((a, b) => a - b);
+            const curMedian = tempSorted[Math.floor(tempSorted.length / 2)];
+            if (measuredRRMs < 0.65 * curMedian || measuredRRMs > 1.45 * curMedian) {
+              // Bỏ qua ngoại lai do cơ thể cử động
+              this.spki = 0.125 * mwi + 0.875 * this.spki;
+              this.peakThreshold = this.npki + 0.25 * (this.spki - this.npki);
+              return { filtered: y, beat: false, rrMs: this.lastRRMs, rMv: this.lastRPeakMv };
+            }
+          }
 
+          this.recentRR.push(measuredRRMs);
+          if (this.recentRR.length > 7) this.recentRR.shift();
+
+          // Bộ lọc trung vị (Median Filter) như MATLAB: median(valid_rr)
           const sorted = [...this.recentRR].sort((a, b) => a - b);
           rrMs = sorted[Math.floor(sorted.length / 2)];
           this.lastRRMs = rrMs;
 
-          // Tính biên độ sóng R (AD8232 Gain ~1100, Vref 3.3V)
-          const estMv = Math.max(0.4, Math.min(2.8, Math.abs(hp) * 0.0016)).toFixed(2);
-          rMv = estMv;
+          // Tính toán nhịp tim ổn định mượt mà (Exponential Moving Average)
+          const instantBpm = Math.round(60000 / rrMs);
+          if (this.stableBpm === 0) {
+            this.stableBpm = instantBpm;
+          } else {
+            // Làm mịn nhẹ 82% lịch sử, 18% giá trị mới để nhịp tim không nhảy loạn xạ
+            this.stableBpm = Math.round(this.stableBpm * 0.82 + instantBpm * 0.18);
+          }
+
+          // Biên độ mV chuẩn AD8232 (Gain ~1100, Vref 3.3V)
+          rMv = Math.max(0.4, Math.min(2.8, Math.abs(localMaxAmp) * 0.0032)).toFixed(2);
           this.lastRPeakMv = rMv;
           beat = true;
         }
       }
+
+      // Cập nhật ngưỡng tín hiệu SPKI theo chuẩn MATLAB
+      this.spki = 0.125 * mwi + 0.875 * this.spki;
+      this.peakThreshold = this.npki + 0.25 * (this.spki - this.npki);
+    } else {
+      // Cập nhật ngưỡng nhiễu NPKI theo chuẩn MATLAB
+      this.npki = 0.125 * mwi + 0.875 * this.npki;
+      this.peakThreshold = this.npki + 0.25 * (this.spki - this.npki);
     }
 
     return {
-      filtered: this.lp,
+      filtered: y,
       beat: beat,
       rrMs: rrMs,
       rMv: rMv
@@ -162,7 +236,7 @@ class MedicalEcgProcessor {
 // Bộ đệm sóng ECG (Oscilloscope Ring Buffer)
 const BUFFER_SIZE = 1000; // 4 giây hiển thị ở tần số lấy mẫu 250Hz (250 * 4 = 1000)
 const ecgBuffer = new Float32Array(BUFFER_SIZE).fill(0);
-const ecgProcessor = new MedicalEcgProcessor(250, 50);
+const ecgProcessor = new MedicalEcgProcessor(250);
 let dynamicPeak = 250;
 let writeIndex = 0;
 let sweepIndex = 0;
@@ -465,8 +539,8 @@ function handleDataPacket(data) {
 
   if (Array.isArray(data.ecg)) {
     for (let i = 0; i < data.ecg.length; i++) {
-      // Khi hở điện cực (leadsOff = 1) hoặc ADC bão hòa (4080) / chạm đáy (50)
-      const isDisconnected = Boolean(data.leadsOff || data.ecg[i] >= 4080 || data.ecg[i] <= 50);
+      // Chỉ ngắt khi cờ phần cứng leadsOff thực sự kích hoạt (hở điện cực)
+      const isDisconnected = Boolean(data.leadsOff);
       const res = ecgProcessor.process(data.ecg[i], isDisconnected);
 
       ecgBuffer[writeIndex] = res.filtered;
@@ -477,17 +551,18 @@ function handleDataPacket(data) {
         lastDetectedBpm = Math.round(60000 / res.rrMs);
         if (elements.rPeakVal) elements.rPeakVal.textContent = res.rMv + ' mV';
         if (elements.rrIntervalVal) elements.rrIntervalVal.textContent = res.rrMs + ' ms';
-        triggerHeartBeat(lastDetectedBpm);
+        triggerHeartBeat(ecgProcessor.stableBpm || lastDetectedBpm);
         lastHeartBeatTime = Date.now();
       }
     }
   }
 
-  // 2. Nhịp tim BPM (Kết hợp tính toán tại Gateway và thuật toán Pan-Tompkins Web)
-  let bpm = data.bpm || 0;
-  // Nếu Gateway bị nhiễu điện lưới kích hoạt nhịp ảo > 120 trong khi Web tính được nhịp chuẩn sinh học 45 - 110:
-  if (lastDetectedBpm >= 45 && lastDetectedBpm <= 115 && (bpm <= 0 || bpm > 115)) {
-    bpm = lastDetectedBpm;
+  // 2. Nhịp tim BPM: Ưu tiên tuyệt đối nhịp tim lọc trung vị & làm mịn EMA chuẩn y sinh (Matlab Pan-Tompkins)
+  let bpm = 0;
+  if (ecgProcessor.stableBpm >= 42 && ecgProcessor.stableBpm <= 140) {
+    bpm = ecgProcessor.stableBpm;
+  } else if (data.bpm >= 45 && data.bpm <= 120) {
+    bpm = data.bpm;
   }
 
   if (data.leadsOff) {

@@ -313,26 +313,42 @@ void processEdgeBPM(float hp) {
   bool rising = isAbove && !qrsAbove;
   qrsAbove = isAbove;
 
-  // 4. Phát hiện đỉnh R với thời gian trơ sinh lý 240ms (60 mẫu @ 250Hz)
-  if (rising && (edgeSampleCounter - lastPeakSample > 60) && edgeSampleCounter > 250) {
+  // 4. Phát hiện đỉnh R với thời gian trơ sinh lý 380ms (95 mẫu @ 250Hz chuẩn Pan-Tompkins & MATLAB)
+  if (rising && (edgeSampleCounter - lastPeakSample > 95) && edgeSampleCounter > 250) {
     unsigned long rrSamples = edgeSampleCounter - lastPeakSample;
     lastPeakSample = edgeSampleCounter;
 
     // Khoảng thời gian RR tính bằng mili-giây (mỗi mẫu = 4ms)
     unsigned long rrMs = rrSamples * 4;
 
-    // Lọc dải sinh lý người bình thường: 40 BPM (1500ms) đến 180 BPM (333ms)
-    if (rrMs >= 333 && rrMs <= 1500) {
-      int calculatedBpm = 60000 / rrMs;
+    // Lọc dải sinh lý chuẩn: 400ms đến 1400ms (43 đến 150 BPM)
+    if (rrMs >= 400 && rrMs <= 1400) {
+      static uint16_t recentRRs[7];
+      static uint8_t rrCount = 0;
+      static uint8_t rrIdx = 0;
+
+      recentRRs[rrIdx] = (uint16_t)rrMs;
+      rrIdx = (rrIdx + 1) % 7;
+      if (rrCount < 7) rrCount++;
+
+      // Bộ lọc trung vị (Median Filter) chuẩn thuật toán MATLAB
+      uint16_t sorted[7];
+      for (uint8_t k = 0; k < rrCount; k++) sorted[k] = recentRRs[k];
+      for (uint8_t i = 0; i < rrCount - 1; i++) {
+        for (uint8_t j = i + 1; j < rrCount; j++) {
+          if (sorted[j] < sorted[i]) {
+            uint16_t temp = sorted[i]; sorted[i] = sorted[j]; sorted[j] = temp;
+          }
+        }
+      }
+      uint16_t medianRR = sorted[rrCount / 2];
+      int calculatedBpm = 60000 / medianRR;
+
       if (edgeBpm == 0) {
         edgeBpm = calculatedBpm;
       } else {
-        // Thuật toán ổn định nhịp tim: bám theo nhịp sinh lý, lọc bỏ đột biến co giật
-        if (abs(calculatedBpm - edgeBpm) <= 15) {
-          edgeBpm = (edgeBpm * 7 + calculatedBpm) / 8;
-        } else {
-          edgeBpm = (edgeBpm * 15 + calculatedBpm) / 16;
-        }
+        // Làm mịn nhẹ 80% lịch sử, 20% giá trị mới để nhịp tim không nhảy loạn
+        edgeBpm = (edgeBpm * 13 + calculatedBpm * 3) / 16;
       }
     }
   }
