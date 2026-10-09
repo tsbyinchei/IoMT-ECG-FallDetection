@@ -292,33 +292,6 @@ unsigned long lastSampleMicros = 0;
 uint8_t sampleIndex = 0;
 unsigned long lastDiagLog = 0;
 
-void setup() {
-  Serial.begin(115200);
-  delay(500); // Chờ cổng USB CDC ổn định
-
-  Serial.println("\n==========================================");
-  Serial.println("  ESP32-C3 BIOMEDICAL SENSOR NODE DANG KHOI DONG");
-  Serial.println("  Tan so lay mau ECG: 250 Hz (4ms/sample)");
-  Serial.println("==========================================");
-
-  // Cấu hình ADC độ phân giải 12-bit (0-4095) cho tín hiệu ECG AD8232
-  analogReadResolution(12);
-  analogSetAttenuation(ADC_11db);
-
-  pinMode(LED_PIN, OUTPUT);
-  pinMode(ECG_PIN, INPUT);
-  pinMode(LO_MINUS_PIN, INPUT_PULLDOWN);
-  pinMode(LO_PLUS_PIN, INPUT_PULLDOWN);
-
-  // Khởi tạo MPU-6050
-  initMPU6050();
-
-  // Khởi tạo giá trị mặc định cho cấu trúc dữ liệu
-  sensorData.bodyTemp = 36.5f;
-  sensorData.smv = 1.0f;
-  sensorData.leadsOff = 0;
-  sensorData.fallDetected = 0;
-
 // ==================== HÀM QUẢN LÝ KẾT NỐI VÀ CHUYỂN VÙNG WI-FI (ROAMING) ====================
 void connectToNetwork(WifiNetType target) {
   WiFi.disconnect();
