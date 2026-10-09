@@ -14,7 +14,7 @@
 #define I2C_SCL_PIN     7    // Chân SCL giao tiếp MPU-6050
 
 #define MPU6050_ADDR    0x68 // Địa chỉ I2C mặc định của MPU-6050
-#define FALL_THRESHOLD  2.2f // Ngưỡng SMV cảnh báo va đập té ngã (đơn vị: g, dải đo ±8g)
+#define FALL_THRESHOLD  2.8f // Ngưỡng SMV va đập té ngã (g) - đặt 2.8g để loại trừ nhấc tay ADL thông thường
 
 // ==================== THÔNG TIN MẠNG UDP & MULTI-WIFI ROAMING ====================
 // 1. Mạng Gateway SoftAP (Mặc định khi ở gần Gateway bàn làm việc)
@@ -231,17 +231,17 @@ void sampleMPU6050() {
       float dotProd = (lastAx * baseGx + lastAy * baseGy + lastAz * baseGz) / instantSMV;
       if (dotProd > 1.0f) dotProd = 1.0f;
       if (dotProd < -1.0f) dotProd = -1.0f;
-      lastTiltAngle = acosf(fabsf(dotProd)) * (180.0f / (float)M_PI);
+      lastTiltAngle = acosf(dotProd) * (180.0f / (float)M_PI);
     }
 
-    // ── GIAI ĐOẠN 1: PHÁT HIỆN XUNG VA ĐẬP (Stage 1: Impact Acceleration Peak) ──
+    // ── GIAI ĐOẠN 1: PHÁT HIỆN XUNG VA ĐẬP KHẢ NGHI (Stage 1: Candidate Impact Peak) ──
     if (instantSMV >= FALL_THRESHOLD && !candidateFall && fallHoldCounter == 0) {
       candidateFall = true;
       candidateFallTime = millis();
       candidatePeakSMV = instantSMV;
-      fallHoldCounter = 30; // Kích hoạt chốt giữ cảnh báo ngã 3 giây (30 gói UDP) ngay lập tức!
-      sensorData.fallDetected = 1;
-      Serial.printf("[STAGE 1: VA ĐẬP] SMV Đỉnh: %.2fg >= %.1fg -> KÍCH HOẠT CÒI HÚ LIÊN TỤC & Bắt đầu thẩm định 2.0s...\n",
+      // QUAN TRỌNG: TUYỆT ĐỐI KHÔNG kích hoạt còi hay đặt fallDetected ở đây!
+      // Bắt đầu cửa sổ phân tích tĩnh 2.5 giây.
+      Serial.printf("\n[GIAI ĐOẠN 1] Phát hiện xung va đập SMV: %.2fg >= %.1fg! Bắt đầu phân tích bất động & tư thế trong 2.5s...\n",
                     instantSMV, FALL_THRESHOLD);
     }
 
@@ -253,32 +253,26 @@ void sampleMPU6050() {
 
       unsigned long elapsed = millis() - candidateFallTime;
 
-      // Kịch bản A - Tự phục hồi / Báo động giả (Self-Recovery):
-      // Người dùng vẫn đứng thẳng (Tilt < 30°) và tiếp tục vận động (Gyro > 80°/s) -> Hủy báo động
-      if (elapsed < 2000) {
-        if (lastTiltAngle < 30.0f && lastTotalGyro > 80.0f) {
-          candidateFall = false;
-          Serial.println("[TỰ HỦY BÁO ĐỘNG] Người dùng đã đứng thẳng và di chuyển bình thường!");
-        }
-      }
-      // Kịch bản B - Hết cửa sổ thẩm định (>= 2.0s):
-      // Kiểm tra 2 tiêu chí y sinh bắt buộc:
-      // 1. Tư thế nằm sàn: Góc nghiêng cơ thể Tilt >= 40°
-      // 2. Trạng thái bất động: Vận tốc góc Gyro < 70°/s và độ biến thiên gia tốc tĩnh ổn định
-      else if (elapsed >= 2000) {
+      // Hết cửa sổ thẩm định 2.5 giây kể từ lúc va đập:
+      // Phải thỏa mãn ĐỒNG THỜI 2 điều kiện y sinh của một ca ngã thật:
+      // 1. Góc nghiêng cơ thể Tilt >= 40° (đang nằm ngang sàn so với tư thế đứng ban đầu)
+      // 2. Trạng thái bất động sau ngã: Vận tốc góc Gyro < 45°/s và lực gia tốc ổn định quanh trọng lực 1g
+      if (elapsed >= 2500) {
         bool isLyingDown = (lastTiltAngle >= 40.0f);
-        bool isImmobile  = (lastTotalGyro < 70.0f && fabsf(instantSMV - 1.0f) < 0.50f);
+        bool isImmobile  = (lastTotalGyro < 45.0f && fabsf(instantSMV - 1.0f) < 0.35f);
 
         if (isLyingDown && isImmobile) {
-          fallHoldCounter = 30; // Chốt giữ cảnh báo ngã trong 3 giây (30 gói tin UDP 100ms)
+          // CHÍNH THỨC XÁC NHẬN NGÃ THẬT SAU 2.5 GIÂY THẨM ĐỊNH!
+          fallHoldCounter = 40; // Chốt giữ cảnh báo ngã 4.0 giây (40 gói tin UDP 100ms)
+          sensorData.fallDetected = 1;
           Serial.println("\n***************************************************");
-          Serial.printf(">>> [XÁC NHẬN TÉ NGÃ 2 GIAI ĐOẠN (POST-FALL VERIFIED)] <<<\n");
+          Serial.println("🚨 >>> [XÁC NHẬN TÉ NGÃ 2 GIAI ĐOẠN HOÀN TẤT (VERIFIED FALL)] <<< 🚨");
           Serial.printf("    - Va đập SMV cực đại: %.2fg (Ngưỡng: %.1fg)\n", candidatePeakSMV, FALL_THRESHOLD);
           Serial.printf("    - Góc nghiêng nằm sàn: %.1f° (Chuẩn >= 40°)\n", lastTiltAngle);
-          Serial.printf("    - Độ bất động sau ngã: Gyro = %.1f°/s (< 70°/s)\n", lastTotalGyro);
+          Serial.printf("    - Độ bất động sau ngã: Gyro = %.1f°/s (< 45°/s)\n", lastTotalGyro);
           Serial.println("***************************************************\n");
         } else {
-          Serial.printf("[HỦY BÁO ĐỘNG] Không thỏa mãn tiêu chuẩn ngã thật: Góc=%.1f° (cần >=40°), Gyro=%.1f°/s\n",
+          Serial.printf("[HỦY BÁO ĐỘNG] Cử động sinh hoạt bình thường: Góc=%.1f° (cần >=40°), Gyro=%.1f°/s (cần <45°/s)\n",
                         lastTiltAngle, lastTotalGyro);
         }
         candidateFall = false;

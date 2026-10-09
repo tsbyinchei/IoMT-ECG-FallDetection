@@ -1026,8 +1026,8 @@ void loop() {
     udp.read((char *)&incomingData, sizeof(incomingData));
     totalPacketsReceived++;
 
-    // Đếm số lần ngã và kích hoạt còi báo động khẩn cấp (khi có cờ ngã từ C3 hoặc xung va chạm cực đại >= 2.5g)
-    bool isCurrentFall = (incomingData.fallDetected == 1) || (incomingData.smv >= 2.5f);
+    // Kích hoạt còi báo động khẩn cấp CHỈ KHI Node C3 đã xác nhận ngã qua 2 giai đoạn (fallDetected == 1)
+    bool isCurrentFall = (incomingData.fallDetected == 1);
     if (isCurrentFall && !prevFallState) {
       totalFallsCount++;
       fallAlarmActive = true; // Kích hoạt còi hú liên tục không ngừng cho đến khi bấm tắt!
