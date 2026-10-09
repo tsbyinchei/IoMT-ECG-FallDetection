@@ -10,7 +10,8 @@ const DEFAULT_CONFIG = {
   user: 'TsByin',
   pass: 'Chei@@@182728',
   topicData: 'biomed/patient/data',
-  topicAlert: 'biomed/patient/alert'
+  topicAlert: 'biomed/patient/alert',
+  topicCmd: 'biomed/gateway/cmd'      // Topic điều khiển Gateway (Tắt còi từ xa)
 };
 
 // ==================== TRẠNG THÁI HỆ THỐNG ====================
@@ -18,6 +19,9 @@ let config = loadConfig();
 let mqttClient = null;
 let isDemoMode = false;
 let audioEnabled = false;
+let isBuzzerMuted = false;
+let currentSirenOsc = null;
+let currentSirenGain = null;
 let totalPackets = 0;
 let totalFalls = 0;
 let prevFallState = 0;
@@ -39,6 +43,10 @@ const elements = {
   audioToggleBtn: document.getElementById('audioToggleBtn'),
   audioIcon: document.getElementById('audioIcon'),
   audioLabel: document.getElementById('audioLabel'),
+  remoteMuteBtn: document.getElementById('remoteMuteBtn'),
+  remoteMuteIcon: document.getElementById('remoteMuteIcon'),
+  remoteMuteLabel: document.getElementById('remoteMuteLabel'),
+  pwaInstallBtn: document.getElementById('pwaInstallBtn'),
   simToggleBtn: document.getElementById('simToggleBtn'),
   configModalBtn: document.getElementById('configModalBtn'),
   configModal: document.getElementById('configModal'),
@@ -50,6 +58,8 @@ const elements = {
   cfgPass: document.getElementById('cfgPass'),
   cfgTopicData: document.getElementById('cfgTopicData'),
   cfgTopicAlert: document.getElementById('cfgTopicAlert'),
+  cfgTopicCmd: document.getElementById('cfgTopicCmd'),
+  toastContainer: document.getElementById('toastContainer'),
   emergencyBanner: document.getElementById('emergencyBanner'),
   alertTitle: document.getElementById('alertTitle'),
   alertDesc: document.getElementById('alertDesc'),
@@ -115,8 +125,23 @@ function playHeartBeep() {
   } catch (e) { console.warn('Lỗi audio beep:', e); }
 }
 
+// ==================== HỆ THỐNG THÔNG BÁO TOAST HUD ====================
+function showToast(message, type = 'info') {
+  if (!elements.toastContainer) return;
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  elements.toastContainer.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 400);
+  }, 3500);
+}
+
 function playAlarmSiren() {
-  if (!audioEnabled || !audioCtx) return;
+  if (!audioEnabled || !audioCtx || isBuzzerMuted) return;
+  stopAlarmSiren();
   try {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -128,9 +153,82 @@ function playAlarmSiren() {
     gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
+
+    currentSirenOsc = osc;
+    currentSirenGain = gain;
     osc.start();
     osc.stop(audioCtx.currentTime + 0.5);
+    osc.onended = () => {
+      if (currentSirenOsc === osc) {
+        currentSirenOsc = null;
+        currentSirenGain = null;
+      }
+    };
   } catch (e) { console.warn('Lỗi còi hú:', e); }
+}
+
+function stopAlarmSiren() {
+  if (currentSirenOsc) {
+    try {
+      currentSirenOsc.stop();
+      currentSirenOsc.disconnect();
+    } catch (e) {}
+    currentSirenOsc = null;
+  }
+  if (currentSirenGain) {
+    try { currentSirenGain.disconnect(); } catch (e) {}
+    currentSirenGain = null;
+  }
+}
+
+// ==================== ĐIỀU KHIỂN CÒI TỪ XA (REMOTE MUTE COMMAND) ====================
+function sendRemoteMuteCommand(forceAction = null) {
+  const targetAction = forceAction || (isBuzzerMuted ? 'unmute' : 'mute');
+
+  if (targetAction === 'mute') {
+    isBuzzerMuted = true;
+    stopAlarmSiren();
+    if (elements.remoteMuteBtn) {
+      elements.remoteMuteBtn.classList.add('muted');
+      elements.remoteMuteIcon.textContent = '🔕';
+      elements.remoteMuteLabel.textContent = 'Còi: Đã tắt (Muted)';
+    }
+
+    const cmdTopic = config.topicCmd || 'biomed/gateway/cmd';
+    if (mqttClient && mqttClient.connected) {
+      const payload = JSON.stringify({
+        cmd: 'mute',
+        source: 'web_dashboard',
+        time: Date.now()
+      });
+      mqttClient.publish(cmdTopic, payload, { qos: 1 });
+      showToast('🔕 Đã gửi lệnh TẮT CÒI BÁO ĐỘNG đến Gateway ESP32!', 'warning');
+    } else {
+      showToast('🔕 Đã tắt còi báo động trên Web Dashboard!', 'info');
+    }
+    addEventLog('TẮT CÒI TỪ XA', '--', '--', '--', 'MQTT: ' + cmdTopic, 'INFO');
+  } else {
+    isBuzzerMuted = false;
+    if (elements.remoteMuteBtn) {
+      elements.remoteMuteBtn.classList.remove('muted');
+      elements.remoteMuteIcon.textContent = '🔔';
+      elements.remoteMuteLabel.textContent = 'Tắt còi từ xa';
+    }
+
+    const cmdTopic = config.topicCmd || 'biomed/gateway/cmd';
+    if (mqttClient && mqttClient.connected) {
+      const payload = JSON.stringify({
+        cmd: 'unmute',
+        source: 'web_dashboard',
+        time: Date.now()
+      });
+      mqttClient.publish(cmdTopic, payload, { qos: 1 });
+      showToast('🔔 Đã gửi lệnh BẬT LẠI CÒI đến Gateway ESP32!', 'success');
+    } else {
+      showToast('🔔 Đã bật lại chế độ còi báo động!', 'info');
+    }
+    addEventLog('BẬT LẠI CÒI', '--', '--', '--', 'MQTT: ' + cmdTopic, 'INFO');
+  }
 }
 
 // ==================== KẾT NỐI MQTT BROKER (WSS) ====================
@@ -157,7 +255,13 @@ function connectMQTT() {
 
     mqttClient.on('connect', () => {
       updateConnectionStatus('connected', 'Cloud WSS Online');
-      mqttClient.subscribe([config.topicData, config.topicAlert, 'biomed/status'], (err) => {
+      const subTopics = [
+        config.topicData,
+        config.topicAlert,
+        'biomed/gateway/status',
+        'biomed/status'
+      ];
+      mqttClient.subscribe(subTopics, (err) => {
         if (!err) {
           addEventLog('KẾT NỐI HỆ THỐNG', 1.0, '--', '--', 'WSS Port 443', 'INFO');
         }
@@ -171,6 +275,8 @@ function connectMQTT() {
           handleDataPacket(JSON.parse(text));
         } else if (topic === config.topicAlert) {
           handleAlertPacket(JSON.parse(text));
+        } else if (topic === 'biomed/gateway/status') {
+          handleGatewayStatus(JSON.parse(text));
         }
       } catch (err) {
         console.warn('Lỗi parse gói tin MQTT:', err);
@@ -284,7 +390,7 @@ function handleDataPacket(data) {
     elements.leadsOffBadge.className = 'tag tag-ok';
   }
 
-  // 6. Phát hiện té ngã
+  // 6. Phát hiện té ngã (Xác thực 2 giai đoạn: Va đập -> Bất động sau ngã)
   const fall = !!data.fall;
   if (fall && !prevFallState) {
     totalFalls++;
@@ -294,8 +400,11 @@ function handleDataPacket(data) {
   prevFallState = fall;
 
   if (fall) {
-    elements.fallStatus.textContent = '🚨 PHÁT HIỆN TÉ NGÃ KHẨN CẤP!';
+    elements.fallStatus.textContent = '🚨 Giai đoạn 2: XÁC NHẬN NGÃ THẬT (Bất động & Nằm sàn)!';
     elements.fallStatus.className = 'vital-status text-danger';
+  } else if (data.smv >= 2.5) {
+    elements.fallStatus.textContent = '⏳ Giai đoạn 1: Va đập mạnh - Đang thẩm định bất động...';
+    elements.fallStatus.className = 'vital-status text-warning';
   } else {
     elements.fallStatus.textContent = 'Tư thế ổn định (Bình thường)';
     elements.fallStatus.className = 'vital-status text-ok';
@@ -305,6 +414,26 @@ function handleDataPacket(data) {
 function handleAlertPacket(alert) {
   if (alert.alert === 'FALL_DETECTED') {
     triggerFallEmergency(alert.smv, '--', alert.temp);
+  }
+}
+
+function handleGatewayStatus(status) {
+  if (status && status.buzzer) {
+    if (status.buzzer === 'muted') {
+      isBuzzerMuted = true;
+      if (elements.remoteMuteBtn) {
+        elements.remoteMuteBtn.classList.add('muted');
+        elements.remoteMuteIcon.textContent = '🔕';
+        elements.remoteMuteLabel.textContent = 'Còi: Đã tắt (Muted)';
+      }
+    } else if (status.buzzer === 'active') {
+      isBuzzerMuted = false;
+      if (elements.remoteMuteBtn) {
+        elements.remoteMuteBtn.classList.remove('muted');
+        elements.remoteMuteIcon.textContent = '🔔';
+        elements.remoteMuteLabel.textContent = 'Tắt còi từ xa';
+      }
+    }
   }
 }
 
@@ -318,11 +447,13 @@ function triggerHeartBeat(bpm) {
 
 function triggerFallEmergency(smv, bpm, temp) {
   elements.emergencyBanner.classList.remove('hidden');
-  elements.alertTitle.textContent = `🚨 CẢNH BÁO TÉ NGÃ KHẨN CẤP (SMV: ${Number(smv).toFixed(2)}g)!`;
-  elements.alertDesc.textContent = `Xung va đập mạnh ${Number(smv).toFixed(2)}g > 2.5g. Đã gửi tin nhắn tự động tới Telegram (@your_telegram_bot) và Zalo Bot!`;
+  elements.alertTitle.textContent = `🚨 CẢNH BÁO TÉ NGÃ 2 GIAI ĐOẠN (SMV: ${Number(smv).toFixed(2)}g)!`;
+  elements.alertDesc.textContent = `Xác thực thành công 2 giai đoạn (Va đập ${Number(smv).toFixed(2)}g > 2.5g kèm bất động & nằm sàn). Đã phát còi và gửi tin khẩn cấp Telegram & Zalo!`;
   
-  playAlarmSiren();
-  addEventLog('TÉ NGÃ KHẨN CẤP', smv, bpm, temp, 'Telegram + Zalo', 'ALERT');
+  if (!isBuzzerMuted) {
+    playAlarmSiren();
+  }
+  addEventLog('XÁC NHẬN TÉ NGÃ 2 GIAI ĐOẠN', smv, bpm, temp, 'MPU-6050 Verification', 'ALERT');
 }
 
 function addEventLog(type, smv, bpm, temp, channel, level) {
@@ -460,12 +591,22 @@ function startDemoMode() {
       samples.push(Math.round(2400 + p + q + r + s + t + breath + noise));
     }
 
-    // Mô phỏng sự kiện té ngã mỗi 400 chu kỳ (40 giây)
+    // Mô phỏng chu trình kiểm định té ngã 2 giai đoạn (mỗi 400 chu kỳ = 40 giây)
     let isFall = false;
     let smv = 1.0 + (Math.random() - 0.5) * 0.12;
-    if (simTick % 400 >= 380 && simTick % 400 <= 385) {
+
+    // Giai đoạn 1: Xung va đập (Impact) ở tick 370 - 374
+    if (simTick % 400 >= 370 && simTick % 400 < 375) {
+      smv = 3.35 + (Math.random() - 0.5) * 0.2; // Đỉnh lực va chạm 3.35g
+    }
+    // Giai đoạn 2: Cửa sổ thẩm định bất động 2.0s (tick 375 - 394)
+    else if (simTick % 400 >= 375 && simTick % 400 < 395) {
+      smv = 1.02 + (Math.random() - 0.5) * 0.04; // Nằm bất động tĩnh
+    }
+    // Xác nhận ngã sau 2.0s thẩm định bất động & nằm sàn (tick 395 - 400)
+    else if (simTick % 400 >= 395 && simTick % 400 < 400) {
       isFall = true;
-      smv = 3.45 + (Math.random() - 0.5) * 0.3; // Đỉnh lực ngã 3.45g
+      smv = 1.01;
     }
 
     handleDataPacket({
@@ -518,10 +659,19 @@ function initEventListeners() {
     }
   });
 
-  // Tắt cảnh báo khẩn
+  // Tắt cảnh báo khẩn & tắt còi từ xa
   elements.dismissAlertBtn.addEventListener('click', () => {
     elements.emergencyBanner.classList.add('hidden');
+    stopAlarmSiren();
+    sendRemoteMuteCommand('mute');
   });
+
+  // Nút bật/tắt còi từ xa trên thanh điều khiển
+  if (elements.remoteMuteBtn) {
+    elements.remoteMuteBtn.addEventListener('click', () => {
+      sendRemoteMuteCommand();
+    });
+  }
 
   // Mở modal cấu hình
   elements.configModalBtn.addEventListener('click', () => {
@@ -530,6 +680,9 @@ function initEventListeners() {
     elements.cfgPass.value = config.pass || '';
     elements.cfgTopicData.value = config.topicData;
     elements.cfgTopicAlert.value = config.topicAlert;
+    if (elements.cfgTopicCmd) {
+      elements.cfgTopicCmd.value = config.topicCmd || DEFAULT_CONFIG.topicCmd;
+    }
     elements.configModal.classList.remove('hidden');
   });
 
@@ -552,9 +705,11 @@ function initEventListeners() {
       user: elements.cfgUser.value.trim(),
       pass: elements.cfgPass.value.trim(),
       topicData: elements.cfgTopicData.value.trim(),
-      topicAlert: elements.cfgTopicAlert.value.trim()
+      topicAlert: elements.cfgTopicAlert.value.trim(),
+      topicCmd: elements.cfgTopicCmd ? elements.cfgTopicCmd.value.trim() : DEFAULT_CONFIG.topicCmd
     });
     elements.configModal.classList.add('hidden');
+    showToast('💾 Đã lưu cấu hình MQTT thành công!', 'success');
     connectMQTT();
   });
 
@@ -565,6 +720,9 @@ function initEventListeners() {
     elements.cfgPass.value = DEFAULT_CONFIG.pass;
     elements.cfgTopicData.value = DEFAULT_CONFIG.topicData;
     elements.cfgTopicAlert.value = DEFAULT_CONFIG.topicAlert;
+    if (elements.cfgTopicCmd) {
+      elements.cfgTopicCmd.value = DEFAULT_CONFIG.topicCmd;
+    }
   });
 
   // Xóa log
@@ -582,10 +740,59 @@ function resizeCanvas() {
   elements.ecgCanvas.height = rect.height * (window.devicePixelRatio || 1);
 }
 
+// ==================== PWA SERVICE WORKER & CÀI ĐẶT APP ====================
+let deferredInstallPrompt = null;
+
+function initPWA() {
+  // 1. Đăng ký Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then((reg) => {
+          console.log('[PWA] Service Worker đăng ký thành công:', reg.scope);
+        })
+        .catch((err) => {
+          console.warn('[PWA] Đăng ký Service Worker thất bại:', err);
+        });
+    });
+  }
+
+  // 2. Lắng nghe sự kiện beforeinstallprompt để kích hoạt nút cài đặt
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (elements.pwaInstallBtn) {
+      elements.pwaInstallBtn.classList.remove('hidden');
+    }
+  });
+
+  if (elements.pwaInstallBtn) {
+    elements.pwaInstallBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const choiceResult = await deferredInstallPrompt.userChoice;
+      if (choiceResult.outcome === 'accepted') {
+        showToast('🎉 Đang cài đặt ứng dụng IoMT Monitor...', 'success');
+      }
+      deferredInstallPrompt = null;
+      elements.pwaInstallBtn.classList.add('hidden');
+    });
+  }
+
+  // 3. Sau khi ứng dụng đã được cài đặt thành công
+  window.addEventListener('appinstalled', () => {
+    if (elements.pwaInstallBtn) {
+      elements.pwaInstallBtn.classList.add('hidden');
+    }
+    showToast('✅ Ứng dụng IoMT Monitor đã được cài đặt vào máy!', 'success');
+  });
+}
+
 // ==================== ENTRY POINT ====================
 window.addEventListener('DOMContentLoaded', () => {
   resizeCanvas();
   initEventListeners();
+  initPWA();
   requestAnimationFrame(drawOscilloscope);
 
   // Tự động kết nối MQTT khi tải trang

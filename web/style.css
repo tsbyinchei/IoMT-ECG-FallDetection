@@ -92,38 +92,44 @@ body {
   gap: 14px;
 }
 
-.brand-pulse {
+.brand-logo-container {
   position: relative;
-  width: 22px;
-  height: 22px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.pulse-dot {
+.brand-logo-img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.45));
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), filter 0.3s ease;
+}
+
+.brand-logo-img:hover {
+  transform: scale(1.08) rotate(-2deg);
+  filter: drop-shadow(0 0 14px rgba(0, 255, 136, 0.65));
+}
+
+.pulse-dot-mini {
   position: absolute;
-  top: 5px;
-  left: 5px;
-  width: 12px;
-  height: 12px;
+  bottom: 1px;
+  right: 1px;
+  width: 10px;
+  height: 10px;
   background: var(--ecg-green);
+  border: 2px solid var(--bg-deep);
   border-radius: 50%;
-  box-shadow: 0 0 10px var(--ecg-green);
+  box-shadow: 0 0 8px var(--ecg-green);
+  animation: mini-pulse 2s infinite ease-in-out;
 }
 
-.pulse-ring {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--ecg-green);
-  border-radius: 50%;
-  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-}
-
-@keyframes pulse-ring {
-  0% { transform: scale(0.6); opacity: 0.9; }
-  70% { transform: scale(1.6); opacity: 0; }
-  100% { transform: scale(1.6); opacity: 0; }
+@keyframes mini-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.7; }
 }
 
 .brand-title {
@@ -230,6 +236,28 @@ body {
 .btn-secondary {
   border-color: rgba(0, 240, 255, 0.3);
   color: var(--cyan-accent);
+}
+
+.btn-warning {
+  background: rgba(255, 184, 0, 0.12);
+  border-color: rgba(255, 184, 0, 0.35);
+  color: var(--amber-warning);
+}
+.btn-warning:hover {
+  background: rgba(255, 184, 0, 0.22);
+  border-color: var(--amber-warning);
+  box-shadow: 0 0 15px rgba(255, 184, 0, 0.3);
+}
+.btn-warning.muted {
+  background: rgba(255, 51, 102, 0.2);
+  border-color: var(--danger-red);
+  color: #ff99bb;
+  animation: pulse-border 1.5s infinite alternate;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 4px rgba(255, 51, 102, 0.3); }
+  100% { box-shadow: 0 0 12px rgba(255, 51, 102, 0.7); }
 }
 
 .btn-danger {
@@ -751,6 +779,55 @@ body {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 10px;
+}
+
+/* Toast Notifications (Medical HUD Floating Alerts) */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(18, 24, 38, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--cyan-accent);
+  color: var(--text-main);
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.toast.toast-warning {
+  border-left-color: var(--amber-warning);
+}
+
+.toast.toast-danger {
+  border-left-color: var(--danger-red);
+}
+
+.toast.toast-success {
+  border-left-color: var(--ecg-green);
 }
 
 /* Bottom Footer */

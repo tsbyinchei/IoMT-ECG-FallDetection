@@ -4,10 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="IoMT Biomedical Telehealth System - Hệ thống giám sát điện tim ECG thời gian thực & cảnh báo té ngã từ xa chuẩn ITU-T Y.2060.">
+  <meta name="theme-color" content="#090c10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="IoMT Monitor">
   <title>IoMT Patient Monitor | Giám Sát Điện Tim & Té Ngã Realtime</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/x-icon" href="assets/icon.ico">
+  <link rel="icon" type="image/webp" href="assets/icon-192.webp">
+  <link rel="apple-touch-icon" href="assets/icon-192.webp">
+  <link rel="apple-touch-startup-image" href="assets/splash.webp">
   <link rel="stylesheet" href="style.css">
   <!-- MQTT.js qua CDN an toàn -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -16,9 +25,9 @@
   <!-- Header / Navigation Bar -->
   <header class="top-nav">
     <div class="brand">
-      <div class="brand-pulse">
-        <span class="pulse-ring"></span>
-        <span class="pulse-dot"></span>
+      <div class="brand-logo-container">
+        <img src="assets/logo.webp" alt="SIT IoMT Telehealth Logo" class="brand-logo-img">
+        <span class="pulse-dot-mini" title="Hệ thống Telehealth Online"></span>
       </div>
       <div>
         <h1 class="brand-title">IoMT Telehealth Monitor</h1>
@@ -32,9 +41,18 @@
         <span id="statusText">Chưa kết nối Broker</span>
       </div>
 
+      <button id="pwaInstallBtn" class="btn btn-secondary hidden" title="Cài đặt ứng dụng lên màn hình chính">
+        <span>📲 Cài đặt App</span>
+      </button>
+
       <button id="audioToggleBtn" class="btn btn-icon" title="Bật/Tắt âm thanh nhịp tim và báo động">
         <span id="audioIcon">🔇</span>
         <span id="audioLabel">Âm thanh: Tắt</span>
+      </button>
+
+      <button id="remoteMuteBtn" class="btn btn-warning" title="Tắt / Bật còi báo động Gateway từ xa qua MQTT">
+        <span id="remoteMuteIcon">🔔</span>
+        <span id="remoteMuteLabel">Tắt còi từ xa</span>
       </button>
 
       <button id="simToggleBtn" class="btn btn-secondary" title="Bật chế độ dữ liệu mô phỏng khi không có phần cứng">
@@ -57,7 +75,7 @@
       </div>
     </div>
     <div class="alert-actions">
-      <button id="dismissAlertBtn" class="btn btn-danger">Tắt còi báo động</button>
+      <button id="dismissAlertBtn" class="btn btn-danger">🔕 Tắt còi & Bỏ qua</button>
     </div>
   </aside>
 
@@ -251,6 +269,11 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label for="cfgTopicCmd">Topic Lệnh Gateway (Remote Mute):</label>
+          <input type="text" id="cfgTopicCmd" value="biomed/gateway/cmd" required>
+        </div>
+
         <div class="modal-actions">
           <button type="button" id="resetConfigBtn" class="btn btn-ghost">Mặc định</button>
           <button type="submit" class="btn btn-primary">Lưu & Kết Nối</button>
@@ -258,6 +281,9 @@
       </form>
     </div>
   </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
   <!-- Footer -->
   <footer class="bottom-footer">
