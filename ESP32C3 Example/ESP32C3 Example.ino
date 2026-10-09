@@ -293,67 +293,129 @@ uint8_t sampleIndex = 0;
 unsigned long lastDiagLog = 0;
 
 // ==================== HÀM QUẢN LÝ KẾT NỐI VÀ CHUYỂN VÙNG WI-FI (ROAMING) ====================
-void connectToNetwork(WifiNetType target) {
-  WiFi.disconnect();
+bool connectToNetwork(WifiNetType target, int channel = 0) {
+  // 1. Ngắt kết nối sạch sẽ để giải phóng radio driver
+  WiFi.disconnect(true, true);
   delay(100);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
-  WiFi.setAutoReconnect(true);
+  WiFi.setAutoReconnect(false);
 
   if (target == NET_GATEWAY_AP) {
-    Serial.printf("[WiFi] Dang ket noi truc tiep vao Gateway AP '%s'...\n", AP_SSID);
+    Serial.printf("[WiFi] Dang ket noi truc tiep vao Gateway AP '%s' (Kenh %d)...\n", AP_SSID, channel);
     IPAddress local_IP(192, 168, 4, 2);
     IPAddress gateway(192, 168, 4, 1);
     IPAddress subnet(255, 255, 255, 0);
     WiFi.config(local_IP, gateway, subnet);
-    WiFi.begin(AP_SSID);
-    currentNet = NET_GATEWAY_AP;
-    currentTargetIP = gwDirectIP;
+    if (channel > 0) {
+      WiFi.begin(AP_SSID, NULL, channel);
+    } else {
+      WiFi.begin(AP_SSID);
+    }
   } else if (target == NET_HOME_WIFI) {
-    Serial.printf("[WiFi] Dang ket noi vao Router Wi-Fi gia dinh '%s'...\n", HOME_SSID);
-    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Dùng DHCP của Router gia đình
-    WiFi.begin(HOME_SSID, HOME_PASS);
-    currentNet = NET_HOME_WIFI;
-    currentTargetIP = IPAddress(255, 255, 255, 255); // Broadcast LAN để Gateway ở bất kỳ tầng nào cũng nhận được
+    Serial.printf("[WiFi] Dang ket noi vao Router Wi-Fi gia dinh '%s' (Kenh %d)...\n", HOME_SSID, channel);
+    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Xóa Static IP, bật lại DHCP của Router
+    if (channel > 0) {
+      WiFi.begin(HOME_SSID, HOME_PASS, channel);
+    } else {
+      WiFi.begin(HOME_SSID, HOME_PASS);
+    }
+  }
+
+  // 2. Chờ kết nối hoàn tất tối đa 6 giây (nháy dấu chấm trên Serial)
+  unsigned long startWait = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startWait < 6000) {
+    delay(200);
+    Serial.print(".");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (target == NET_GATEWAY_AP) {
+      currentNet = NET_GATEWAY_AP;
+      currentTargetIP = gwDirectIP;
+    } else {
+      currentNet = NET_HOME_WIFI;
+      currentTargetIP = IPAddress(255, 255, 255, 255); // Broadcast LAN để Gateway ở bất kỳ tầng nào cũng nhận được
+    }
+    Serial.printf("\n[WiFi OK] Da ket noi thanh cong vao %s! IP: %s (RSSI: %d dBm)\n",
+                  (target == NET_GATEWAY_AP) ? AP_SSID : HOME_SSID,
+                  WiFi.localIP().toString().c_str(),
+                  WiFi.RSSI());
+    return true;
+  } else {
+    Serial.printf("\n[WiFi THAT BAI] Khong the ket noi vao %s sau 6s!\n",
+                  (target == NET_GATEWAY_AP) ? AP_SSID : HOME_SSID);
+    return false;
   }
 }
 
 void selectBestNetwork() {
   Serial.println("\n[WiFi ROAMING] Dang quet cac mang kha dung...");
-  int n = WiFi.scanNetworks(false, true); // Quét nhanh mạng xung quanh
+  // Phải giải phóng radio trước khi quét để tránh xung đột 'wifi:sta is connecting'
+  WiFi.disconnect(true, true);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+
+  int n = WiFi.scanNetworks(false, false); // Quét đồng bộ thông thường
+  if (n < 0) {
+    Serial.printf("[WiFi] Quet mang that bai (ma loi: %d), thu ket noi Gateway AP...\n", n);
+    connectToNetwork(NET_GATEWAY_AP, 0);
+    return;
+  }
+
+  Serial.printf("[WiFi] Tim thay %d mang xung quanh:\n", n);
   bool hasGW = false;
   int gwRssi = -100;
+  int gwChan = 0;
   bool hasHome = false;
   int homeRssi = -100;
+  int homeChan = 0;
 
   for (int i = 0; i < n; i++) {
-    if (WiFi.SSID(i) == AP_SSID) {
+    String ssid = WiFi.SSID(i);
+    int rssi = WiFi.RSSI(i);
+    int chan = WiFi.channel(i);
+    Serial.printf("  [%d] SSID: '%s' | RSSI: %d dBm | Kenh: %d\n", i + 1, ssid.c_str(), rssi, chan);
+
+    if (ssid == AP_SSID) {
       hasGW = true;
-      gwRssi = WiFi.RSSI(i);
-    } else if (WiFi.SSID(i) == HOME_SSID) {
+      gwRssi = rssi;
+      gwChan = chan;
+    } else if (ssid == HOME_SSID) {
       hasHome = true;
-      homeRssi = WiFi.RSSI(i);
+      homeRssi = rssi;
+      homeChan = chan;
     }
   }
   WiFi.scanDelete();
 
   // Chiến lược ưu tiên:
-  // 1. Ở gần bàn Gateway (sóng AP >= -78 dBm) -> Bắt thẳng Gateway AP không cần qua Router
-  // 2. Đi xa khỏi Gateway (sóng AP < -78 dBm hoặc mất sóng) -> Tự động chuyển sang Wi-Fi nhà phủ khắp nhà
-  // 3. Nếu chỉ có một trong hai mạng -> Tự động kết nối mạng đang có
+  // 1. Ở gần Gateway (sóng AP >= -78 dBm) -> Bắt thẳng Gateway AP không cần qua Router
+  // 2. Đi xa khỏi Gateway (sóng AP < -78 dBm hoặc không có) -> Chuyển sang Wi-Fi nhà
+  // 3. Nếu mạng được chọn bị lỗi kết nối -> Tự động Fallback sang mạng còn lại
   if (hasGW && gwRssi >= -78) {
     Serial.printf("[WiFi] Gateway AP song manh (%d dBm >= -78 dBm) -> Chon BIOMED_GW\n", gwRssi);
-    connectToNetwork(NET_GATEWAY_AP);
+    if (!connectToNetwork(NET_GATEWAY_AP, gwChan)) {
+      if (hasHome) {
+        Serial.println("[WiFi] Gateway AP ket noi that bai -> Fallback sang Wi-Fi gia dinh...");
+        connectToNetwork(NET_HOME_WIFI, homeChan);
+      }
+    }
   } else if (hasHome) {
-    Serial.printf("[WiFi] Gateway AP yeu (%d dBm) hoac xa -> Chuyen vung sang Wi-Fi nha '%s' (%d dBm)\n",
+    Serial.printf("[WiFi] Gateway AP yeu (%d dBm) hoac xa -> Chuyen sang Wi-Fi nha '%s' (%d dBm)\n",
                   gwRssi, HOME_SSID, homeRssi);
-    connectToNetwork(NET_HOME_WIFI);
+    if (!connectToNetwork(NET_HOME_WIFI, homeChan)) {
+      if (hasGW) {
+        Serial.println("[WiFi] Wi-Fi nha ket noi that bai -> Fallback sang Gateway AP...");
+        connectToNetwork(NET_GATEWAY_AP, gwChan);
+      }
+    }
   } else if (hasGW) {
     Serial.printf("[WiFi] Chi tim thay Gateway AP (%d dBm) -> Chon BIOMED_GW\n", gwRssi);
-    connectToNetwork(NET_GATEWAY_AP);
+    connectToNetwork(NET_GATEWAY_AP, gwChan);
   } else {
-    Serial.println("[WiFi] Khong tim thay mang nao, thu lai voi Gateway AP...");
-    connectToNetwork(NET_GATEWAY_AP);
+    Serial.println("[WiFi] Khong tim thay BIOMED_GW lan Wi-Fi nha! Thu mac dinh Gateway AP...");
+    connectToNetwork(NET_GATEWAY_AP, 0);
   }
 }
 
@@ -394,20 +456,26 @@ void setup() {
 void loop() {
   // Quản lý kết nối Wi-Fi & Tự động chuyển vùng Roaming
   static unsigned long lastWifiCheck = 0;
+  static unsigned long lastRetry = 0;
+
   if (WiFi.status() != WL_CONNECTED) {
     digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Nháy LED khi mất mạng
-    static unsigned long lastRetry = 0;
-    if (millis() - lastRetry >= 3000) {
+    if (lastRetry == 0) {
+      lastRetry = millis(); // Khởi tạo mốc đếm thời gian khi mất mạng
+    }
+    // Chờ 8 giây trước khi quét và thử lại để tránh spam ngắt radio liên tục
+    if (millis() - lastRetry >= 8000) {
       lastRetry = millis();
       selectBestNetwork();
     }
     delay(10);
     return;
   } else {
+    lastRetry = 0; // Đặt lại khi đã kết nối ổn định
     digitalWrite(LED_PIN, HIGH); // Sáng liên tục khi đã kết nối ổn định
     
-    // Kiểm tra chất lượng sóng định kỳ mỗi 5 giây để tự động chuyển vùng nếu đi xa:
-    if (millis() - lastWifiCheck >= 5000) {
+    // Kiểm tra chất lượng sóng định kỳ mỗi 8 giây để tự động chuyển vùng nếu đi xa:
+    if (millis() - lastWifiCheck >= 8000) {
       lastWifiCheck = millis();
       int rssi = WiFi.RSSI();
       // Nếu đang nối với Gateway AP nhưng sóng tụt dưới -82 dBm (bệnh nhân đi xa khỏi bàn):
