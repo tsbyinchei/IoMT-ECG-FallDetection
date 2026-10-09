@@ -328,7 +328,9 @@ function handleDataPacket(data) {
   // 1. Cập nhật mẫu ECG vào bộ đệm (25 mẫu / gói)
   if (Array.isArray(data.ecg)) {
     for (let i = 0; i < data.ecg.length; i++) {
-      ecgBuffer[writeIndex] = data.ecg[i];
+      // Khi hở điện cực (leadsOff = 1) hoặc ADC bão hòa (4095), vẽ đường đẳng điện chuẩn ở giữa màn hình (2400)
+      const isDisconnected = data.leadsOff || data.ecg[i] >= 4080 || data.ecg[i] <= 50;
+      ecgBuffer[writeIndex] = isDisconnected ? 2400 : data.ecg[i];
       writeIndex = (writeIndex + 1) % BUFFER_SIZE;
     }
   }
@@ -563,7 +565,8 @@ function drawOscilloscope(timestamp) {
   ctx.fillStyle = gradient;
   ctx.fillRect(sweepX - 2, 0, 6, height);
 
-  sweepIndex = (sweepIndex + 2) % BUFFER_SIZE;
+  // Tốc độ quét đồng bộ tần số lấy mẫu 250Hz (250 / 60 FPS = ~4.17 mẫu/frame)
+  sweepIndex = (sweepIndex + 4.17) % BUFFER_SIZE;
 
   // Cập nhật nhãn giờ quét
   const now = new Date();
