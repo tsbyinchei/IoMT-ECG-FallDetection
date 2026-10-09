@@ -35,6 +35,7 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE,
 // báo lỗi rc=-2) Đặt 'true' khi chạy chính thức đẩy dữ liệu lên Ubuntu Server
 // (1Panel: EMQX Broker)
 #define ENABLE_MQTT true
+#define DEBUG_MUTE_DATA_STREAM false
 
 // 1. Wi-Fi Router kết nối ra Internet / Mạng nội bộ tới Ubuntu Server
 #ifndef SECRET_ROUTER_SSID

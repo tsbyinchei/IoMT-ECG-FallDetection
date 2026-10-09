@@ -1026,9 +1026,10 @@ function initPWA() {
   // 1. Đăng ký Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
+      navigator.serviceWorker.register('./sw.js?v=1.7')
         .then((reg) => {
           console.log('[PWA] Service Worker đăng ký thành công:', reg.scope);
+          reg.update(); // Chủ động kiểm tra cập nhật bản mới nhất
         })
         .catch((err) => {
           console.warn('[PWA] Đăng ký Service Worker thất bại:', err);
