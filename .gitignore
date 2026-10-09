@@ -31,11 +31,17 @@ config_private.m
 
 # External reference archives
 Elderly-Fall-Detection-System-main/
+AWECG-Monitor-main/
+esp32-serial-BLE-ECG-main/
+ESP32_Heart_Rate_MQTT-master/
+ESP32-ECG-main/
+
 *.zip
 
 # Hardware Flash Folders (Full credentials & ready-to-flash)
 ESP32/
 ESP32C3/
+projectthamkhao/
 
 # Python cache
 __pycache__/

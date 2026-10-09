@@ -488,10 +488,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
                                int32_t event_id, void *event_data) {
   esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
   switch ((esp_mqtt_event_id_t)event_id) {
+  case MQTT_EVENT_BEFORE_CONNECT:
+    Serial.println("\n[MQTT] >> Dang thiet lap bat tay TLS va ket noi Broker Cloud...");
+    break;
   case MQTT_EVENT_CONNECTED:
     mqtt_connected = true;
-    Serial.println(
-        "\n[MQTT] >>> KET NOI THANH CONG TOI BROKER CLOUD (WSS)! <<<");
+    Serial.println("\n=======================================================");
+    Serial.println("[MQTT] >>> KET NOI THANH CONG TOI BROKER CLOUD (WSS)! <<<");
+    Serial.println("=======================================================\n");
     esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS,
                             "{\"status\":\"online\",\"buzzer\":\"active\"}", 0, 1, 0);
     esp_mqtt_client_subscribe(mqtt_client, TOPIC_CMD, 1);
@@ -499,7 +503,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     break;
   case MQTT_EVENT_DISCONNECTED:
     mqtt_connected = false;
-    Serial.println("[MQTT] Mat ket noi Broker. Dang tu dong ket noi lai...");
+    Serial.println("\n[MQTT] Mat ket noi Broker. Dang tu dong ket noi lai...");
     break;
   case MQTT_EVENT_DATA: {
     char topicBuf[64] = {0};
@@ -510,7 +514,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     int dLen = event->data_len < (int)sizeof(dataBuf) - 1 ? event->data_len : (int)sizeof(dataBuf) - 1;
     strncpy(dataBuf, event->data, dLen);
 
-    Serial.printf("[MQTT CMD] Nhan lenh dieu khien tai [%s]: %s\n", topicBuf, dataBuf);
+    Serial.printf("\n[MQTT CMD] Nhan lenh dieu khien tai [%s]: %s\n", topicBuf, dataBuf);
 
     if (strstr(dataBuf, "mute") != NULL && strstr(dataBuf, "unmute") == NULL) {
       buzzerMuted = true;
@@ -531,7 +535,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     break;
   }
   case MQTT_EVENT_ERROR:
-    Serial.println("[MQTT] Bao loi ket noi MQTT WSS");
+    Serial.printf("\n[MQTT ERROR] type: %d | conn_code: %d | tls_err: 0x%x | sock_errno: %d\n",
+                  event->error_handle ? event->error_handle->error_type : -1,
+                  event->error_handle ? event->error_handle->connect_return_code : -1,
+                  event->error_handle ? event->error_handle->esp_tls_last_esp_err : -1,
+                  event->error_handle ? event->error_handle->esp_transport_sock_errno : -1);
     break;
   default:
     break;
@@ -546,44 +554,48 @@ void initAndStartMQTT() {
   esp_mqtt_client_config_t mqtt_cfg = {};
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   mqtt_cfg.broker.address.uri = MQTT_URI;
+  mqtt_cfg.broker.address.transport = MQTT_TRANSPORT_OVER_WSS;
+  mqtt_cfg.broker.address.hostname = "mqtt.tsbyin.dev";
+  mqtt_cfg.broker.address.port = 443;
+  mqtt_cfg.broker.address.path = "/mqtt";
   mqtt_cfg.broker.verification.certificate = ISRG_ROOT_X1_CA;
   mqtt_cfg.broker.verification.skip_cert_common_name_check = true;
-#if HAS_ESP_CRT_BUNDLE
-  mqtt_cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
-#endif
+  mqtt_cfg.session.protocol_ver = MQTT_PROTOCOL_V_3_1_1;
   if (strlen(MQTT_USER) > 0) {
     mqtt_cfg.credentials.username = MQTT_USER;
     mqtt_cfg.credentials.authentication.password = MQTT_PASS;
   }
   mqtt_cfg.credentials.client_id = MQTT_CLIENT_ID;
   mqtt_cfg.network.disable_auto_reconnect = false;
-  mqtt_cfg.network.timeout_ms = 10000;
+  mqtt_cfg.network.timeout_ms = 15000;
+  mqtt_cfg.task.stack_size = 10240;
   mqtt_cfg.buffer.size = 2048;
   mqtt_cfg.buffer.out_size = 2048;
 #else
   mqtt_cfg.uri = MQTT_URI;
   mqtt_cfg.cert_pem = ISRG_ROOT_X1_CA;
   mqtt_cfg.skip_cert_common_name_check = true;
-#if HAS_ESP_CRT_BUNDLE
-  mqtt_cfg.crt_bundle_attach = esp_crt_bundle_attach;
-#endif
   if (strlen(MQTT_USER) > 0) {
     mqtt_cfg.username = MQTT_USER;
     mqtt_cfg.password = MQTT_PASS;
   }
   mqtt_cfg.client_id = MQTT_CLIENT_ID;
   mqtt_cfg.disable_auto_reconnect = false;
-  mqtt_cfg.network_timeout_ms = 10000;
+  mqtt_cfg.network_timeout_ms = 15000;
   mqtt_cfg.buffer_size = 2048;
   mqtt_cfg.out_buffer_size = 2048;
 #endif
 
   mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+  if (!mqtt_client) {
+    Serial.println("\n[MQTT LOI] esp_mqtt_client_init that bai!\n");
+    return;
+  }
   esp_mqtt_client_register_event(mqtt_client,
-                                 (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID,
+                                 MQTT_EVENT_ANY,
                                  mqtt_event_handler, NULL);
-  esp_mqtt_client_start(mqtt_client);
-  Serial.printf("[MQTT] Khoi chay client ket noi Cloud Broker: %s\n", MQTT_URI);
+  esp_err_t startErr = esp_mqtt_client_start(mqtt_client);
+  Serial.printf("\n[MQTT] Khoi chay client ket noi Cloud Broker: %s (Status: %d)\n", MQTT_URI, startErr);
 #endif
 }
 
@@ -595,9 +607,9 @@ void publishDataMQTT() {
     if (millis() - lastWarnTime >= 5000) {
       lastWarnTime = millis();
       if (WiFi.status() != WL_CONNECTED) {
-        Serial.printf("[MQTT CHUA DAY] Wi-Fi chua ket noi Router '%s' (Trang thai: %d). Dang doi...\n", ROUTER_SSID, WiFi.status());
+        Serial.printf("\n[MQTT CHUA DAY] Wi-Fi chua ket noi Router '%s' (Trang thai: %d). Dang doi...\n", ROUTER_SSID, WiFi.status());
       } else {
-        Serial.printf("[MQTT CHUA DAY] Wi-Fi da ket noi (IP: %s) nhung Broker Cloud (%s) chua Connected! Dang ket noi...\n",
+        Serial.printf("\n[MQTT CHUA DAY] Wi-Fi da ket noi (IP: %s) nhung Broker Cloud (%s) chua Connected! Dang ket noi...\n",
                       WiFi.localIP().toString().c_str(), MQTT_URI);
       }
     }
@@ -622,8 +634,8 @@ void publishDataMQTT() {
 
   static unsigned long totalPubCount = 0;
   totalPubCount++;
-  if (totalPubCount % 100 == 0) {
-    Serial.printf("[MQTT] >>> Da day thanh cong %lu goi tin sinh hieu len Web Dashboard Cloud! <<<\n", totalPubCount);
+  if (totalPubCount == 1 || totalPubCount % 50 == 0) {
+    Serial.printf("\n[MQTT] >>> Da day %lu goi tin sinh hieu len Web Dashboard Cloud! <<<\n", totalPubCount);
   }
 
   if (incomingData.fallDetected || incomingData.leadsOff) {
@@ -794,6 +806,13 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("\n[WiFi] Da ket noi Router! IP: %s (Kenh: %d | RSSI: %d dBm)\n",
                   WiFi.localIP().toString().c_str(), WiFi.channel(), WiFi.RSSI());
+    WiFi.setDNS(IPAddress(8, 8, 8, 8), IPAddress(1, 1, 1, 1));
+    IPAddress resolvedIP;
+    if (WiFi.hostByName("mqtt.tsbyin.dev", resolvedIP)) {
+      Serial.printf("[DNS] Giai ma mqtt.tsbyin.dev -> %s\n", resolvedIP.toString().c_str());
+    } else {
+      Serial.println("[DNS CANH BAO] Chua giai ma duoc domain mqtt.tsbyin.dev");
+    }
     // Cài đặt mốc thời gian hệ thống (>2025) để mbedTLS không báo lỗi ngày chứng chỉ
     struct timeval tv = { .tv_sec = 1770000000 };
     settimeofday(&tv, NULL);
