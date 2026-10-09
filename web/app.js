@@ -27,11 +27,146 @@ let totalFalls = 0;
 let prevFallState = 0;
 let lastHeartBeatTime = 0;
 
+// ==================== BỘ LỌC TÍN HIỆU ECG CHUẨN Y TẾ ====================
+/**
+ * Chuỗi lọc số thời gian thực chuẩn sinh y:
+ * 1. 2nd-order IIR Biquad 50Hz Notch Filter (Fs = 250Hz, Q = 7.0): Triệt tiêu triệt để nhiễu điện lưới 50Hz.
+ * 2. High-pass Filter (0.5Hz Baseline Detrending): Loại bỏ trôi đường đẳng điện do thở và dịch chuyển điện cực.
+ * 3. Low-pass Filter (35Hz Muscle Tremor Rejection): Làm mịn gai nhiễu ADC và co cơ EMG.
+ * 4. Pan-Tompkins QRS Derivative + Moving Window Integration: Nhận diện R-Peak và đo chu kỳ RR thực tế.
+ */
+class MedicalEcgProcessor {
+  constructor(fs = 250, mainsHz = 50) {
+    this.fs = fs;
+    // Biquad 50Hz Notch Filter (@ 250Hz sample rate, f0 = 50Hz, Q = 7.0)
+    const w0 = (2.0 * Math.PI * mainsHz) / fs;
+    const c = Math.cos(w0);
+    const s = Math.sin(w0);
+    const alpha = s / (2.0 * 7.0);
+    const a0 = 1.0 + alpha;
+    this.b0 = 1.0 / a0;
+    this.b1 = (-2.0 * c) / a0;
+    this.b2 = 1.0 / a0;
+    this.a1 = (-2.0 * c) / a0;
+    this.a2 = (1.0 - alpha) / a0;
+
+    this.x1 = 2048; this.x2 = 2048;
+    this.y1 = 2048; this.y2 = 2048;
+
+    this.baseline = 2048;
+    this.lp = 0;
+
+    // Pan-Tompkins QRS Detector
+    this.hp1 = 0; this.hp2 = 0; this.hp3 = 0; this.hp4 = 0;
+    this.mwiWindow = 30; // 120ms @ 250Hz
+    this.mwiBuf = new Float32Array(this.mwiWindow).fill(0);
+    this.mwiIdx = 0;
+    this.mwiSum = 0;
+    this.mwiPeak = 300;
+    this.lastBeatSample = 0;
+    this.sampleCount = 0;
+    this.refractorySamples = Math.round(fs * 0.24); // 240ms refractory (~250 BPM max)
+    this.above = false;
+    this.recentRR = [];
+    this.lastRRMs = 0;
+    this.lastRPeakMv = 0;
+  }
+
+  reset() {
+    this.x1 = 2048; this.x2 = 2048;
+    this.y1 = 2048; this.y2 = 2048;
+    this.baseline = 2048;
+    this.lp = 0;
+    this.hp1 = 0; this.hp2 = 0; this.hp3 = 0; this.hp4 = 0;
+    this.mwiBuf.fill(0);
+    this.mwiSum = 0;
+    this.mwiPeak = 300;
+    this.above = false;
+  }
+
+  process(rawSample, isLeadsOff) {
+    this.sampleCount++;
+    if (isLeadsOff || rawSample <= 20 || rawSample >= 4080) {
+      this.reset();
+      return { filtered: 0, beat: false, rrMs: 0, rMv: '0.00' };
+    }
+
+    // 1. Biquad Notch Filter 50Hz (Triệt tiêu hoàn toàn nhiễu sóng xoay chiều 220V/50Hz)
+    const notch = this.b0 * rawSample + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
+    this.x2 = this.x1; this.x1 = rawSample;
+    this.y2 = this.y1; this.y1 = notch;
+
+    // 2. High-pass Filter (0.5Hz Baseline Tracker): Khử trôi baseline do hô hấp
+    this.baseline += (notch - this.baseline) * 0.005;
+    const hp = notch - this.baseline;
+
+    // 3. Low-pass Filter (~35Hz): Khử nhiễu rung cơ EMG & gai ADC
+    this.lp += (hp - this.lp) * 0.38;
+
+    // 4. Pan-Tompkins 5-point derivative
+    const deriv = (2.0 * hp + this.hp1 - this.hp3 - 2.0 * this.hp4) * 0.125;
+    this.hp4 = this.hp3; this.hp3 = this.hp2; this.hp2 = this.hp1; this.hp1 = hp;
+    const dsq = deriv * deriv;
+
+    this.mwiSum += dsq - this.mwiBuf[this.mwiIdx];
+    this.mwiBuf[this.mwiIdx] = dsq;
+    this.mwiIdx = (this.mwiIdx + 1) % this.mwiWindow;
+    const mwi = this.mwiSum / this.mwiWindow;
+
+    this.mwiPeak *= 0.9985;
+    if (mwi > this.mwiPeak) this.mwiPeak = mwi;
+
+    const threshold = this.mwiPeak * 0.35;
+    const isAbove = mwi > threshold;
+    const rising = isAbove && !this.above;
+    this.above = isAbove;
+
+    let beat = false;
+    let rrMs = this.lastRRMs;
+    let rMv = this.lastRPeakMv;
+
+    if (rising && (this.sampleCount - this.lastBeatSample > this.refractorySamples) && this.sampleCount > this.fs) {
+      const prevBeat = this.lastBeatSample;
+      const rrSamples = this.sampleCount - prevBeat;
+      this.lastBeatSample = this.sampleCount;
+
+      if (prevBeat !== 0) {
+        const measuredRRMs = Math.round(rrSamples * (1000 / this.fs));
+        // Giới hạn dải nhịp tim sinh học hợp lý: 35 BPM (1714ms) đến 200 BPM (300ms)
+        if (measuredRRMs >= 300 && measuredRRMs <= 1714) {
+          this.recentRR.push(measuredRRMs);
+          if (this.recentRR.length > 5) this.recentRR.shift();
+
+          const sorted = [...this.recentRR].sort((a, b) => a - b);
+          rrMs = sorted[Math.floor(sorted.length / 2)];
+          this.lastRRMs = rrMs;
+
+          // Tính biên độ sóng R (AD8232 Gain ~1100, Vref 3.3V)
+          const estMv = Math.max(0.4, Math.min(2.8, Math.abs(hp) * 0.0016)).toFixed(2);
+          rMv = estMv;
+          this.lastRPeakMv = rMv;
+          beat = true;
+        }
+      }
+    }
+
+    return {
+      filtered: this.lp,
+      beat: beat,
+      rrMs: rrMs,
+      rMv: rMv
+    };
+  }
+}
+
 // Bộ đệm sóng ECG (Oscilloscope Ring Buffer)
 const BUFFER_SIZE = 1000; // 4 giây hiển thị ở tần số lấy mẫu 250Hz (250 * 4 = 1000)
-const ecgBuffer = new Float32Array(BUFFER_SIZE).fill(2048);
+const ecgBuffer = new Float32Array(BUFFER_SIZE).fill(0);
+const ecgProcessor = new MedicalEcgProcessor(250, 50);
+let dynamicPeak = 250;
 let writeIndex = 0;
 let sweepIndex = 0;
+let lastDetectedBpm = 0;
 
 // Web Audio API Context
 let audioCtx = null;
@@ -325,22 +460,42 @@ function handleDataPacket(data) {
   totalPackets++;
   elements.packetCountVal.textContent = totalPackets.toLocaleString();
 
-  // 1. Cập nhật mẫu ECG vào bộ đệm (25 mẫu / gói)
+  // 1. Cập nhật mẫu ECG vào bộ đệm qua bộ lọc số y sinh (25 mẫu / gói @ 250Hz)
+  let localBeatDetected = false;
+
   if (Array.isArray(data.ecg)) {
     for (let i = 0; i < data.ecg.length; i++) {
-      // Khi hở điện cực (leadsOff = 1) hoặc ADC bão hòa (4095), vẽ đường đẳng điện chuẩn ở giữa màn hình (2400)
-      const isDisconnected = data.leadsOff || data.ecg[i] >= 4080 || data.ecg[i] <= 50;
-      ecgBuffer[writeIndex] = isDisconnected ? 2400 : data.ecg[i];
+      // Khi hở điện cực (leadsOff = 1) hoặc ADC bão hòa (4080) / chạm đáy (50)
+      const isDisconnected = Boolean(data.leadsOff || data.ecg[i] >= 4080 || data.ecg[i] <= 50);
+      const res = ecgProcessor.process(data.ecg[i], isDisconnected);
+
+      ecgBuffer[writeIndex] = res.filtered;
       writeIndex = (writeIndex + 1) % BUFFER_SIZE;
+
+      if (res.beat) {
+        localBeatDetected = true;
+        lastDetectedBpm = Math.round(60000 / res.rrMs);
+        if (elements.rPeakVal) elements.rPeakVal.textContent = res.rMv + ' mV';
+        if (elements.rrIntervalVal) elements.rrIntervalVal.textContent = res.rrMs + ' ms';
+        triggerHeartBeat(lastDetectedBpm);
+        lastHeartBeatTime = Date.now();
+      }
     }
   }
 
-  // 2. Nhịp tim BPM
-  const bpm = data.bpm || 0;
+  // 2. Nhịp tim BPM (Kết hợp tính toán tại Gateway và thuật toán Pan-Tompkins Web)
+  let bpm = data.bpm || 0;
+  // Nếu Gateway bị nhiễu điện lưới kích hoạt nhịp ảo > 120 trong khi Web tính được nhịp chuẩn sinh học 45 - 110:
+  if (lastDetectedBpm >= 45 && lastDetectedBpm <= 115 && (bpm <= 0 || bpm > 115)) {
+    bpm = lastDetectedBpm;
+  }
+
   if (data.leadsOff) {
     elements.bpmVal.textContent = '--';
     elements.bpmStatus.textContent = 'HỞ ĐIỆN CỰC AD8232';
     elements.bpmStatus.className = 'vital-status text-danger';
+    if (elements.rPeakVal) elements.rPeakVal.textContent = '-- mV';
+    if (elements.rrIntervalVal) elements.rrIntervalVal.textContent = '-- ms';
   } else if (bpm > 0) {
     elements.bpmVal.textContent = bpm;
     if (bpm > 120) {
@@ -354,12 +509,14 @@ function handleDataPacket(data) {
       elements.bpmStatus.className = 'vital-status text-ok';
     }
 
-    // Hiệu ứng tim đập theo chu kỳ
-    const now = Date.now();
-    const intervalMs = (60 / bpm) * 1000;
-    if (now - lastHeartBeatTime >= intervalMs * 0.9) {
-      triggerHeartBeat(bpm);
-      lastHeartBeatTime = now;
+    // Hiệu ứng tim đập theo chu kỳ nếu chưa được kích hoạt bởi R-peak
+    if (!localBeatDetected) {
+      const now = Date.now();
+      const intervalMs = (60 / bpm) * 1000;
+      if (now - lastHeartBeatTime >= intervalMs * 0.95) {
+        triggerHeartBeat(bpm);
+        lastHeartBeatTime = now;
+      }
     }
   } else {
     elements.bpmVal.textContent = '--';
@@ -510,43 +667,51 @@ function drawOscilloscope(timestamp) {
   const width = elements.ecgCanvas.width;
   const height = elements.ecgCanvas.height;
 
-  // Xóa canvas với hiệu ứng phosphor decay nhẹ
-  ctx.fillStyle = 'rgba(3, 8, 12, 0.18)';
-  ctx.fillRect(0, 0, width, height);
+  // Xóa sạch canvas mỗi khung hình để không tích tụ vệt phát quang gây nhòe / biến dạng sóng
+  ctx.clearRect(0, 0, width, height);
 
-  // Đường quét y tế (Sweeping line phosphor trace)
-  // Tính tọa độ quét X từ 0 đến width
   const stepX = width / BUFFER_SIZE;
   const sweepX = (sweepIndex % BUFFER_SIZE) * stepX;
+  const midY = height * 0.52;
+  const gapPixels = 26; // Khe hở quét xóa dữ liệu cũ phía trước tia quét (Sweep Erase Gap)
 
-  // Xóa một vệt phía trước đầu quét (Beam Erase Window 30px)
-  ctx.fillStyle = '#03080c';
-  ctx.fillRect(sweepX, 0, 36, height);
+  // 1. Tự động cân chỉnh biên độ hiển thị (Dynamic Auto-Gain Envelope)
+  let maxAbs = 60;
+  for (let i = 0; i < BUFFER_SIZE; i++) {
+    const a = Math.abs(ecgBuffer[i]);
+    if (a > maxAbs) maxAbs = a;
+  }
+  if (maxAbs > dynamicPeak) {
+    dynamicPeak = dynamicPeak * 0.90 + maxAbs * 0.10;
+  } else {
+    dynamicPeak = dynamicPeak * 0.997 + maxAbs * 0.003;
+  }
+  if (dynamicPeak < 90) dynamicPeak = 90; // Ngưỡng sàn bảo vệ chống phóng to nhiễu tĩnh điện
 
-  // Vẽ sóng ECG
-  ctx.lineWidth = 2.2;
-  ctx.strokeStyle = '#00ff88';
-  ctx.shadowColor = '#00ff88';
-  ctx.shadowBlur = 8;
+  // Hệ số co giãn trục Y: Sóng chiếm tối đa 72% chiều cao khung hình, không chạm trần / chạm sàn
+  const scale = (height * 0.36) / dynamicPeak;
+
+  // 2. VẼ LỚP PHÁT QUANG PHOSPHOR NGOÀI (Soft Phosphor Glow Aura)
+  ctx.save();
+  ctx.lineWidth = 3.6;
+  ctx.strokeStyle = 'rgba(0, 255, 136, 0.22)';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.beginPath();
 
   let started = false;
-  // Vẽ toàn bộ buffer
   for (let i = 0; i < BUFFER_SIZE; i++) {
     const x = i * stepX;
-    // Bỏ qua cửa sổ ngay sát tia quét
-    if (Math.abs(x - sweepX) < 16) {
+    // Bỏ qua dải quét phía trước để tạo hiệu ứng sweep gap chuẩn màn hình bệnh viện
+    const dist = (x - sweepX + width) % width;
+    if (dist < gapPixels) {
       started = false;
       continue;
     }
 
-    const raw = ecgBuffer[i];
-    // Ánh xạ ADC 12-bit (2000 - 3600) vào khung chiều cao canvas
-    // Tâm đồ thị nằm ở height * 0.55
-    const baseline = 2400;
-    const scale = height / 1600;
-    const y = (height * 0.55) - (raw - baseline) * scale;
-    const clampedY = Math.max(15, Math.min(height - 15, y));
+    const val = ecgBuffer[i];
+    const y = midY - val * scale;
+    const clampedY = Math.max(14, Math.min(height - 14, y));
 
     if (!started) {
       ctx.moveTo(x, clampedY);
@@ -556,17 +721,39 @@ function drawOscilloscope(timestamp) {
     }
   }
   ctx.stroke();
-  ctx.shadowBlur = 0; // Tắt shadow để tối ưu hiệu năng
 
-  // Vẽ vạch tia quét phosphor (Sweep Beam)
-  const gradient = ctx.createLinearGradient(sweepX, 0, sweepX + 4, 0);
-  gradient.addColorStop(0, 'rgba(0, 255, 136, 0.9)');
-  gradient.addColorStop(1, 'rgba(0, 255, 136, 0.0)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(sweepX - 2, 0, 6, height);
+  // 3. VẼ LÕI TIA SÁNG ĐIỆN TIM CHÍNH (Sharp Center Neon Core)
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = '#00ff88';
+  ctx.shadowColor = '#00ff88';
+  ctx.shadowBlur = 6;
+  ctx.stroke();
+  ctx.restore();
 
-  // Tốc độ quét đồng bộ tần số lấy mẫu 250Hz (250 / 60 FPS = ~4.17 mẫu/frame)
-  sweepIndex = (sweepIndex + 4.17) % BUFFER_SIZE;
+  // 4. HIỆU ỨNG TIA QUÉT Y TẾ (Medical Sweep Beam & Leading Cursor)
+  const beamGrad = ctx.createLinearGradient(sweepX - 12, 0, sweepX + 2, 0);
+  beamGrad.addColorStop(0, 'rgba(0, 255, 136, 0)');
+  beamGrad.addColorStop(0.7, 'rgba(0, 255, 136, 0.25)');
+  beamGrad.addColorStop(1, 'rgba(0, 255, 136, 0.95)');
+  ctx.fillStyle = beamGrad;
+  ctx.fillRect(sweepX - 12, 0, 14, height);
+
+  // Điểm sáng laser dẫn đầu tia quét
+  const currIdx = Math.floor(sweepIndex) % BUFFER_SIZE;
+  const leadVal = ecgBuffer[currIdx] || 0;
+  const leadY = Math.max(14, Math.min(height - 14, midY - leadVal * scale));
+
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#00ff88';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(sweepX, leadY, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Tốc độ quét đồng bộ tần số lấy mẫu 250Hz (250 / 60 FPS = 4.167 mẫu / frame)
+  sweepIndex = (sweepIndex + 4.167) % BUFFER_SIZE;
 
   // Cập nhật nhãn giờ quét
   const now = new Date();

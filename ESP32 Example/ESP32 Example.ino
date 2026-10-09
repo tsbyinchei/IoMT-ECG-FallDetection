@@ -222,56 +222,115 @@ void handleButton() {
   lastButtonState = reading;
 }
 
-// ==================== THUẬT TOÁN ĐO NHỊP TIM TẠI BIÊN (EDGE BPM)
+// ==================== BỘ LỌC SỐ ECG 50Hz NOTCH + PAN-TOMPKINS ====================
+struct EcgFilterBiquad {
+  float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
+  float x1 = 2048.0f, x2 = 2048.0f, y1 = 2048.0f, y2 = 2048.0f;
+
+  void init(float f0, float fs, float Q) {
+    float w0 = 2.0f * 3.14159265f * f0 / fs;
+    float c = cosf(w0);
+    float s = sinf(w0);
+    float alpha = s / (2.0f * Q);
+    float a0 = 1.0f + alpha;
+    b0 = 1.0f / a0;
+    b1 = -2.0f * c / a0;
+    b2 = 1.0f / a0;
+    a1 = -2.0f * c / a0;
+    a2 = (1.0f - alpha) / a0;
+  }
+
+  float step(float x) {
+    float y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1; x1 = x;
+    y2 = y1; y1 = y;
+    return y;
+  }
+
+  void reset(float val = 2048.0f) {
+    x1 = val; x2 = val; y1 = val; y2 = val;
+  }
+};
+
+static EcgFilterBiquad gwNotch;
+static bool gwFilterInited = false;
+static float gwBaseline = 2048.0f;
+static float gwLp = 0.0f;
+
+float filterGatewayEcg(uint16_t raw, bool leadsOff) {
+  if (!gwFilterInited) {
+    gwNotch.init(50.0f, 250.0f, 7.0f);
+    gwFilterInited = true;
+  }
+  if (leadsOff || raw < 50 || raw >= 4080) {
+    gwNotch.reset(2048.0f);
+    gwBaseline = 2048.0f;
+    gwLp = 0.0f;
+    return 0.0f;
+  }
+  // 1. Notch filter 50Hz (Khử triệt để nhiễu điện lưới 50Hz)
+  float n = gwNotch.step((float)raw);
+  // 2. High-pass filter 0.5Hz (Khử trôi đường đẳng điện do hô hấp)
+  gwBaseline += (n - gwBaseline) * 0.005f;
+  float hp = n - gwBaseline;
+  // 3. Low-pass filter 35Hz (Khử nhiễu rung cơ EMG & gai ADC)
+  gwLp += (hp - gwLp) * 0.38f;
+  return gwLp;
+}
+
+// ==================== THUẬT TOÁN ĐO NHỊP TIM TẠI BIÊN (EDGE BPM - PAN-TOMPKINS)
 // ==================== Tần số lấy mẫu 250Hz -> Mỗi mẫu = 4ms
 unsigned long edgeSampleCounter = 0;
 unsigned long lastPeakSample = 0;
-uint16_t prevSample1 = 3400;
-uint16_t prevSample2 = 3400;
-int slopeThreshold = 80;
+static float ptHp1 = 0, ptHp2 = 0, ptHp3 = 0, ptHp4 = 0;
+#define MWI_LEN 25
+static float mwiBuf[MWI_LEN] = {0};
+static int mwiIdx = 0;
+static float mwiSum = 0;
+static float mwiPeak = 200.0f;
+static bool qrsAbove = false;
 
-void processEdgeBPM(uint16_t sample) {
+void processEdgeBPM(float hp) {
   edgeSampleCounter++;
 
-  // Tính độ dốc đạo hàm bậc 1 của sóng QRS: slope = x[n] - x[n-2]
-  int slope = (int)sample - (int)prevSample2;
-  prevSample2 = prevSample1;
-  prevSample1 = sample;
+  // 1. Đạo hàm bậc 1 5 điểm nhấn mạnh sườn dốc QRS: deriv = (2*x[n] + x[n-1] - x[n-3] - 2*x[n-4]) / 8
+  float deriv = (2.0f * hp + ptHp1 - ptHp3 - 2.0f * ptHp4) * 0.125f;
+  ptHp4 = ptHp3; ptHp3 = ptHp2; ptHp2 = ptHp1; ptHp1 = hp;
+  float dsq = deriv * deriv;
 
-  // Thích ứng ngưỡng độ dốc (Slope Adaptive Threshold)
-  if (slope > slopeThreshold) {
-    slopeThreshold = (slopeThreshold * 7 + slope) / 8;
-  } else {
-    slopeThreshold =
-        (slopeThreshold * 511 + 60) / 512; // Hạ dần về ngưỡng sàn 60
-  }
+  // 2. Tích phân cửa sổ động (Moving Window Integration - 100ms)
+  mwiSum += dsq - mwiBuf[mwiIdx];
+  mwiBuf[mwiIdx] = dsq;
+  mwiIdx = (mwiIdx + 1) % MWI_LEN;
+  float mwi = mwiSum / (float)MWI_LEN;
 
-  // Phát hiện đỉnh sóng R:
-  // - Vượt ngưỡng độ dốc sườn QRS nhọn
-  // - Thời gian trơ sinh lý (Refractory Period): 380ms = 95 mẫu @ 250Hz để LOẠI
-  // BỎ HOÀN TOÀN SÓNG T
-  if (slope > slopeThreshold && (edgeSampleCounter - lastPeakSample > 95)) {
+  // 3. Ngưỡng thích ứng biên độ đỉnh QRS
+  mwiPeak *= 0.999f;
+  if (mwi > mwiPeak) mwiPeak = mwi;
+
+  float thr = 0.35f * mwiPeak;
+  bool isAbove = (mwi > thr);
+  bool rising = isAbove && !qrsAbove;
+  qrsAbove = isAbove;
+
+  // 4. Phát hiện đỉnh R với thời gian trơ sinh lý 240ms (60 mẫu @ 250Hz)
+  if (rising && (edgeSampleCounter - lastPeakSample > 60) && edgeSampleCounter > 250) {
     unsigned long rrSamples = edgeSampleCounter - lastPeakSample;
     lastPeakSample = edgeSampleCounter;
 
     // Khoảng thời gian RR tính bằng mili-giây (mỗi mẫu = 4ms)
     unsigned long rrMs = rrSamples * 4;
 
-    // Lọc dải sinh lý người bình thường: 45 BPM (1333ms) đến 140 BPM (428ms)
-    if (rrMs >= 428 && rrMs <= 1333) {
+    // Lọc dải sinh lý người bình thường: 40 BPM (1500ms) đến 180 BPM (333ms)
+    if (rrMs >= 333 && rrMs <= 1500) {
       int calculatedBpm = 60000 / rrMs;
       if (edgeBpm == 0) {
         edgeBpm = calculatedBpm;
       } else {
-        // Thuật toán chống nhảy vọt (Outlier Rejection):
-        // Nếu nhịp tính toán lệch quá 20 BPM so với nhịp nền (thường do co
-        // cơ/rung lắc MPU tạo đỉnh giả)
-        // -> Lọc bỏ đỉnh giả đó, không cho nhịp tim nhảy vọt
-        if (abs(calculatedBpm - edgeBpm) <= 18) {
+        // Thuật toán ổn định nhịp tim: bám theo nhịp sinh lý, lọc bỏ đột biến co giật
+        if (abs(calculatedBpm - edgeBpm) <= 15) {
           edgeBpm = (edgeBpm * 7 + calculatedBpm) / 8;
         } else {
-          // Nếu lệch nhiều, chỉ dịch chuyển rất từ từ (1/16) để bám theo nhịp
-          // tim thực
           edgeBpm = (edgeBpm * 15 + calculatedBpm) / 16;
         }
       }
@@ -286,29 +345,16 @@ void processEdgeBPM(uint16_t sample) {
 
 // ==================== CẬP NHẬT ĐỒ THỊ SÓNG OLED MINI (DYNAMIC AUTO-RANGING)
 // ====================
-void updateWaveformBuffer(uint16_t rawSample) {
-  // Tự động thích ứng với dải tín hiệu thực tế (Ví dụ: 3200 - 4095)
-  static uint16_t sigMin = 3200;
-  static uint16_t sigMax = 3800;
+void updateWaveformBuffer(float filteredSample) {
+  static float oledPeak = 300.0f;
+  float a = fabsf(filteredSample);
+  if (a > oledPeak) oledPeak = a;
+  oledPeak *= 0.998f;
+  if (oledPeak < 80.0f) oledPeak = 80.0f; // Ngưỡng sàn
 
-  if (rawSample < sigMin && rawSample > 200)
-    sigMin = rawSample;
-  if (rawSample > sigMax && rawSample <= 4095)
-    sigMax = rawSample;
-
-  // Co giãn ngưỡng từ từ để bám sát nhịp thở và đường đẳng điện
-  sigMin = (sigMin * 63 + 3200) / 64;
-  sigMax = (sigMax * 63 + 3900) / 64;
-
-  int span = sigMax - sigMin;
-  if (span < 150)
-    span = 150; // Bảo vệ chống chia cho 0
-
-  // Ánh xạ tín hiệu vừa vặn vào khung đồ thị OLED (Y: 54 ở dưới, 16 ở trên)
-  int mappedY =
-      54 -
-      (int)((long)(constrain(rawSample, sigMin, sigMax) - sigMin) * 38 / span);
-  waveBuffer[waveWriteIdx] = (uint8_t)constrain(mappedY, 16, 56);
+  // Đường đẳng điện OLED ở Y = 36 (giữa khung đồ thị 16 - 56)
+  int y = 36 - (int)(filteredSample * 18.0f / oledPeak);
+  waveBuffer[waveWriteIdx] = (uint8_t)constrain(y, 16, 56);
   waveWriteIdx = (waveWriteIdx + 1) % WAVE_WIDTH;
 }
 
@@ -977,15 +1023,16 @@ void loop() {
     }
     prevFallState = incomingData.fallDetected;
 
-    // Xử lý từng mẫu trong 25 mẫu ECG
+    // Xử lý từng mẫu trong 25 mẫu ECG qua bộ lọc số 50Hz Notch + Pan-Tompkins
     for (int i = 0; i < 25; i++) {
+      float filtered = filterGatewayEcg(incomingData.ecgSamples[i], incomingData.leadsOff);
       if (!incomingData.leadsOff) {
-        processEdgeBPM(incomingData.ecgSamples[i]);
+        processEdgeBPM(filtered);
       } else {
         edgeBpm = 0; // Khi hở dây, nhịp tim về 0
       }
       if (i % 3 == 0) {
-        updateWaveformBuffer(incomingData.ecgSamples[i]);
+        updateWaveformBuffer(filtered);
       }
     }
 
