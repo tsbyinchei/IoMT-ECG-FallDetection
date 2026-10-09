@@ -35,7 +35,7 @@ AWECG-Monitor-main/
 esp32-serial-BLE-ECG-main/
 ESP32_Heart_Rate_MQTT-master/
 ESP32-ECG-main/
-
+MATLAB/
 *.zip
 
 # Hardware Flash Folders (Full credentials & ready-to-flash)
@@ -46,3 +46,4 @@ projectthamkhao/
 # Python cache
 __pycache__/
 *.pyc
+.venv/
