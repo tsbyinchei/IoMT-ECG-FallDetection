@@ -19,3 +19,73 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+IMPORTANT NOTICE: BIOMEDICAL & HARDWARE SAFETY DISCLAIMER
+
+1. NON-MEDICAL DEVICE NOTICE (ACADEMIC & PROTOTYPING USE ONLY):
+   This system, including its source code, hardware schematics, firmware, signal
+   processing algorithms, cloud infrastructure, and documentation, is developed
+   solely for engineering education, academic research, and experimental prototyping.
+   It is NOT a certified medical device under US FDA (21 CFR Part 870), European
+   Union MDR (2017/745), ISO 13485, or the Vietnam Ministry of Health regulations.
+   It must NEVER be used for clinical diagnosis, patient treatment, medical triage,
+   critical care, or life-support applications. It cannot substitute for professional
+   medical judgment, hospital-grade diagnostic monitors, or certified personal
+   emergency response systems (PERS).
+
+2. ELECTRICAL SAFETY & PATIENT ISOLATION WARNING (IEC 60601-1):
+   The AD8232 ECG sensor module attaches conductive Ag/AgCl electrodes directly to
+   human skin. To prevent lethal electrical shock and ventricular fibrillation from
+   AC mains leakage currents, the wearable sensor node must ONLY be powered by
+   isolated DC battery sources (such as Li-Po / Li-Ion cells or ungrounded battery packs).
+   NEVER power or program the wearable sensor node using a USB charger connected to
+   AC mains (110V/220V) or a computer plugged into AC mains without medical-grade
+   galvanic isolation complying with IEC 60601-1 (Type BF/CF patient isolation).
+
+3. ALGORITHMIC & TELECOMMUNICATION LIMITATIONS:
+   Fall detection algorithms (acceleration magnitude and posture verification) and
+   ECG peak detection algorithms (Pan-Tompkins) are subject to false positives
+   (false alarms) and false negatives (missed falls or undetected arrhythmias).
+   Telecommunication channels (Wi-Fi, UDP, MQTT, Telegram, Zalo) depend on
+   third-party networks, internet connectivity, and external APIs. Delivery of alerts
+   is strictly best-effort and cannot be guaranteed against network latency, packet
+   loss, or cloud downtime.
+
+4. LIMITATION OF LIABILITY:
+   Under no circumstances shall the authors, copyright holders, or contributors
+   be held liable for any direct, indirect, incidental, special, exemplary, or
+   consequential damages, including but not limited to bodily injury, electrical
+   shock, illness, misdiagnosis, loss of life, or property damage arising in any
+   way out of the use, replication, modification, or deployment of this hardware
+   and software.
+
+--------------------------------------------------------------------------------
+
+TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM Y TẾ & AN TOÀN PHẦN CỨNG (TIẾNG VIỆT)
+
+1. MỤC ĐÍCH HỌC THUẬT & NGUYÊN MẪU (KHÔNG PHẢI THIẾT BỊ Y TẾ):
+   Dự án này (mã nguồn, mạch phần cứng, firmware, thuật toán xử lý tín hiệu và tài
+   liệu kỹ thuật) được phát triển thuần túy cho mục đích nghiên cứu học thuật, giáo
+   dục kỹ thuật và thử nghiệm nguyên mẫu (prototype). Dự án KHÔNG PHẢI là thiết bị
+   y tế được chứng nhận bởi Bộ Y tế, FDA hay CE. Tuyệt đối KHÔNG được sử dụng cho
+   mục đích chẩn đoán lâm sàng, điều trị, theo dõi bệnh nhân nguy kịch hoặc thay thế
+   hệ thống cấp cứu y tế chuyên nghiệp.
+
+2. CẢNH BÁO AN TOÀN ĐIỆN HỌC Y SINH (CHUẨN IEC 60601-1):
+   Cảm biến AD8232 kết nối điện cực dẫn điện Ag/AgCl trực tiếp lên da người. Bắt buộc
+   CHỈ CẤP NGUỒN CHO NODE CẢM BIẾN BẰNG PIN ĐỘC LẬP (Pin sạc Li-Po / Li-Ion 3.7V - 4.2V).
+   Tuyệt đối KHÔNG cắm nguồn sạc trực tiếp từ lưới điện 220V/110V nếu không có bộ cách
+   ly y tế chuyên dụng (Medical Galvanic Isolation), nhằm tránh nguy cơ dòng rò gây
+   điện giật nguy hiểm hoặc rung thất cho người đeo điện cực.
+
+3. GIỚI HẠN THUẬT TOÁN & ĐỘ TIN CẬY MẠNG:
+   Thuật toán phát hiện té ngã và xử lý ECG có thể có sai số (báo động giả hoặc sót
+   biến cố). Kênh truyền thông mạng (Wi-Fi, UDP, MQTT, Telegram, Zalo) có thể bị trễ
+   hoặc mất gói tin tùy thuộc hạ tầng viễn thông và kết nối Internet.
+
+4. MIỄN TRỪ TRÁCH NHIỆM:
+   Tác giả và những người đóng góp hoàn toàn không chịu bất kỳ trách nhiệm pháp lý
+   nào đối với thương tích, điện giật, tổn hại sức khỏe, tử vong hoặc thiệt hại vật
+   chất nào phát sinh từ việc chế tạo, thử nghiệm, sao chép hay sử dụng hệ thống này.

@@ -32,84 +32,84 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
        [ AD8232 ] (ECG - GPIO 1)
        [ DS18B20 ] (Nhiệt - GPIO 4)  
        [ MPU-6050 ] (Gia tốc - GPIO 6, 7)
-                  │ (Cáp tín hiệu)
-                  ▼
-       +──────────────────────+
-       │  NODE: ESP32-C3      │ (IP: 192.168.4.2)
-       │  Lấy mẫu 250Hz (4ms) │
-       +──────────────────────+
-                  │
-                  │ Wi-Fi UDP Socket (Port 4210)
-                  │ (Kết nối AP: BIOMED_GW)
-                  ▼
-       +──────────────────────+
-       │  GATEWAY: ESP32      │ (IP: 192.168.4.1 - SoftAP)
-       │  - Bóc tách gói UDP  │
-       │  - Edge BPM & Filter │
-       +──────────┬───────────+
-                  │
-        ┌─────────┴─────────┐
-        ▼                   ▼
-+───────────────+   +───────────────+
+                  | (Cáp tín hiệu)
+                  v
+       +----------------------+
+       |  NODE: ESP32-C3      | (IP: 192.168.4.2)
+       |  Lấy mẫu 250Hz (4ms) |
+       +----------------------+
+                  |
+                  | Wi-Fi UDP Socket (Port 4210)
+                  | (Kết nối AP: BIOMED_GW)
+                  v
+       +----------------------+
+       |  GATEWAY: ESP32      | (IP: 192.168.4.1 - SoftAP)
+       |  - Bóc tách gói UDP  |
+       |  - Edge BPM & Filter |
+       +----------+-----------+
+                  |
+        +---------+---------+
+        |                   |
+        v                   v
++---------------+   +---------------+
 | OLED SH1106   |   | ACTIVE BUZZER | (Còi hú cảnh báo ngã & tuột cực)
 | (I2C 128x64)  |   | (GPIO 23)     |
-+───────────────+   +───────────────+
-        │
-        │ UART USB Serial (115200 Baud)
-        ▼
-+───────────────────────────────────+
-| TRẠM XỬ LÝ MATLAB (OFFLINE)       |
-| - Đọc luồng bản tin $DATA         |
-| - Thuật toán Pan-Tompkins R-Peaks |
-| - Phát hiện té ngã ngưỡng 2.5g    |
-| - Xuất file ECG_Patient_Record.mat|
-+───────────────────────────────────+
++---------------+   +---------------+
+        |
+        | UART USB Serial (115200 Baud)
+        v
++------------------------------------+
+| TRẠM XỬ LÝ MATLAB (OFFLINE)        |
+| - Đọc luồng bản tin $DATA          |
+| - Thuật toán Pan-Tompkins R-Peaks  |
+| - Phát hiện té ngã ngưỡng 2.5g     |
+| - Xuất file ECG_Patient_Record.mat |
++------------------------------------+
 ```
 
 ---
 
 ### 🔹 Chế độ 2: Kiến trúc IoMT Chuẩn ITU-T Rec. Y.2060 (Server / Cloud)
-
 ```
-+=============================================================================+
-| 4. TẦNG ỨNG DỤNG (Application Layer)                                        |
-|    - Web Dashboard: IoMT Telehealth Monitor (https://iomt.yourdomain.com)    |
-|    - Quản trị Broker: EMQX Console (https://emqx.yourdomain.com)             |
-|    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@your_telegram_bot) & Zalo Bot |
-|    - Phân tích chuyên sâu: MATLAB Biomedical Signal Processing Toolbox      |
-+=============================================================================+
++===================================================================================+
+| 4. TẦNG ỨNG DỤNG (Application Layer)                                              |
+|    - Web Dashboard: IoMT Telehealth Monitor (https://iomt.yourdomain.com)         |
+|    - Quản trị Broker: EMQX Console (https://emqx.yourdomain.com)                  |
+|    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@your_telegram_bot) & Zalo Bot     |
+|    - Phân tích chuyên sâu: MATLAB Biomedical Signal Processing Toolbox            |
++===================================================================================+
                                       ▲
                                       │ WSS / HTTPS (Port 443 - Cloudflare Tunnel)
-+=============================================================================+
-| 3. TẦNG HỖ TRỢ DỊCH VỤ & ỨNG DỤNG (Service & Application Support Layer)     |
-|    - Hạ tầng: Ubuntu Server cá nhân quản lý qua 1Panel (192.168.1.x)        |
++===================================================================================+
+| 3. TẦNG HỖ TRỢ DỊCH VỤ & ỨNG DỤNG (Service & Application Support Layer)           |
+|    - Hạ tầng: Ubuntu Server cá nhân quản lý qua 1Panel (192.168.1.x)              |
 |    - MQTT Broker: EMQX (Cổng WebSocket 8083 -> Domain: wss://mqtt.yourdomain.com) |
-|    - Cơ sở dữ liệu chuỗi thời gian: InfluxDB (Lưu ECG 250Hz, Temp, SMV)     |
-|    - Bảo mật & Chứng chỉ số: Cloudflare Zero Trust SSL/TLS Tunnel           |
-+=============================================================================+
+|    - Cơ sở dữ liệu chuỗi thời gian: InfluxDB (Lưu ECG 250Hz, Temp, SMV)           |
+|    - Bảo mật & Chứng chỉ số: Cloudflare Zero Trust SSL/TLS Tunnel                 |
++===================================================================================+
                                       ▲
                                       │ MQTT WSS / TCP (Wi-Fi / 4G Hotspot)
-+=============================================================================+
-| 2. TẦNG MẠNG (Network Layer)                                                |
-|    - Gateway: ESP32-WROOM-32 (Chế độ Wi-Fi kép AP + STA)                    |
-|      + AP Mode: BIOMED_GW (Giao tiếp UDP nội bộ 192.168.4.1)                |
-|      + STA Mode: Đẩy dữ liệu lên Cloud qua wss://mqtt.yourdomain.com/mqtt    |
-|      + Khách thể ngầm: Native esp_mqtt_client FreeRTOS đa luồng             |
-|    - Giao thức nội bộ: Wi-Fi UDP Socket (Port 4210, 60 bytes/packet)        |
-+=============================================================================+
++===================================================================================+
+| 2. TẦNG MẠNG (Network Layer)                                                      |
+|    - Gateway: ESP32-WROOM-32 (Chế độ Wi-Fi kép AP + STA)                          |
+|      + AP Mode: BIOMED_GW (Giao tiếp UDP nội bộ 192.168.4.1)                      |
+|      + STA Mode: Đẩy dữ liệu lên Cloud qua wss://mqtt.yourdomain.com/mqtt         |
+|      + Khách thể ngầm: Native esp_mqtt_client FreeRTOS đa luồng                   |
+|    - Giao thức nội bộ: Wi-Fi UDP Socket (Port 4210, 60 bytes/packet)              |
++===================================================================================+
                                       ▲
                                       │ Gói tin UDP (25 mẫu/packet @ 250Hz)
-+=============================================================================+
-| 1. TẦNG THIẾT BỊ (Device Layer)                                             |
-|    - Node thu thập: ESP32-C3 SuperMini (Hardware Timer lấy mẫu 4ms)         |
-|    - Cảm biến sinh học (Sensors):                                           |
-|      + AD8232: Điện tâm đồ ECG Analog (ADC 12-bit)                          |
-|      + DS18B20: Thân nhiệt bề mặt (1-Wire Protocol)                         |
-|      + MPU-6050: Gia tốc 3 trục phát hiện té ngã (I2C Standard 100kHz)      |
-|    - Cơ cấu chấp hành (Actuators):                                          |
-|      + Màn hình OLED SH1106: Giao diện 4 trang lâm sàng (Báo Cloud WSS)     |
-|      + Active Buzzer: Báo động âm thanh tần số cao                           |
-+=============================================================================+
++===================================================================================+
+| 1. TẦNG THIẾT BỊ (Device Layer)                                                   |
+|    - Node thu thập: ESP32-C3 SuperMini (Hardware Timer lấy mẫu 4ms)               |
+|    - Cảm biến sinh học (Sensors):                                                 |
+|      + AD8232: Điện tâm đồ ECG Analog (ADC 12-bit)                                |
+|      + DS18B20: Thân nhiệt bề mặt (1-Wire Protocol)                               |
+|      + MPU-6050: Gia tốc 3 trục phát hiện té ngã (I2C Standard 100kHz)            |
+|    - Cơ cấu chấp hành (Actuators):                                                |
+|      + Màn hình OLED SH1106: Giao diện 4 trang lâm sàng (Báo Cloud WSS)           |
+|      + Active Buzzer: Báo động âm thanh tần số cao                                |
++===================================================================================+
 ```
 
 ---

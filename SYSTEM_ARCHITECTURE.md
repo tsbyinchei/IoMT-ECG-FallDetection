@@ -263,24 +263,24 @@ flowchart TD
 Trong các hệ sinh thái IoT y tế (IoMT), dữ liệu nhịp tim và biến cố bệnh nhân thuộc danh mục dữ liệu y tế nhạy cảm (tuân thủ các chuẩn mực an toàn thông tin HIPAA / GDPR). Dự án triển khai giải pháp bảo mật cấp cao bằng việc tích hợp trực tiếp chuỗi chứng chỉ số **Let's Encrypt Root CA** vào bộ nhớ flash của Gateway và thực thi giao thức bắt tay an toàn **TLS 1.3** thông qua thư viện mật mã học **mbedTLS**.
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│               CHUỖI ỦY THÁC SỐ (CHAIN OF TRUST - X.509 PKI)            │
-├────────────────────────────────────────────────────────────────────────┤
-│                                                                        │
-│   [ISRG Root X1 (RSA 4096)]      hoặc    [ISRG Root X2 (ECDSA P-384)]  │
-│   (Root CA - Nhúng trực tiếp trong firmware Gateway qua ISRG_ROOT_CA)  │
-│                                │                                       │
-│                                ▼                                       │
-│                [Let's Encrypt R3 / R10 / R11 / E1]                     │
-│                (Intermediate CA - Cơ quan cấp phát trung gian)         │
-│                                │                                       │
-│                                ▼                                       │
-│                     [mqtt.tsbyin.dev]                                  │
-│   (End-Entity / Leaf Certificate - Chứng chỉ tên miền máy chủ)         │
-│   • Cấp phát với SAN: mqtt.tsbyin.dev                                  │
-│   • Mã hóa: TLS 1.3 (Cipher: TLS_AES_256_GCM_SHA384)                   │
-│                                                                        │
-└────────────────────────────────────────────────────────────────────────┘
++------------------------------------------------------------------------+
+|               CHUỖI ỦY THÁC SỐ (CHAIN OF TRUST - X.509 PKI)            |
++------------------------------------------------------------------------+
+|                                                                        |
+|   [ISRG Root X1 (RSA 4096)]      hoặc    [ISRG Root X2 (ECDSA P-384)]  |
+|   (Root CA - Nhúng trực tiếp trong firmware Gateway qua ISRG_ROOT_CA)  |
+|                                |                                       |
+|                                v                                       |
+|                [Let's Encrypt R3 / R10 / R11 / E1]                     |
+|                (Intermediate CA - Cơ quan cấp phát trung gian)         |
+|                                |                                       |
+|                                v                                       |
+|                     [mqtt.tsbyin.dev]                                  |
+|   (End-Entity / Leaf Certificate - Chứng chỉ tên miền máy chủ)         |
+|   - Cấp phát với SAN: mqtt.tsbyin.dev                                  |
+|   - Mã hóa: TLS 1.3 (Cipher: TLS_AES_256_GCM_SHA384)                   |
+|                                                                        |
++------------------------------------------------------------------------+
 ```
 
 #### A. Cấu trúc Cặp Chứng chỉ Gốc ISRG Root X1 & X2 trong Firmware
@@ -361,10 +361,10 @@ Hệ thống giải quyết bài toán này bằng cơ chế 3 lớp bảo vệ:
 Hệ thống triển khai mô hình kiến trúc mạng hiện đại **Không mở cổng modem (No Port Forwarding / Zero Trust Architecture)**:
 
 ```
-┌──────────────────┐               ┌───────────────────────────┐               ┌──────────────────┐
-│  ESP32 Gateway   │  WSS (TLS1.3) │   Cloudflare Global Edge  │  Multiplexed  │  Ubuntu Server   │
-│  (Trạm tại nhà)  │──────────────>│   (Edge Termination 443)  │==============>│  (EMQX Broker)   │
-└──────────────────┘               └───────────────────────────┘    Tunnel     └──────────────────┘
++------------------+               +---------------------------+               +------------------+
+|  ESP32 Gateway   |  WSS (TLS1.3) |   Cloudflare Global Edge  |  Multiplexed  |  Ubuntu Server   |
+|  (Trạm tại nhà)  |-------------->|   (Edge Termination 443)  |==============>|  (EMQX Broker)   |
++------------------+               +---------------------------+    Tunnel     +------------------+
          ▲                                       ▲                  (QUIC)              ▲
          │                                       │                                      │
    Client mbedTLS                         Let's Encrypt /                         cloudflared
@@ -436,23 +436,23 @@ flowchart TD
 Để xác lập vị trí kiến trúc của dự án trong lý thuyết mạng máy tính chuẩn mực, bảng dưới đây đối sánh mô hình truyền thông 4 lớp của hệ thống với **Mô hình Tham chiếu OSI (7 tầng)** và **Mô hình TCP/IP (4 tầng)**:
 
 ```
-┌───────────────────────────────┬───────────────────────────────┬───────────────────────────────────────────────┐
-│     MÔ HÌNH OSI (7 TẦNG)      │    MÔ HÌNH TCP/IP (4 TẦNG)    │        MÔ HÌNH TRUYỀN THÔNG IOT DỰ ÁN         │
-├───────────────────────────────┼───────────────────────────────┼───────────────────────────────────────────────┤
-│ 7. Tầng Ứng dụng (App)        │                               │                                               │
-│ 6. Tầng Trình diễn (Pres)     │ 4. Tầng Ứng dụng (App)        │ 4. LỚP ỨNG DỤNG NGHIỆP VỤ (Application)       │
-│ 5. Tầng Phiên (Session)       │                               │    • MQTT JSON, HTTPS REST, Web PWA, Chatbots │
-├───────────────────────────────┼───────────────────────────────┼───────────────────────────────────────────────┤
-│                               │                               │ 3. LỚP NỀN TẢNG DỊCH VỤ (Service / Platform)  │
-│ 4. Tầng Vận chuyển (Transport)│ 3. Tầng Giao vận (Transport)  │    • EMQX Broker, TLS 1.3, Cloudflare Tunnel  │
-│                               │                               │    • UDP (C3 -> GW) & TCP/WSS (GW -> Cloud)   │
-├───────────────────────────────┼───────────────────────────────┼───────────────────────────────────────────────┤
-│ 3. Tầng Mạng (Network)        │ 2. Tầng Mạng (Internet)       │ 2. LỚP MẠNG & LIÊN LẠC (Network/Connectivity) │
-│                               │                               │    • IPv4 Addressing, Multi-WiFi Roaming      │
-├───────────────────────────────┼───────────────────────────────┼───────────────────────────────────────────────┤
-│ 2. Tầng Liên kết dữ liệu (DLL)│ 1. Tầng Truy cập mạng         │ 1. LỚP CẢM BIẾN VẬT LÝ (Physical & Sensor)    │
-│ 1. Tầng Vật lý (Physical)     │    (Network Access)           │    • RF 2.4GHz, I2C Fast-mode, 1-Wire, ADC    │
-└───────────────────────────────┴───────────────────────────────┴───────────────────────────────────────────────┘
++-------------------------------+-------------------------------+-----------------------------------------------+
+|     MÔ HÌNH OSI (7 TẦNG)      |    MÔ HÌNH TCP/IP (4 TẦNG)    |        MÔ HÌNH TRUYỀN THÔNG IOT DỰ ÁN         |
++-------------------------------+-------------------------------+-----------------------------------------------+
+| 7. Tầng Ứng dụng (App)        |                               |                                               |
+| 6. Tầng Trình diễn (Pres)     | 4. Tầng Ứng dụng (App)        | 4. LỚP ỨNG DỤNG NGHIỆP VỤ (Application)       |
+| 5. Tầng Phiên (Session)       |                               |    - MQTT JSON, HTTPS REST, Web PWA, Chatbots |
++-------------------------------+-------------------------------+-----------------------------------------------+
+|                               |                               | 3. LỚP NỀN TẢNG DỊCH VỤ (Service / Platform)  |
+| 4. Tầng Vận chuyển (Transport)| 3. Tầng Giao vận (Transport)  |    - EMQX Broker, TLS 1.3, Cloudflare Tunnel  |
+|                               |                               |    - UDP (C3 -> GW) & TCP/WSS (GW -> Cloud)   |
++-------------------------------+-------------------------------+-----------------------------------------------+
+| 3. Tầng Mạng (Network)        | 2. Tầng Mạng (Internet)       | 2. LỚP MẠNG & LIÊN LẠC (Network/Connectivity) |
+|                               |                               |    - IPv4 Addressing, Multi-WiFi Roaming      |
++-------------------------------+-------------------------------+-----------------------------------------------+
+| 2. Tầng Liên kết dữ liệu (DLL)| 1. Tầng Truy cập mạng         | 1. LỚP CẢM BIẾN VẬT LÝ (Physical & Sensor)    |
+| 1. Tầng Vật lý (Physical)     |    (Network Access)           |    - RF 2.4GHz, I2C Fast-mode, 1-Wire, ADC    |
++-------------------------------+-------------------------------+-----------------------------------------------+
 ```
 
 ### Bảng Phân bổ Công nghệ Chi tiết:
