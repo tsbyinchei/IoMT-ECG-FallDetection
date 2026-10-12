@@ -81,26 +81,25 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
 
 ---
 
-### CHƯƠNG 5: KẾT QUẢ THỰC NGHIỆM & THẢO LUẬN (4–5 trang)
-5.1. Danh mục 4 đồ thị thực nghiệm chuẩn in ấn 300 DPI (Thư mục `MATLAB/figures/`):
+### CHƯƠNG 5: HƯỚNG DẪN TRÌNH BÀY KẾT QUẢ THỰC NGHIỆM & THẢO LUẬN (4–5 trang)
+5.1. Danh mục 4 đồ thị thực nghiệm cần chèn vào báo cáo (Xuất từ thư mục `MATLAB/figures/`):
    - **Hình 5.1:** Tín hiệu ECG thô, tín hiệu sau lọc số Pan-Tompkins Bandpass và năng lượng tích phân MWI gán nhãn đỉnh R.
    - **Hình 5.2:** Biểu đồ Poincaré Plot biểu diễn phân bố elip các cặp khoảng $RR_n - RR_{n+1}$.
    - **Hình 5.3:** Phổ mật độ công suất PSD Welch chứng minh năng lượng tập trung ở dải $5 - 15\text{Hz}$ và triệt tiêu hoàn toàn nhiễu lưới $50\text{Hz}$.
    - **Hình 5.4:** Động lực học véc-tơ gia tốc $SMV$ phân tích 3 pha té ngã.
-5.2. Bảng kết quả thống kê lâm sàng chính thức từ file thực nghiệm `ECG_Patient_Record.mat`:
-   - Tần số lấy mẫu: $F_s = 250\text{ Hz}$ ($T_s = 4.0\text{ ms}$).
-   - Tổng số mẫu thu nhận: $117,225\text{ mẫu}$ ($468.90\text{ giây} \approx 7.8\text{ phút}$).
-   - Tổng số phức bộ QRS bóc tách: $533\text{ đỉnh R}$.
-   - Nhịp tim trung bình: $82.1\text{ BPM}$ (Min: $45.6\text{ BPM}$, Max: $150.0\text{ BPM}$).
-   - Chỉ số HRV: $SDNN = 1427.23\text{ ms}$, $RMSSD = 2046.21\text{ ms}$.
-   - Thông số Poincaré: $SD_1 = 1448.25\text{ ms}$, $SD_2 = 1408.47\text{ ms}$, tỷ số $SD_1 / SD_2 = 1.028$.
-   - Thân nhiệt bề mặt trung bình: $32.46^\circ\text{C}$.
-5.3. Kết quả thử nghiệm cảnh báo té ngã:
-   - Xung va đập đạt đỉnh $3.5g > 2.5g$.
-   - Cảnh báo tức thời đồng thời trên màn hình OLED `! FALL DETECTED !`, còi hú Active Buzzer và **tin nhắn khẩn cấp gửi về smartphone qua Telegram (@your_telegram_bot) & Zalo Bot** trong $< 500\text{ms}$.
-5.4. Đánh giá hiệu năng mạng IoT phân tầng:
-   - Tầng nội bộ (Wi-Fi UDP Socket): Độ trễ $< 4\text{ms}$, tỷ lệ mất gói (Packet Loss Rate) $0\%$.
-   - Tầng đám mây (Cloudflare Tunnel WSS MQTT): Độ trễ $< 50\text{ms}$, bảo mật mã hóa SSL/TLS Port 443 toàn diện.
+5.2. Hướng dẫn lập bảng thống kê chỉ số lâm sàng (Trích xuất từ file kết quả phiên đo thực tế của nhóm):
+   - Tần số lấy mẫu thực tế ($F_s$) và tổng thời gian ghi nhận tín hiệu phiên đo.
+   - Tổng số mẫu thu nhận và số lượng phức bộ QRS bóc tách được.
+   - Nhịp tim trung bình, nhịp tim nhỏ nhất (Min) và lớn nhất (Max) trong phiên đo (BPM).
+   - Các chỉ số biến thiên nhịp tim HRV: $SDNN$, $RMSSD$, trục phân tán ngắn hạn $SD_1$, trục dài hạn $SD_2$ và tỷ số $SD_1 / SD_2$.
+   - Thân nhiệt bề mặt trung bình ghi nhận từ cảm biến DS18B20.
+5.3. Đánh giá thử nghiệm chức năng cảnh báo té ngã:
+   - Mô tả kịch bản thử nghiệm: So sánh giữa các cú va đập té ngã mô phỏng ($SMV \ge 2.5g$) và hoạt động thường nhật (ngồi nhanh, nằm phịch xuống giường).
+   - Đánh giá cơ chế chống báo động giả: Hiệu quả của cửa sổ thẩm định tư thế nghiêng $Tilt$ và trạng thái bất động sau va đập.
+   - Thời gian đáp ứng của còi hú Active Buzzer, hiển thị cảnh báo trên màn hình OLED và thời gian đẩy tin nhắn khẩn cấp qua Telegram Bot & Zalo Bot.
+5.4. Đánh giá hiệu năng mạng truyền thông IoT:
+   - Tầng mạng nội bộ (Wi-Fi UDP Socket): Đánh giá độ trễ truyền gói tin điểm-điểm và tỷ lệ mất gói tin.
+   - Tầng đám mây (Cloudflare Tunnel WSS MQTT): Đánh giá thời gian phân phối thông điệp từ Gateway lên Broker và Web Dashboard.
 
 ---
 

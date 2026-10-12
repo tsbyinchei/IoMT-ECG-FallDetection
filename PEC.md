@@ -23,22 +23,22 @@
 
 ## ⚙️ 2. BẢNG THÔNG SỐ KỸ THUẬT CHI TIẾT (TECHNICAL SPECIFICATIONS)
 
-| Tham số kỹ thuật | Yêu cầu thiết kế | Giá trị thực nghiệm đạt được | Đánh giá |
+| Tham số kỹ thuật | Yêu cầu thiết kế | Cấu hình định mức / Giải pháp | Tiêu chuẩn áp dụng |
 | :--- | :--- | :--- | :--- |
-| **Vi điều khiển Node** | ESP32-C3 SuperMini (RISC-V 32-bit) | 160MHz, 400KB SRAM | Đạt chuẩn |
-| **Vi điều khiển Gateway** | ESP32-WROOM-32 (Dual-core Xtensa) | 240MHz, 520KB SRAM | Đạt chuẩn |
-| **Tần số lấy mẫu ECG ($F_s$)** | $250\text{ Hz}$ ($4.0\text{ ms}$/sample) | $250.0\text{ Hz}$ (ổn định) | Đạt chuẩn y tế |
-| **Độ phân giải ADC** | $\ge 10\text{-bit}$ | $12\text{-bit}$ (0 – 4095 levels) | Vượt yêu cầu |
-| **Dải điện áp sinh lý** | $0\text{V} - 3.3\text{V}$ ($V_{REF} \approx 1.65\text{V}$) | Đường đẳng điện $2400 - 2600$ | Chuẩn vi sai |
-| **Băng thông lọc số ECG** | $5\text{ Hz} - 15\text{ Hz}$ (Bandpass) | IIR Butterworth bậc 2 | Khử trôi cực tốt |
-| **Thời gian trơ sinh lý** | $300\text{ms} - 400\text{ms}$ | $380\text{ms}$ (95 mẫu @ 250Hz) | Khử 100% sóng T |
-| **Dải đo gia tốc MPU-6050** | $\pm 2g$ hoặc $\pm 4g$ | $\pm 2g$ (Độ nhạy 16384 LSB/g) | Đạt chuẩn |
-| **Tần số quét MPU-6050** | $\ge 50\text{ Hz}$ ($20\text{ ms}$) | $50\text{ Hz}$ (cứ mỗi 5 mẫu ECG) | Bắt trọn xung va đập |
-| **Ngưỡng cảnh báo té ngã** | $2.0g - 3.0g$ | $SMV \ge 2.5g$ | Cực nhạy |
-| **Thời gian chốt cảnh báo ngã** | $\ge 2.0\text{ giây}$ | $2.0\text{ giây}$ (20 gói tin 100ms) | Tránh bỏ sót xung |
-| **Dải đo thân nhiệt DS18B20** | $+15^\circ\text{C}$ đến $+50^\circ\text{C}$ | Phân giải 12-bit ($0.0625^\circ\text{C}$) | Độ chính xác cao |
-| **Kích thước khung gói tin UDP** | $\le 100\text{ bytes}$ | **Đúng 60 bytes** (Packed Struct) | Tối ưu hóa băng thông |
-| **Độ trễ truyền dẫn nội bộ** | $< 10\text{ ms}$ | $2 - 4\text{ ms}$ (Wi-Fi UDP) | Thời gian thực |
+| **Vi điều khiển Node** | Gọn nhẹ, hỗ trợ Wi-Fi & Timer phần cứng | ESP32-C3 SuperMini (RISC-V 160MHz) | Chuẩn nhúng IoT |
+| **Vi điều khiển Gateway** | Đa nhân, xử lý song song SoftAP & MQTT | ESP32-WROOM-32 (Dual-core 240MHz) | FreeRTOS đa luồng |
+| **Tần số lấy mẫu ECG ($F_s$)** | $250\text{ Hz}$ ($4.0\text{ ms}$/mẫu) | Định thời Hardware Timer ngắt $4.0\text{ms}$ | ANSI/AAMI EC13 |
+| **Độ phân giải ADC** | $\ge 10\text{-bit}$ | $12\text{-bit}$ (0 – 4095 mức lượng tử) | ADC SAR nội chip |
+| **Dải điện áp sinh lý** | $0\text{V} - 3.3\text{V}$ ($V_{REF} \approx 1.65\text{V}$) | Mạch tiền khuếch đại vi sai AD8232 | Chuẩn Analog Front-End |
+| **Băng thông lọc số ECG** | $5\text{ Hz} - 15\text{ Hz}$ (Bandpass) | Lọc IIR Butterworth dải thông bậc 2 | Khử trôi đường đẳng điện |
+| **Thời gian trơ sinh lý** | $300\text{ms} - 400\text{ms}$ | $380\text{ms}$ (95 mẫu @ 250Hz) | Chuẩn Pan-Tompkins 1985 |
+| **Dải đo gia tốc MPU-6050** | $\pm 2g$ hoặc $\pm 4g$ | Cấu hình dải $\pm 2g$ (Độ nhạy 16384 LSB/g) | Giao tiếp I2C 100kHz |
+| **Tần số quét MPU-6050** | $\ge 50\text{ Hz}$ ($20\text{ ms}$) | Lấy mẫu đồng bộ mỗi 5 chu kỳ ECG | Nhận diện xung va đập |
+| **Ngưỡng cảnh báo té ngã** | $2.0g - 3.0g$ | Ngưỡng kích hoạt $SMV \ge 2.5g$ | Động lực học rơi tự do |
+| **Thời gian chốt cảnh báo ngã** | $\ge 2.0\text{ giây}$ | Cửa sổ kiểm định bất động $2.0\text{ giây}$ | Chống báo động giả |
+| **Dải đo thân nhiệt DS18B20** | $+15^\circ\text{C}$ đến $+50^\circ\text{C}$ | Cảm biến kỹ thuật số phân giải 12-bit | Giao thức 1-Wire |
+| **Kích thước khung gói tin UDP** | $\le 100\text{ bytes}$ | Khung nhị phân Packed Struct 60 bytes | Tối ưu hóa băng thông |
+| **Độ trễ truyền dẫn nội bộ** | $< 10\text{ ms}$ | Wi-Fi UDP Socket điểm-điểm | Thời gian thực (< 5ms) |
 
 ---
 
@@ -133,17 +133,16 @@
 
 ---
 
-## 📈 6. BẢNG KẾT QUẢ THỰC NGHIỆM CHỨNG THỰC (VERIFIED BENCHMARK)
+## 🎯 6. TIÊU CHÍ NGHIỆM THU HỆ THỐNG (SYSTEM ACCEPTANCE CRITERIA)
 
-Dữ liệu thực nghiệm thực tế thu nhận từ người thật qua file `ECG_Patient_Record.mat` (Phiên đo 468.90 giây):
+Để nghiệm thu và đánh giá mức độ hoàn thiện của hệ thống, các tiêu chí kỹ thuật cần đạt bao gồm:
 
-| Chỉ số kỹ thuật & Y sinh | Kết quả thực nghiệm | Đánh giá so với tiêu chuẩn |
+| Hạng mục kiểm thử | Tiêu chí nghiệm thu kỹ thuật | Phương pháp kiểm tra |
 | :--- | :--- | :--- |
-| **Tổng số mẫu tín hiệu ECG** | **117,225 mẫu** | Đạt tần số lấy mẫu chính xác $250.0\text{ Hz}$ |
-| **Số phức bộ QRS bóc tách** | **533 đỉnh R** | Không bỏ sót đỉnh nhọn, không đếm đúp sóng T |
-| **Nhịp tim trung bình** | **82.1 BPM** | Nằm trong dải sinh lý bình thường ($60 - 100\text{ BPM}$) |
-| **Độ biến thiên nhịp tim (SDNN)** | **1427.23 ms** | Phản ánh đầy đủ phổ tần số biến thiên nhịp |
-| **Độ biến thiên nhịp tim (RMSSD)** | **2046.21 ms** | Đo lường độ nhạy phó giao cảm tim mạch |
-| **Chỉ số Poincaré SD1 / SD2** | **1448.25 ms / 1408.47 ms** | Tỷ số $SD_1 / SD_2 = 1.028 \approx 1.0$ (Cân bằng tốt) |
-| **Thân nhiệt bề mặt trung bình** | **32.46 °C** | Phù hợp với dải đo nhiệt độ ngoài da |
-| **Số lần phát hiện té ngã** | **121 lần** | Nhận dạng chính xác xung va đập $SMV \ge 2.5g$ |
+| **Độ ổn định chu kỳ lấy mẫu** | Tần số lấy mẫu ECG đạt $250\text{ Hz} \pm 1\%$ (chu kỳ $4.0\text{ ms}$) | Đo kiểm xung nhịp Hardware Timer qua ngắt nội |
+| **Hiệu năng bóc tách đỉnh R** | Thuật toán Pan-Tompkins nhận diện chính xác đỉnh R, không đếm lặp sóng T | Đối chiếu biểu đồ nhãn đỉnh R trên MATLAB |
+| **Kiểm định lọc nhiễu ECG** | Triệt tiêu hoàn toàn trôi baseline do hô hấp và nhiễu xoay chiều 50Hz | Phân tích mật độ phổ công suất PSD Welch |
+| **Độ nhạy phát hiện té ngã** | Kích hoạt cảnh báo khi $SMV \ge 2.5g$ và giữ trạng thái bất động sau va đập | Thử nghiệm các kịch bản va chạm mô phỏng |
+| **Khả năng chống báo động giả** | Tự động hủy cảnh báo nếu người dùng đứng dậy vận động bình thường trong vòng 2s | Kiểm tra góc nghiêng thân $Tilt$ và vận tốc góc $Gyro$ |
+| **Độ trễ kênh cảnh báo khẩn** | Tin nhắn khẩn cấp gửi đến Telegram Bot & Zalo Bot trong vòng $< 1.0\text{s}$ | Ghi log thời gian gửi HTTP POST trên Gateway |
+| **Độ tin cậy truyền nhận UDP** | Tỷ lệ mất gói tin nội bộ $< 0.5\%$ trong phạm vi không gian sinh hoạt gia đình | Đối chiếu số thứ tự gói tin giữa Node và Gateway |
