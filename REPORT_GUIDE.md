@@ -1,25 +1,26 @@
-# 📖 KHUNG SƯỜN BÁO CÁO MÔN HỌC (25–30 TRANG)
-## Academic Project Report Guide for IoT & BDSP
+# 📖 KHUNG SƯỜN BÁO CÁO ĐỀ TÀI (25–30 TRANG)
+## ĐỀ TÀI: "THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ"
 **Tác giả:** TsByinChei ([@tsbyinchei](https://github.com/tsbyinchei)) • [contact@tsbyin.dev](mailto:contact@tsbyin.dev)  
 
-Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và các bảng số liệu, biểu đồ thực nghiệm cần đưa vào để hoàn thiện bài báo cáo môn học **Thiết kế Hệ thống IoT** và **Xử lý Tín hiệu Y sinh (BDSP)** đạt điểm tối đa (A/A+).
+Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và các bảng số liệu, biểu đồ thực nghiệm cần đưa vào để hoàn thiện bài báo cáo cho đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"** trong học phần Thiết kế Hệ thống IoT và Xử lý Tín hiệu Y sinh (BDSP) đạt điểm tối đa (A/A+).
 
 ---
 
 ## 📑 MỤC LỤC BÁO CÁO CHUẨN
 
 * **LỜI CẢM ƠN & TÓM TẮT ĐỀ TÀI (ABSTRACT)**
-* **DANH MỤC TỪ VIẾT TẮT (IoMT, ECG, QRS, MWI, SMV, HRV, UDP, MQTT)**
+* **DANH MỤC TỪ VIẾT TẮT (IoT, IoMT, ECG, QRS, MWI, SMV, HRV, UDP, MQTT, WSS)**
 * **DANH MỤC HÌNH VẼ & BẢNG BIỂU**
 
 ---
 
 ### CHƯƠNG 1: TỔNG QUAN & TÍNH CẤP THIẾT CỦA ĐỀ TÀI (4–5 trang)
-1.1. Bối cảnh già hóa dân số và các bệnh lý tim mạch, đột quỵ, té ngã ở người cao tuổi.  
-1.2. Hạn chế của các phương pháp giám sát y tế truyền thống tại bệnh viện.  
-1.3. Xu hướng ứng dụng Internet of Medical Things (IoMT) và thiết bị đeo (Wearable Devices).  
-1.4. Mục tiêu nghiên cứu và phạm vi thực nghiệm của đề tài.  
-1.5. Cấu trúc bài báo cáo.
+1.1. Bối cảnh già hóa dân số và nhu cầu giám sát sức khỏe cho người cao tuổi sinh hoạt tại nhà.  
+1.2. Các nguy cơ rủi ro thường trực: Loạn nhịp tim, sốt cao/hạ thân nhiệt và tai nạn té ngã (hội chứng Long Lie).  
+1.3. Hạn chế của các phương pháp thăm khám ngắt quãng truyền thống tại cơ sở y tế.  
+1.4. Xu hướng ứng dụng Internet of Things (IoT/IoMT), cảm biến đeo người và điện toán biên (Edge Computing).  
+1.5. Mục tiêu, đối tượng thụ hưởng và phạm vi thực nghiệm của đề tài.  
+1.6. Bố cục bài báo cáo.
 
 ---
 

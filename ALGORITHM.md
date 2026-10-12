@@ -1,9 +1,9 @@
 # 📐 CƠ SỞ TOÁN HỌC & NGUYÊN LÝ THUẬT TOÁN (ALGORITHMS)
-## Mathematical Foundations & Signal Processing Architecture
+## ĐỀ TÀI: "THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ"
 
-Tài liệu này trình bày chi tiết cơ sở toán học của 2 thuật toán cốt lõi được triển khai trong hệ thống:
-1. **Thuật toán Pan-Tompkins hoàn chỉnh (Bóc tách đỉnh R thời gian thực & HRV)**
-2. **Thuật toán Phát hiện Té ngã Động lực học 3 Pha (3-Phase Fall Dynamic Verification)**
+Tài liệu này trình bày chi tiết cơ sở toán học của các thuật toán cốt lõi phục vụ theo dõi điện tim và cảnh báo té ngã cho người cao tuổi:
+1. **Thuật toán Pan-Tompkins hoàn chỉnh (Bóc tách đỉnh R thời gian thực & Phân tích HRV)**
+2. **Thuật toán Phát hiện Té ngã Động lực học Phân tầng (Multi-Phase Fall Dynamic Verification)**
 
 ---
 

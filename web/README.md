@@ -1,6 +1,7 @@
-# 🌐 IoMT Realtime Telehealth Dashboard
+# 🌐 Dashboard Theo Dõi Điện Tim, Thân Nhiệt & Cảnh Báo Té Ngã Từ Xa
+## ĐỀ TÀI: "THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ"
 
-Trang hiển thị và giám sát y tế thời gian thực (**Realtime Telehealth Monitor**) dành cho đề tài **IoMT-ECG-FallDetection**, thiết kế theo tiêu chuẩn màn hình monitor phòng hồi sức cấp cứu (**ICU Patient Monitor**).
+Giao diện Web PWA hiển thị và giám sát dữ liệu thời gian thực dành cho đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"**, kết nối qua giao thức WebSocket Secure (WSS).
 
 ---
 

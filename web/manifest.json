@@ -1,7 +1,7 @@
 {
-  "name": "IoMT Telehealth Patient Monitor",
-  "short_name": "IoMT Monitor",
-  "description": "Hệ thống giám sát điện tim ECG thời gian thực & cảnh báo té ngã từ xa chuẩn ITU-T Y.2060",
+  "name": "IoT Theo Dõi Điện Tim, Thân Nhiệt & Té Ngã",
+  "short_name": "IoT Monitor",
+  "description": "Hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

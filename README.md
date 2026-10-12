@@ -1,10 +1,10 @@
-# 🫀 Dual-MCU IoMT Wearable System: ECG Monitoring & Fall Detection
-### Hệ thống Thiết bị Y tế Đeo người (IoMT) Giám sát Điện tim Thời gian thực & Cảnh báo Té ngã Đa tầng
+# 🫀 Thiết kế Hệ thống IoT Theo dõi Điện tim, Thân nhiệt và Cảnh báo Té ngã Từ xa cho Người cao tuổi tại Nhà
+### Dual-MCU IoT System: Remote Monitoring of ECG, Body Temperature & Fall Detection for the Elderly at Home
 
 [![Platform](https://img.shields.io/badge/Platform-ESP32%20%7C%20ESP32--C3-blue.svg)](https://www.espressif.com/)
 [![Language](https://img.shields.io/badge/Language-C%2B%2B%20%7C%20MATLAB-orange.svg)](https://mathworks.com/)
 [![Protocol](https://img.shields.io/badge/Protocols-Wi--Fi%20UDP%20%7C%20MQTT%20%7C%20Serial-green.svg)]()
-[![Standard](https://img.shields.io/badge/Standard-ITU--T%20Y.2060%20IoMT-purple.svg)]()
+[![Standard](https://img.shields.io/badge/Standard-ITU--T%20Y.2060%20IoT-purple.svg)]()
 [![Algorithm](https://img.shields.io/badge/Algorithm-Pan--Tompkins%20QRS-red.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -17,27 +17,27 @@
 | Tài liệu | Phân loại | Mô tả nội dung chính | Liên kết trực tiếp |
 | :--- | :--- | :--- | :--- |
 | 📋 **PEC.md** | **Đặc tả Kỹ thuật & Lâm sàng** | Tiêu chuẩn ITU-T Y.2060, ANSI/AAMI EC13, bảng thông số ADC/Fs, giao thức UDP/MQTT, dự toán nguồn pin Li-Po. | 👉 **[Xem tài liệu PEC.md](PEC.md)** |
-| 📖 **SYSTEM_ARCHITECTURE.md** | **Kiến trúc & Nguyên lý Toàn diện** | Hướng dẫn trực quan, dễ hiểu (cho người không chuyên code) về Sensor, Actuator, Vi điều khiển, các mô hình & giao thức truyền dữ liệu, kiến trúc phân tầng IoT. | 👉 **[Xem tài liệu SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** |
+| 📖 **SYSTEM_ARCHITECTURE.md** | **Kiến trúc Kỹ thuật Hệ thống** | Đặc tả kiến trúc kỹ thuật hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà. | 👉 **[Xem tài liệu SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** |
 | 📐 **ALGORITHM.md** | **Cơ sở Toán học & Thuật toán** | Chi tiết giải thuật Pan-Tompkins 1985 (hàm Z, vi phân, bình phương, MWI) & Động lực học kiểm định té ngã 3 pha. | 👉 **[Xem tài liệu ALGORITHM.md](ALGORITHM.md)** |
-| 📖 **REPORT_GUIDE.md** | **Khung Báo cáo Môn học** | Khung sườn 6 chương chuẩn hóa cho bài báo cáo 25–30 trang môn Thiết kế IoT & Xử lý tín hiệu Y sinh (BDSP). | 👉 **[Xem tài liệu REPORT_GUIDE.md](REPORT_GUIDE.md)** |
+| 📖 **REPORT_GUIDE.md** | **Khung Báo cáo Môn học** | Khung sườn 6 chương chuẩn hóa cho bài báo cáo 25–30 trang môn Thiết kế Hệ thống IoT & Xử lý Tín hiệu Y sinh. | 👉 **[Xem tài liệu REPORT_GUIDE.md](REPORT_GUIDE.md)** |
 | 📜 **LICENSE** | **Giấy phép Bản quyền** | Giấy phép mã nguồn mở MIT License (cho phép tự do sử dụng, chỉnh sửa và phân phối). | 👉 **[Xem giấy phép MIT](LICENSE)** |
-| 🛡️ **SECURITY.md** | **Chính sách An toàn** | Khuyến cáo an toàn điện học y sinh IEC 60601-1, cách ly nguồn pin và bảo mật dữ liệu MQTT. | 👉 **[Xem tài liệu SECURITY.md](SECURITY.md)** |
+| 🛡️ **SECURITY.md** | **Chính sách An toàn** | Khuyến cáo an toàn điện học y sinh IEC 60601-1, cách ly nguồn pin và bảo mật dữ liệu MQTT qua Cloudflare Tunnel. | 👉 **[Xem tài liệu SECURITY.md](SECURITY.md)** |
 | 🤝 **CONTRIBUTING.md** | **Hướng dẫn Đóng góp** | Quy chuẩn đóng gói code Arduino, tiêu chuẩn xử lý tín hiệu MATLAB và quy trình Pull Request. | 👉 **[Xem tài liệu CONTRIBUTING.md](CONTRIBUTING.md)** |
 | 📜 **CODE_OF_CONDUCT.md** | **Quy tắc Ứng xử** | Bộ quy tắc ứng xử chuẩn Contributor Covenant v2.1 cho cộng đồng nghiên cứu khoa học. | 👉 **[Xem tài liệu CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** |
-| 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 60-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
+| 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 58-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
 | 📟 **ESP32 Example** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32%20Example/ESP32%20Example.ino)** |
 | 📊 **MATLAB Scripts** | **Trạm Xử lý Tín hiệu** | Pan-Tompkins thời gian thực với chấm đỏ đỉnh R, bộ lọc trung vị Median, xuất file .MAT và phân tích HRV. | 👉 **[Xem thư mục MATLAB](MATLAB/)** |
-| 🌐 **Web Dashboard** | **Giao diện Telehealth Realtime** | Màn hình ICU Monitor 60 FPS, sóng quét phosphor, nhịp tim BPM, thân nhiệt, lực va đập SMV & còi hú Web Audio API. | 👉 **[Xem Web Dashboard](web/)** |
+| 🌐 **Web Dashboard** | **Giao diện Theo dõi Realtime** | Màn hình PWA 60 FPS theo dõi điện tim, thân nhiệt, gia tốc va đập SMV & còi hú Web Audio API cho người thân. | 👉 **[Xem Web Dashboard](web/)** |
 
 ---
 
 ## 📌 1. TỔNG QUAN HỆ THỐNG (SYSTEM OVERVIEW)
 
-Hệ thống được thiết kế theo chuẩn kiến trúc **Internet of Medical Things (IoMT)** và **Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP)**, phục vụ theo dõi sức khỏe liên tục cho bệnh nhân tim mạch và người cao tuổi có nguy cơ đột quỵ / té ngã:
+Hệ thống được thiết kế phục vụ đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"**, kết hợp kiến trúc **Internet of Medical Things (IoMT)** và **Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP)**:
 
-* **Node cảm biến đeo người (Wearable Sensor Node):** Sử dụng chip vi điều khiển **ESP32-C3 SuperMini (RISC-V 160MHz)** nhỏ gọn, lấy mẫu điện tim ECG **250 Hz (chu kỳ 4ms)** qua cảm biến sinh học **AD8232**, đọc gia tốc 3 trục từ **MPU-6050** để tính vector gia tốc toàn phần $SMV = \sqrt{a_x^2 + a_y^2 + a_z^2}$, và theo dõi thân nhiệt qua **DS18B20**.
-* **Đóng gói & Truyền thông không dây:** Dữ liệu được gom theo khung **25 mẫu ECG/100ms** thành struct nhị phân 60-byte, truyền không dây qua **Wi-Fi UDP Socket** nội bộ tới Gateway với độ trễ cực thấp ($< 5\text{ms}$).
-* **Gateway trung tâm (IoMT Edge Gateway):** Sử dụng **ESP32 Dev Module (Dual-core Xtensa)**, phát mạng SoftAP riêng biệt, chạy thuật toán bóc tách đỉnh R thời gian thực (Edge BPM), hiển thị đa trang trên màn hình **OLED SH1106 1.3"** qua nút nhấn chuyển trang BOOT, còi chíp **Active Buzzer** báo động té ngã và tuột điện cực.
+* **Node cảm biến đeo người (Wearable Sensor Node):** Sử dụng chip vi điều khiển **ESP32-C3 SuperMini (RISC-V 160MHz)** nhỏ gọn đeo trên ngực người cao tuổi, lấy mẫu điện tim ECG **250 Hz (chu kỳ 4ms)** qua cảm biến sinh học **AD8232**, đọc gia tốc 3 trục từ **MPU-6050** để tính vector gia tốc toàn phần $SMV = \sqrt{a_x^2 + a_y^2 + a_z^2}$, và theo dõi thân nhiệt qua **DS18B20**.
+* **Đóng gói & Truyền thông không dây:** Dữ liệu được gom theo khung **25 mẫu ECG/100ms** thành struct nhị phân 58-byte, truyền không dây qua **Wi-Fi UDP Socket** nội bộ tới Gateway với độ trễ cực thấp ($< 5\text{ms}$).
+* **Gateway trung tâm (IoT Edge Gateway):** Sử dụng **ESP32 Dev Module (Dual-core Xtensa)** đặt tại nhà, phát mạng SoftAP riêng biệt, chạy thuật toán bóc tách đỉnh R thời gian thực (Edge BPM), hiển thị đa trang trên màn hình **OLED SH1106 1.3"** qua nút nhấn chuyển trang BOOT, còi chíp **Active Buzzer** báo động té ngã và tuột điện cực.
 * **Xử lý tín hiệu chuyên sâu trên MATLAB (BDSP Center):** Thuật toán **Pan-Tompkins** hoàn chỉnh (Lọc dải thông số IIR 5–15Hz $\to$ Đạo hàm $\to$ Bình phương $\to$ Tích phân cửa sổ trượt MWI $\to$ Ngưỡng thích ứng kép với thời gian trơ sinh lý 380ms), bộ lọc trung vị (Median Filter) chống nhiễu co cơ (EMG), phân tích biến thiên nhịp tim HRV (Poincaré Plot, RMSSD, SD1, SD2), mô hình động học té ngã 3 pha và tự động xuất hồ sơ bệnh án chuẩn hóa (`.mat`).
 
 ---

@@ -1,7 +1,7 @@
 # 🛡️ CHÍNH SÁCH BẢO MẬT & AN TOÀN Y SINH (SECURITY POLICY)
-## Dual-MCU IoMT Wearable System Security & Clinical Safety
+## ĐỀ TÀI: "THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ"
 
-Tài liệu này xác định các chính sách bảo mật mạng và khuyến cáo an toàn điện học y sinh đối với thiết bị đeo IoMT đo điện tâm đồ và cảnh báo té ngã.
+Tài liệu này xác định các chính sách bảo mật thông tin mạng và khuyến cáo an toàn điện học y sinh đối với hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà.
 
 ---
 

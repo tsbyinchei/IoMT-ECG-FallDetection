@@ -1,7 +1,7 @@
 # 📋 ĐẶC TẢ KỸ THUẬT VÀ TIÊU CHUẨN LÂM SÀNG (PEC)
-## Project Engineering & Clinical Specification (PEC Document)
+## ĐỀ TÀI: "THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ"
 **Tác giả:** TsByinChei ([@tsbyinchei](https://github.com/tsbyinchei)) • [contact@tsbyin.dev](mailto:contact@tsbyin.dev)  
-**Dự án:** Hệ thống IoMT Đeo người Giám sát Điện tim (ECG) & Cảnh báo Té ngã Đa tầng  
+**Đề tài:** Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà  
 **Tiêu chuẩn áp dụng:** ITU-T Rec. Y.2060 (IoT), ANSI/AAMI EC13 (ECG Standard), IEC 60601-2-47  
 
 ---

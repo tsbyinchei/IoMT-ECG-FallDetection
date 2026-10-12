@@ -1,8 +1,8 @@
-# 🏗️ TÀI LIỆU ĐẶC TẢ KIẾN TRÚC KỸ THUẬT HỆ THỐNG IoMT
-## HỆ THỐNG GIÁM SÁT ĐIỆN TIM THỜI GIAN THỰC & CẢNH BÁO TÉ NGÃ Y SINH THÔNG MINH
+# 🏗️ TÀI LIỆU ĐẶC TẢ KIẾN TRÚC KỸ THUẬT HỆ THỐNG IoT
+## THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ
 
-> **Tài liệu Kỹ thuật:** Đặc tả Kiến trúc Toàn diện Hệ thống IoMT (System Architecture Specification)  
-> **Dự án:** Intelligent Real-Time IoMT ECG Monitoring & Fall Detection System  
+> **Đề tài:** Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà  
+> **Tên tiếng Anh:** Design of an IoT System for Remote Monitoring of ECG, Body Temperature and Fall Detection for the Elderly at Home  
 > **Tác giả:** [TsByinChei](https://github.com/tsbyinchei)  
 > **Kho mã nguồn:** [IoMT-ECG-FallDetection](https://github.com/tsbyinchei/IoMT-ECG-FallDetection)  
 > **Phiên bản:** 2.0 (Engineering Architecture Release)
@@ -24,22 +24,23 @@
 
 ## 1. TỔNG QUAN KIẾN TRÚC & BỐI CẢNH ỨNG DỤNG
 
-### 1.1. Bối cảnh Kỹ thuật & Y tế
-Trong môi trường y tế gia đình, viện dưỡng lão và các cơ sở điều trị ngoại trú, việc giám sát sinh hiệu liên tục cho người cao tuổi và bệnh nhân tim mạch gặp hai thách thức kỹ thuật lớn:
-- **Biến cố Rối loạn Nhịp tim (Cardiac Arrhythmias):** Các cơn rung nhĩ, ngoại tâm thu hoặc nhịp nhanh kịch phát thường diễn ra thoáng qua và ngắt quãng, rất khó phát hiện qua các thiết bị đo tĩnh định kỳ tại bệnh viện. Việc phát hiện đòi hỏi giám sát sóng điện tim (ECG) liên tục với tần số lấy mẫu tối thiểu $\ge 200\text{ Hz}$.
-- **Tai nạn Té ngã (Fall Incidents):** Té ngã là nguyên nhân hàng đầu dẫn đến chấn thương sọ não, gãy xương chậu và tử vong ở người già. Hậu quả nghiêm trọng nhất xuất phát từ hội chứng "Nằm bất động kéo dài" (Long Lie) sau khi ngã do nạn nhân mất ý thức hoặc không thể tiếp cận phương tiện cầu cứu.
+### 1.1. Bối cảnh Kỹ thuật & Thực tiễn Đề tài
+Đối với người cao tuổi sinh sống tại gia đình, viện dưỡng lão hoặc sống một mình, ba rủi ro sức khỏe nguy hiểm và phổ biến nhất cần giám sát liên tục gồm:
+- **Biến cố Loạn nhịp tim (Cardiac Arrhythmias):** Các cơn rung nhĩ, nhịp nhanh kịch phát hoặc ngoại tâm thu nguy hiểm thường xuất hiện thoáng qua trong sinh hoạt hàng ngày, đòi hỏi thu nhận sóng điện tim (ECG) liên tục thời gian thực với tần số lấy mẫu cao ($\ge 200\text{ Hz}$).
+- **Bất thường Thân nhiệt (Body Temperature):** Người cao tuổi có khả năng điều hòa thân nhiệt suy giảm, dễ bị sốt cao nhiễm trùng hoặc hạ thân nhiệt đột ngột vào ban đêm, cần được theo dõi định kỳ liên tục để người nhà kịp thời xử lý.
+- **Tai nạn Té ngã (Fall Incidents):** Người già bị ngã thường mất ý thức, chấn thương hoặc gãy xương, dẫn đến hội chứng "Nằm bất động kéo dài" (Long Lie) mà không thể với tới điện thoại để gọi người thân. Việc phát hiện cú va đập và gửi cảnh báo khẩn cấp từ xa tức thì đóng vai trò quyết định "thời gian vàng" cứu hộ.
 
-### 1.2. Giải pháp Kiến trúc IoMT (Internet of Medical Things)
-Hệ thống được thiết kế theo mô hình **Điện toán Biên kết hợp Đám mây (Edge-Cloud Hybrid Architecture)**, cấu thành từ hai phân hệ phần cứng nhúng độc lập, kết hợp hạ tầng Đám mây bảo mật và các nền tảng ứng dụng đa kênh:
-- **Nút cảm biến đeo trên người (Wearable Sensing Node - ESP32-C3):** Thu thập tín hiệu vi điện thế tim (ECG), vector gia tốc chuyển động 3 chiều và thân nhiệt thực tế theo chu kỳ vi giây.
-- **Trạm trung tâm xử lý biên (Edge Computing Gateway - ESP32):** Tiếp nhận gói tin qua sóng vô tuyến nội bộ, thực thi giải thuật lọc số thích nghi (Notch 50Hz, Pan-Tompkins QRS), hiển thị sóng tim 60 FPS, kích hoạt còi báo động khẩn cấp tại chỗ và chuyển tiếp dữ liệu lên Cloud.
-- **Hạ tầng Đám mây & Giao diện Giám sát Từ xa (Cloud & Remote Monitoring Layer):** Định tuyến thông điệp qua MQTT Broker mã hóa TLS 1.3, cập nhật Web Dashboard thời gian thực cho người thân và kích hoạt tin nhắn cấp cứu qua Telegram Bot & Zalo API.
+### 1.2. Giải pháp Kiến trúc IoT Toàn diện của Đề tài
+Hệ thống được thiết kế theo mô hình **Điện toán Biên kết hợp Đám mây (Edge-Cloud Hybrid Architecture)**, phục vụ theo dõi trọn vẹn 3 thông số sinh hiệu và biến cố cho người cao tuổi tại nhà:
+- **Nút cảm biến đeo người (Wearable Node - ESP32-C3):** Thiết bị nhỏ gọn đeo trên ngực người cao tuổi, đo liên tục điện thế tim (AD8232 @ 250Hz), gia tốc chuyển động 3 chiều (MPU-6050 @ 125Hz) và thân nhiệt biểu mô (DS18B20 1-Wire).
+- **Trạm trung tâm xử lý biên (Edge Gateway - ESP32):** Đặt tại phòng ngủ hoặc phòng khách, thu nhận dữ liệu nội bộ qua Wi-Fi, chạy thuật toán lọc số IIR Notch 50Hz, Pan-Tompkins tính nhịp tim BPM, hiển thị màn hình OLED 60 FPS, kích hoạt còi hú báo động lớn khi phát hiện ngã và chuyển tiếp dữ liệu lên Cloud.
+- **Hạ tầng Đám mây & Giám sát Từ xa cho Người thân:** Định tuyến thông điệp qua MQTT Broker mã hóa TLS 1.3, cập nhật Web Dashboard trực quan và kích hoạt tin nhắn cấp cứu tức thời qua Telegram Bot & Zalo API đến điện thoại của người nhà.
 
 ```mermaid
 flowchart LR
     A["Node C3 (Cảm biến đeo ngực)"] -->|"UDP Datagram (4ms/mẫu)"| B["Gateway ESP32 (Trạm trung tâm)"]
     B -->|"WSS / TLS 1.3 (Port 443)"| C["EMQX MQTT Broker (Cloud Server)"]
-    C --> D["Web Dashboard Giám sát (Người thân)"]
+    C --> D["Web Dashboard Giám sát"]
     C --> E["Telegram / Zalo Alert Bot"]
     B -->|"UART 115200 Baud"| F["MATLAB Analytics Engine"]
 ```
@@ -504,7 +505,7 @@ Toàn bộ các thành phần mã nguồn và tài liệu kỹ thuật liên qua
 | **Mã nguồn Node Cảm biến** | [ESP32C3 Example.ino](ESP32C3%20Example/ESP32C3%20Example.ino) | Firmware thu thập ECG, MPU-6050, DS18B20 và truyền UDP trên ESP32-C3 SuperMini. |
 | **Mã nguồn Trạm Gateway** | [ESP32 Example.ino](ESP32%20Example/ESP32%20Example.ino) | Firmware Gateway lọc số Pan-Tompkins, hiển thị OLED, còi Buzzer và MQTT WSS TLS 1.3. |
 | **Cấu hình Bí mật Mẫu** | [secrets_example.h](ESP32%20Example/secrets_example.h) | File mẫu khai báo cấu hình Wi-Fi Router, MQTT credentials và API Token Telegram / Zalo. |
-| **Giao diện Web Giám sát (Người thân)** | [index.html](web/index.html) & [app.js](web/app.js) | Ứng dụng Web PWA hiển thị ECG Canvas 60 FPS, chỉ số sinh hiệu và điều khiển còi từ xa. |
+| **Giao diện Web Giám sát** | [index.html](web/index.html) & [app.js](web/app.js) | Ứng dụng Web PWA hiển thị ECG Canvas 60 FPS, chỉ số sinh hiệu và điều khiển còi từ xa. |
 | **Kịch bản Xử lý MATLAB** | [matlab_serial_ecg_processor.m](MATLAB/matlab_serial_ecg_processor.m) | Công cụ phân tích tín hiệu điện tim và kiểm nghiệm thuật toán qua cổng Serial USB. |
 | **Hướng dẫn Kiểm thử Hệ thống** | [REPORT_GUIDE.md](REPORT_GUIDE.md) | Tài liệu hướng dẫn thiết lập môi trường, kiểm thử thực nghiệm và báo cáo chuyên sâu. |
 | **Đặc tả Kiểm tra Bảo mật** | [SECURITY.md](SECURITY.md) | Chính sách an toàn thông tin, quản lý thông tin xác thực và bảo mật mã nguồn. |
