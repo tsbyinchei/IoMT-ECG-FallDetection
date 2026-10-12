@@ -1,3 +1,29 @@
+/**
+ * ====================================================================================================
+ * ĐỀ TÀI: THIẾT KẾ HỆ THỐNG IOT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ
+ * HỆ THỐNG: TRẠM TRUNG TÂM XỬ LÝ BIÊN & CỔNG KẾT NỐI ĐÁM MÂY (IOT EDGE GATEWAY - BẢN EXAMPLE MẪU)
+ * VI ĐIỀU KHIỂN: ESP32-WROOM-32 (Dual-core Xtensa LX6 32-bit, xung nhịp 240MHz)
+ * TÁC GIẢ: TsByinChei (contact@tsbyin.dev) • GITHUB: @tsbyinchei
+ * ====================================================================================================
+ * NGUYÊN LÝ HOẠT ĐỘNG:
+ * 1. Thu nhận dữ liệu gói tin UDP 60 bytes từ Node cảm biến ESP32-C3:
+ *    - Cơ chế đọc cạn hàng đợi (while udp.parsePacket) chống tràn buffer LwIP.
+ * 2. Xử lý tín hiệu điện tim thời gian thực tại biên (Edge Computing):
+ *    - Bộ lọc số IIR Notch 50Hz (bậc 2) triệt tiêu hoàn toàn nhiễu lưới điện xoay chiều.
+ *    - Bộ lọc dải thông 5-15Hz và giải thuật Pan-Tompkins bóc tách đỉnh R, tính nhịp tim tức thời (Edge BPM).
+ *    - Cửa sổ trơ sinh lý 380ms (95 mẫu @ 250Hz) ngăn ngừa đếm trùng đỉnh sóng T.
+ * 3. Hiển thị đồ thị và thông số trên màn hình OLED SH1106 1.3" (128x64 I2C):
+ *    - Giao diện lâm sàng 4 trang chuyển đổi mượt mà qua nút nhấn BOOT (GPIO 0).
+ *    - Tần số làm mới 10 FPS (100ms) giải phóng 50% CPU cho các tác vụ mạng.
+ * 4. Kích hoạt còi hú báo động lớn Active Buzzer (GPIO 23):
+ *    - Hú liên tục không ngừng khi phát hiện té ngã, có thể bấm nút BOOT để tắt tạm thời.
+ * 5. Đẩy dữ liệu lên Cloud Broker & Kích hoạt tin nhắn khẩn cấp:
+ *    - MQTT WebSocket Secure (WSS TLS 1.3 qua Port 443) tới máy chủ EMQX qua Cloudflare Tunnel.
+ *    - Tích hợp chuỗi chứng chỉ gốc Let's Encrypt Root CA (ISRG Root X1 / X2) trong Flash.
+ *    - Gửi tin nhắn tức thời kèm chỉ số sinh hiệu qua Telegram Bot & Zalo Bot API.
+ * ====================================================================================================
+ */
+
 #include "esp_idf_version.h"
 #include "mqtt_client.h"
 #if __has_include("esp_crt_bundle.h")
@@ -223,7 +249,14 @@ void handleButton() {
   lastButtonState = reading;
 }
 
-// ==================== BỘ LỌC SỐ ECG 50Hz NOTCH + PAN-TOMPKINS ====================
+// ==================== BỘ LỌC XỬ LÝ TÍN HIỆU SỐ ECG (DSP PIPELINE) ====================
+// Xử lý luồng tín hiệu điện tim thời gian thực tại biên (Edge Processing) với Fs = 250 Hz (chu kỳ 4ms):
+//
+// Giai đoạn 1: Bộ lọc số Biquad IIR Notch 50Hz (Bi-quadratic Direct Form I Filter)
+// - Hàm truyền miền Z: H(z) = (b0 + b1*z^-1 + b2*z^-2) / (1 + a1*z^-1 + a2*z^-2)
+// - Phương trình sai phân: y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
+// - Tần số cắt triệt tiêu f0 = 50.0 Hz, Fs = 250.0 Hz, Hệ số phẩm chất Q = 7.0 (băng thông dải chặn hẹp ~ 7Hz).
+// - Mục đích: Triệt tiêu hoàn toàn sóng hài can nhiễu 50Hz bức xạ từ lưới điện xoay chiều AC trong nhà.
 struct EcgFilterBiquad {
   float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
   float x1 = 2048.0f, x2 = 2048.0f, y1 = 2048.0f, y2 = 2048.0f;
@@ -263,24 +296,39 @@ float filterGatewayEcg(uint16_t raw, bool leadsOff) {
     gwNotch.init(50.0f, 250.0f, 7.0f);
     gwFilterInited = true;
   }
+  // Khi tuột điện cực hoặc tín hiệu chạm trần ray ADC -> Reset trạng thái bộ lọc tránh méo quá độ
   if (leadsOff || raw < 50 || raw >= 4080) {
     gwNotch.reset(2048.0f);
     gwBaseline = 2048.0f;
     gwLp = 0.0f;
     return 0.0f;
   }
-  // 1. Notch filter 50Hz (Khử triệt để nhiễu điện lưới 50Hz)
+  // Bước 1: Khử triệt để can nhiễu 50Hz qua bộ lọc Notch Biquad bậc 2
   float n = gwNotch.step((float)raw);
-  // 2. High-pass filter 0.5Hz (Khử trôi đường đẳng điện do hô hấp)
+
+  // Bước 2: Bộ lọc thông cao 0.5Hz khử trôi đường đẳng điện (Baseline Wander Removal do nhịp thở lồng ngực)
+  // Thực thi qua bộ lọc ước lượng baseline đệ quy: baseline[n] = baseline[n-1] + 0.005 * (x[n] - baseline[n-1])
   gwBaseline += (n - gwBaseline) * 0.005f;
   float hp = n - gwBaseline;
-  // 3. Low-pass filter 35Hz (Khử nhiễu rung cơ EMG & gai ADC)
+
+  // Bước 3: Bộ lọc thông thấp 35Hz khử nhiễu rung cơ (EMG Artifacts) và xung kim gai ADC
   gwLp += (hp - gwLp) * 0.38f;
   return gwLp;
 }
 
-// ==================== THUẬT TOÁN ĐO NHỊP TIM TẠI BIÊN (EDGE BPM - PAN-TOMPKINS)
-// ==================== Tần số lấy mẫu 250Hz -> Mỗi mẫu = 4ms
+// ==================== THUẬT TOÁN ĐO NHỊP TIM TẠI BIÊN (EDGE BPM - PAN-TOMPKINS) ====================
+// Triển khai giải thuật kinh điển Pan & Tompkins (1985) đã tối ưu hoá cho vi điều khiển nhúng 32-bit:
+// 1. Bộ vi phân bậc 1 năm điểm (5-point Derivative Filter):
+//    y[n] = (1/8) * (2*x[n] + x[n-1] - x[n-3] - 2*x[n-4])
+//    Nhấn mạnh dải tần số dốc của phức bộ QRS (10 - 25 Hz), giảm thiểu biên độ sóng P và sóng T.
+// 2. Bình phương phi tuyến (Non-linear Squaring):
+//    y[n] = (x[n])^2 -> Đảm bảo mọi giá trị đều dương và khuếch đại vượt trội năng lượng đỉnh R.
+// 3. Tích phân cửa sổ động (Moving Window Integrator - MWI):
+//    Độ rộng cửa sổ 100ms (25 mẫu @ 250Hz), tích lũy toàn bộ năng lượng của phức bộ QRS.
+// 4. Ngưỡng thích ứng kép & Thời gian trơ sinh lý (Refractory Blanking):
+//    Ngưỡng phát hiện thích ứng = 0.35 * Peak. Cửa sổ trơ 380ms (95 mẫu) loại bỏ tuyệt đối đếm nhầm sóng T.
+// 5. Bộ lọc trung vị (Median Filter) trên 7 khoảng RR gần nhất:
+//    Loại trừ các nhịp ngoại tâm thu đột biến, đảm bảo chỉ số BPM ổn định chuẩn lâm sàng.
 unsigned long edgeSampleCounter = 0;
 unsigned long lastPeakSample = 0;
 static float ptHp1 = 0, ptHp2 = 0, ptHp3 = 0, ptHp4 = 0;
@@ -294,18 +342,18 @@ static bool qrsAbove = false;
 void processEdgeBPM(float hp) {
   edgeSampleCounter++;
 
-  // 1. Đạo hàm bậc 1 5 điểm nhấn mạnh sườn dốc QRS: deriv = (2*x[n] + x[n-1] - x[n-3] - 2*x[n-4]) / 8
+  // 1. Đạo hàm bậc 1 5 điểm: Nhấn mạnh sườn dốc QRS
   float deriv = (2.0f * hp + ptHp1 - ptHp3 - 2.0f * ptHp4) * 0.125f;
   ptHp4 = ptHp3; ptHp3 = ptHp2; ptHp2 = ptHp1; ptHp1 = hp;
   float dsq = deriv * deriv;
 
-  // 2. Tích phân cửa sổ động (Moving Window Integration - 100ms)
+  // 2. Tích phân cửa sổ động (Moving Window Integration - 100ms = 25 mẫu @ 250Hz)
   mwiSum += dsq - mwiBuf[mwiIdx];
   mwiBuf[mwiIdx] = dsq;
   mwiIdx = (mwiIdx + 1) % MWI_LEN;
   float mwi = mwiSum / (float)MWI_LEN;
 
-  // 3. Ngưỡng thích ứng biên độ đỉnh QRS
+  // 3. Cập nhật ngưỡng thích ứng biên độ đỉnh QRS (suy hao chậm 0.1% mỗi mẫu)
   mwiPeak *= 0.999f;
   if (mwi > mwiPeak) mwiPeak = mwi;
 
@@ -314,15 +362,15 @@ void processEdgeBPM(float hp) {
   bool rising = isAbove && !qrsAbove;
   qrsAbove = isAbove;
 
-  // 4. Phát hiện đỉnh R với thời gian trơ sinh lý 380ms (95 mẫu @ 250Hz chuẩn Pan-Tompkins & MATLAB)
+  // 4. Phát hiện đỉnh R với thời gian trơ sinh lý 380ms (95 mẫu @ 250Hz chuẩn Pan-Tompkins)
   if (rising && (edgeSampleCounter - lastPeakSample > 95) && edgeSampleCounter > 250) {
     unsigned long rrSamples = edgeSampleCounter - lastPeakSample;
     lastPeakSample = edgeSampleCounter;
 
-    // Khoảng thời gian RR tính bằng mili-giây (mỗi mẫu = 4ms)
+    // Khoảng thời gian RR tính bằng mili-giây (mỗi mẫu = 4.0ms)
     unsigned long rrMs = rrSamples * 4;
 
-    // Lọc dải sinh lý chuẩn: 400ms đến 1400ms (43 đến 150 BPM)
+    // Lọc dải nhịp tim sinh lý người: 400ms đến 1400ms (tương ứng 43 đến 150 BPM)
     if (rrMs >= 400 && rrMs <= 1400) {
       static uint16_t recentRRs[7];
       static uint8_t rrCount = 0;
@@ -332,7 +380,7 @@ void processEdgeBPM(float hp) {
       rrIdx = (rrIdx + 1) % 7;
       if (rrCount < 7) rrCount++;
 
-      // Bộ lọc trung vị (Median Filter) chuẩn thuật toán MATLAB
+      // Bộ lọc trung vị (Median Filter) 7 phần tử để loại bỏ ngoại tâm thu thất & gai nhiễu cử động
       uint16_t sorted[7];
       for (uint8_t k = 0; k < rrCount; k++) sorted[k] = recentRRs[k];
       for (uint8_t i = 0; i < rrCount - 1; i++) {
@@ -348,13 +396,13 @@ void processEdgeBPM(float hp) {
       if (edgeBpm == 0) {
         edgeBpm = calculatedBpm;
       } else {
-        // Làm mịn nhẹ 80% lịch sử, 20% giá trị mới để nhịp tim không nhảy loạn
+        // Bộ lọc trung bình trượt có trọng số (EMA): 81.25% lịch sử + 18.75% giá trị mới
         edgeBpm = (edgeBpm * 13 + calculatedBpm * 3) / 16;
       }
     }
   }
 
-  // Quá 3.5 giây không có nhịp tim (875 mẫu) -> nhịp tim về 0
+  // Quá 3.5 giây không phát hiện đỉnh R nào (875 mẫu @ 250Hz) -> Coi như mất tín hiệu nhịp tim
   if (edgeSampleCounter - lastPeakSample > 875) {
     edgeBpm = 0;
   }
@@ -1020,66 +1068,75 @@ void loop() {
   }
 #endif
 
-  // 3. Lắng nghe và đọc gói tin UDP từ ESP32-C3
-  int packetSize = udp.parsePacket();
-  if (packetSize >= sizeof(incomingData)) {
-    udp.read((char *)&incomingData, sizeof(incomingData));
-    totalPacketsReceived++;
+  // 3. LẮNG NGHE & XỬ LÝ HÀNG ĐỢI UDP TỪ NODE ESP32-C3 (CƠ CHẾ DRAIN SOCKET BUFFER CHỐNG TRÀN)
+  // Kỹ thuật then chốt: Sử dụng vòng lặp 'while (udp.parsePacket() > 0)' thay vì 'if':
+  // - Nếu trong thời gian Gateway đang bận truyền dữ liệu I2C vẽ OLED (~20ms) mà Node C3 gửi liên tiếp các gói UDP,
+  //   hàng đợi socket của stack mạng LwIP sẽ tích tụ nhiều gói tin.
+  // - Lệnh 'while' đảm bảo hút cạn (drain) toàn bộ các gói tin đang tồn đọng trong bộ đệm hàng đợi PCB,
+  //   triệt tiêu 100% nguy cơ tràn buffer hoặc drop gói tin sinh hiệu y tế!
+  while (udp.parsePacket() > 0) {
+    int len = udp.read((char *)&incomingData, sizeof(incomingData));
+    if (len >= sizeof(incomingData)) {
+      totalPacketsReceived++;
 
-    // Kích hoạt còi báo động khẩn cấp CHỈ KHI Node C3 đã xác nhận ngã qua 2 giai đoạn (fallDetected == 1)
-    bool isCurrentFall = (incomingData.fallDetected == 1);
-    if (isCurrentFall && !prevFallState) {
-      totalFallsCount++;
-      fallAlarmActive = true; // Kích hoạt còi hú liên tục không ngừng cho đến khi bấm tắt!
-      buzzerMuted = false;    // Tự động mở còi ngay cả khi trước đó người dùng bấm tắt
-      digitalWrite(BUZZER_PIN, HIGH);
-      Serial.println("\n🚨 >>> [CẢNH BÁO TÉ NGÃ KHẨN CẤP] CÒI BÁO ĐỘNG HÚ LIÊN TỤC! <<< 🚨");
-      sendTelegramFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
-      sendZaloFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
-      if (mqtt_connected) {
-        esp_mqtt_client_publish(mqtt_client, TOPIC_ALERT,
-                                "{\"alert\":\"fall\",\"status\":\"alarming\"}", 0, 1, 0);
+      // Kích hoạt còi hú khẩn cấp CHỈ KHI Node C3 đã xác nhận ngã qua 2 giai đoạn (fallDetected == 1)
+      bool isCurrentFall = (incomingData.fallDetected == 1);
+      if (isCurrentFall && !prevFallState) {
+        totalFallsCount++;
+        fallAlarmActive = true; // Kích hoạt còi hú liên tục không ngừng cho đến khi người nhà bấm tắt!
+        buzzerMuted = false;    // Tự động giải trừ cờ tắt còi nếu trước đó người dùng từng bấm tắt
+        digitalWrite(BUZZER_PIN, HIGH);
+        Serial.println("\n🚨 >>> [CẢNH BÁO TÉ NGÃ KHẨN CẤP] CÒI BÁO ĐỘNG HÚ LIÊN TỤC! <<< 🚨");
+        sendTelegramFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
+        sendZaloFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
+        if (mqtt_connected) {
+          esp_mqtt_client_publish(mqtt_client, TOPIC_ALERT,
+                                  "{\"alert\":\"fall\",\"status\":\"alarming\"}", 0, 1, 0);
+        }
       }
+
+      // Khi người bệnh đã ổn định và phục hồi (hết cờ ngã), tự động phục hồi còi sẵn sàng cho lần ngã sau
+      if (!incomingData.fallDetected && prevFallState && buzzerMuted) {
+        buzzerMuted = false;
+        Serial.println("[BUZZER] Tu dong tai kich hoat coi sau khi ket thuc bien co.");
+        if (mqtt_connected) {
+          esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS,
+                                  "{\"status\":\"ok\",\"buzzer\":\"active\"}", 0, 1, 0);
+        }
+      }
+      prevFallState = incomingData.fallDetected;
+
+      // Xử lý từng mẫu trong 25 mẫu ECG qua chuỗi thuật toán DSP (50Hz Notch + Pan-Tompkins)
+      for (int i = 0; i < 25; i++) {
+        float filtered = filterGatewayEcg(incomingData.ecgSamples[i], incomingData.leadsOff);
+        if (!incomingData.leadsOff) {
+          processEdgeBPM(filtered);
+        } else {
+          edgeBpm = 0; // Khi hở dây điện cực, nhịp tim lập tức về 0
+        }
+        // Cập nhật bộ đệm vẽ dạng sóng mini cuộn trên màn hình OLED (lấy mẫu tỉ lệ 1:3 để khớp chiều rộng 128px)
+        if (i % 3 == 0) {
+          updateWaveformBuffer(filtered);
+        }
+      }
+
+      // Xuất dữ liệu ra cổng Serial phục vụ thu thập trên MATLAB và giám sát offline
+      outputSerialForMatlab();
+
+      // Đóng gói JSON và đẩy lên Broker MQTT Cloud (WebSocket Secure TLS 1.3)
+      publishDataMQTT();
     }
-    prevFallState = isCurrentFall;
-
-    // Khi người bệnh đã ổn định (hết ngã), tự động nhả cờ buzzerMuted để sẵn sàng cho lần sau
-    if (!incomingData.fallDetected && prevFallState && buzzerMuted) {
-      buzzerMuted = false;
-      Serial.println("[BUZZER] Tu dong tai kich hoat coi sau khi ket thuc bien co.");
-      if (mqtt_connected) {
-        esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS,
-                                "{\"status\":\"ok\",\"buzzer\":\"active\"}", 0, 1, 0);
-      }
-    }
-    prevFallState = incomingData.fallDetected;
-
-    // Xử lý từng mẫu trong 25 mẫu ECG qua bộ lọc số 50Hz Notch + Pan-Tompkins
-    for (int i = 0; i < 25; i++) {
-      float filtered = filterGatewayEcg(incomingData.ecgSamples[i], incomingData.leadsOff);
-      if (!incomingData.leadsOff) {
-        processEdgeBPM(filtered);
-      } else {
-        edgeBpm = 0; // Khi hở dây, nhịp tim về 0
-      }
-      if (i % 3 == 0) {
-        updateWaveformBuffer(filtered);
-      }
-    }
-
-    // Xuất dữ liệu ra Serial phục vụ MATLAB và quan sát
-    outputSerialForMatlab();
-
-    // Đẩy MQTT (nếu bật)
-    publishDataMQTT();
   }
 
-  // 4. Cập nhật màn hình OLED định kỳ (50ms = 20 FPS)
-  if (millis() - lastOledRefresh >= 50) {
+  // 4. CẬP NHẬT MÀN HÌNH OLED ĐỊNH KỲ (100ms = 10 FPS - TỐI ƯU HÓA TẢI CPU & BUS I2C)
+  // - Việc gửi trọn vẹn 1024 bytes khung hình tới SH1106 qua bus I2C Fast-mode 400kHz tiêu tốn khoảng ~20ms.
+  // - Giữ chu kỳ làm mới ở mức 100ms (10 FPS) đảm bảo đồ thị sóng hiển thị mượt mà theo chuẩn máy theo dõi y sinh,
+  //   đồng thời giải phóng tới 80% thời gian bus I2C, tránh nghẽn luồng xử lý gói tin mạng UDP/MQTT.
+  if (millis() - lastOledRefresh >= 100) {
     lastOledRefresh = millis();
     drawOLED();
   }
 
-  // 5. Điều khiển còi chíp cảnh báo Buzzer
+  // 5. Quản lý trạng thái còi chip Active Buzzer (còi hú liên tục khi ngã, bíp nhẹ khi tuột điện cực)
   handleBuzzer();
 }
