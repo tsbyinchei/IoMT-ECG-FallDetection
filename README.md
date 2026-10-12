@@ -17,6 +17,7 @@
 | Tài liệu | Phân loại | Mô tả nội dung chính | Liên kết trực tiếp |
 | :--- | :--- | :--- | :--- |
 | 📋 **PEC.md** | **Đặc tả Kỹ thuật & Lâm sàng** | Tiêu chuẩn ITU-T Y.2060, ANSI/AAMI EC13, bảng thông số ADC/Fs, giao thức UDP/MQTT, dự toán nguồn pin Li-Po. | 👉 **[Xem tài liệu PEC.md](PEC.md)** |
+| 📖 **SYSTEM_ARCHITECTURE.md** | **Kiến trúc & Nguyên lý Toàn diện** | Hướng dẫn trực quan, dễ hiểu (cho người không chuyên code) về Sensor, Actuator, Vi điều khiển, các mô hình & giao thức truyền dữ liệu, kiến trúc phân tầng IoT. | 👉 **[Xem tài liệu SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** |
 | 📐 **ALGORITHM.md** | **Cơ sở Toán học & Thuật toán** | Chi tiết giải thuật Pan-Tompkins 1985 (hàm Z, vi phân, bình phương, MWI) & Động lực học kiểm định té ngã 3 pha. | 👉 **[Xem tài liệu ALGORITHM.md](ALGORITHM.md)** |
 | 📖 **REPORT_GUIDE.md** | **Khung Báo cáo Môn học** | Khung sườn 6 chương chuẩn hóa cho bài báo cáo 25–30 trang môn Thiết kế IoT & Xử lý tín hiệu Y sinh (BDSP). | 👉 **[Xem tài liệu REPORT_GUIDE.md](REPORT_GUIDE.md)** |
 | 📜 **LICENSE** | **Giấy phép Bản quyền** | Giấy phép mã nguồn mở MIT License (cho phép tự do sử dụng, chỉnh sửa và phân phối). | 👉 **[Xem giấy phép MIT](LICENSE)** |
