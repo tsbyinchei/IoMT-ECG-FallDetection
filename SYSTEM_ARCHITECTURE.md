@@ -65,7 +65,7 @@ Kiến trúc phần cứng của hệ thống phân định rõ ràng giữa cá
 
 ### 2.1. Đặc tả Chi tiết Các Vi điều khiển (Microcontrollers)
 
-#### A. Vi điều khiển Node Cảm biến Đeo: [ESP32-C3 SuperMini](ESP32C3/ESP32C3.ino)
+#### A. Vi điều khiển Node Cảm biến Đeo: [ESP32-C3 SuperMini](ESP32C3%20Example/ESP32C3%20Example.ino)
 - **Kiến trúc Vi xử lý:** Lõi đơn 32-bit RISC-V RV32IMC, xung nhịp tối đa $160\text{ MHz}$, tích hợp $400\text{ KB}$ SRAM và $384\text{ KB}$ ROM.
 - **Kích thước & Trọng lượng:** Form-factor siêu thu nhỏ ($22.5 \times 18\text{ mm}$), phù hợp tuyệt đối cho thiết bị y sinh đeo ngực (Wearable Holter/Patch).
 - **Hệ thống Thu thập Tín hiệu:**
@@ -77,7 +77,7 @@ Kiến trúc phần cứng của hệ thống phân định rõ ràng giữa cá
   2. Vận hành máy trạng thái bất đồng bộ (Non-blocking State Machine) đọc DS18B20 nhằm loại bỏ hoàn toàn hiện tượng nghẽn CPU $750\text{ ms}$ khi cảm biến chuyển đổi nhiệt độ.
   3. Gom bộ đệm nhị phân 25 mẫu ECG thành khung truyền dữ liệu cố định **58 bytes** và truyền phát qua giao thức UDP Datagram Socket.
 
-#### B. Vi điều khiển Trạm Biên Xử lý: [ESP32 Gateway (Xtensa Dual-Core LX6)](ESP32/ESP32.ino)
+#### B. Vi điều khiển Trạm Biên Xử lý: [ESP32 Gateway (Xtensa Dual-Core LX6)](ESP32%20Example/ESP32%20Example.ino)
 - **Kiến trúc Vi xử lý:** 2 nhân xử lý độc lập (Core 0 và Core 1) kiến trúc Tensilica Xtensa LX6 32-bit, xung nhịp $240\text{ MHz}$, tích hợp $520\text{ KB}$ SRAM.
 - **Mô hình Đa luồng Thực thi (SMP Concurrency):**
   - **Core 0:** Phụ trách toàn bộ ngăn xếp giao thức mạng (TCP/IP, Wi-Fi Driver, mã hóa SSL/TLS 1.3 mbedTLS, SNTP Synchronization và tiến trình MQTT Client daemon).
@@ -283,7 +283,7 @@ Trong các hệ sinh thái IoT y tế (IoMT), dữ liệu nhịp tim và biến 
 ```
 
 #### A. Cấu trúc Cặp Chứng chỉ Gốc ISRG Root X1 & X2 trong Firmware
-Mã nguồn Gateway ([ESP32.ino](ESP32/ESP32.ino#L85-L146)) lưu trữ cặp chứng chỉ gốc định dạng PEM trực tiếp trong bộ nhớ Flash ROM:
+Mã nguồn Gateway ([ESP32 Example.ino](ESP32%20Example/ESP32%20Example.ino#L85-L146)) lưu trữ cặp chứng chỉ gốc định dạng PEM trực tiếp trong bộ nhớ Flash ROM:
 1. **ISRG Root X1:**
    - **Tổ chức phát hành:** Internet Security Research Group (ISRG).
    - **Thuật toán Khóa công khai:** RSA 4096-bit, thuật toán băm chữ ký SHA-256.
@@ -327,7 +327,7 @@ Nếu Gateway thực thi bắt tay TLS 1.3 khi đồng hồ hệ thống đang �
   $$\text{MBEDTLS\_X509\_BADCERT\_FUTURE} \quad \text{hoặc} \quad \text{MBEDTLS\_X509\_BADCERT\_EXPIRED}$$
 - Mã lỗi trả về: `MBEDTLS_ERR_X509_CERT_VERIFY_FAILED (-0x2700)`. Quá trình bắt tay bị hủy bỏ ngay lập tức, ngắt kết nối Cloud Broker.
 
-#### B. Giải pháp Khắc phục Toàn diện trong Firmware Gateway ([ESP32.ino](ESP32/ESP32.ino#L953-L968))
+#### B. Giải pháp Khắc phục Toàn diện trong Firmware Gateway ([ESP32 Example.ino](ESP32%20Example/ESP32%20Example.ino#L953-L968))
 Hệ thống giải quyết bài toán này bằng cơ chế 3 lớp bảo vệ:
 1. **Thiết lập Thời gian Dự phòng Tức thời (Fallback Epoch Pre-seeding):**
    Ngay khi vừa kết nối Wi-Fi thành công, trước khi máy chủ NTP phản hồi, Gateway chủ động gán mốc thời gian hợp lệ tối thiểu nằm chính xác trong cửa sổ hiệu lực của chứng chỉ:
@@ -501,10 +501,9 @@ Toàn bộ các thành phần mã nguồn và tài liệu kỹ thuật liên qua
 
 | Danh mục Tài nguyên | Đường dẫn Tệp tin Tham chiếu | Mô tả Nội dung Kỹ thuật |
 | :--- | :--- | :--- |
-| **Mã nguồn Node Cảm biến** | [ESP32C3.ino](ESP32C3/ESP32C3.ino) | Firmware thu thập ECG, MPU-6050, DS18B20 và truyền UDP trên ESP32-C3 SuperMini. |
-| **Mã nguồn Trạm Gateway** | [ESP32.ino](ESP32/ESP32.ino) | Firmware Gateway lọc số Pan-Tompkins, hiển thị OLED, còi Buzzer và MQTT WSS TLS 1.3. |
-| **Mã nguồn Mẫu Gateway** | [ESP32 Example.ino](ESP32%20Example/ESP32%20Example.ino) | Bản mẫu phát hành công khai của Gateway với tệp cấu hình bảo mật tách rời. |
-| **Mã nguồn Mẫu Node C3** | [ESP32C3 Example.ino](ESP32C3%20Example/ESP32C3%20Example.ino) | Bản mẫu phát hành công khai của Node cảm biến đeo ngực. |
+| **Mã nguồn Node Cảm biến** | [ESP32C3 Example.ino](ESP32C3%20Example/ESP32C3%20Example.ino) | Firmware thu thập ECG, MPU-6050, DS18B20 và truyền UDP trên ESP32-C3 SuperMini. |
+| **Mã nguồn Trạm Gateway** | [ESP32 Example.ino](ESP32%20Example/ESP32%20Example.ino) | Firmware Gateway lọc số Pan-Tompkins, hiển thị OLED, còi Buzzer và MQTT WSS TLS 1.3. |
+| **Cấu hình Bí mật Mẫu** | [secrets_example.h](ESP32%20Example/secrets_example.h) | File mẫu khai báo cấu hình Wi-Fi Router, MQTT credentials và API Token Telegram / Zalo. |
 | **Giao diện Web Giám sát (Người thân)** | [index.html](web/index.html) & [app.js](web/app.js) | Ứng dụng Web PWA hiển thị ECG Canvas 60 FPS, chỉ số sinh hiệu và điều khiển còi từ xa. |
 | **Kịch bản Xử lý MATLAB** | [matlab_serial_ecg_processor.m](MATLAB/matlab_serial_ecg_processor.m) | Công cụ phân tích tín hiệu điện tim và kiểm nghiệm thuật toán qua cổng Serial USB. |
 | **Hướng dẫn Kiểm thử Hệ thống** | [REPORT_GUIDE.md](REPORT_GUIDE.md) | Tài liệu hướng dẫn thiết lập môi trường, kiểm thử thực nghiệm và báo cáo chuyên sâu. |
