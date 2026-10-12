@@ -1,4 +1,4 @@
-# 🏗️ TÀI LIỆU ĐẶC TẢ KIẾN TRÚC KỸ THUẬT HỆ THỐNG IoT
+# 🏗️ TÀI LIỆU ĐẶC TẢ KIẾN TRÚC KỸ THUẬT HỆ THỐNG IoMT
 ## THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ
 
 > **Đề tài:** Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà  

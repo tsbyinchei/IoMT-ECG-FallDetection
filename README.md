@@ -1,10 +1,10 @@
 # 🫀 Thiết kế Hệ thống IoT Theo dõi Điện tim, Thân nhiệt và Cảnh báo Té ngã Từ xa cho Người cao tuổi tại Nhà
-### Dual-MCU IoT System: Remote Monitoring of ECG, Body Temperature & Fall Detection for the Elderly at Home
+### Dual-MCU IoMT Wearable System: Remote Monitoring of ECG, Body Temperature & Fall Detection for the Elderly at Home
 
 [![Platform](https://img.shields.io/badge/Platform-ESP32%20%7C%20ESP32--C3-blue.svg)](https://www.espressif.com/)
 [![Language](https://img.shields.io/badge/Language-C%2B%2B%20%7C%20MATLAB-orange.svg)](https://mathworks.com/)
 [![Protocol](https://img.shields.io/badge/Protocols-Wi--Fi%20UDP%20%7C%20MQTT%20%7C%20Serial-green.svg)]()
-[![Standard](https://img.shields.io/badge/Standard-ITU--T%20Y.2060%20IoT-purple.svg)]()
+[![Standard](https://img.shields.io/badge/Standard-ITU--T%20Y.2060%20IoMT-purple.svg)]()
 [![Algorithm](https://img.shields.io/badge/Algorithm-Pan--Tompkins%20QRS-red.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 

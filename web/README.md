@@ -1,7 +1,7 @@
-# 🌐 Dashboard Theo Dõi Điện Tim, Thân Nhiệt & Cảnh Báo Té Ngã Từ Xa
+# 🌐 IoMT Realtime Telehealth Dashboard
 ## ĐỀ TÀI: "THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ"
 
-Giao diện Web PWA hiển thị và giám sát dữ liệu thời gian thực dành cho đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"**, kết nối qua giao thức WebSocket Secure (WSS).
+Giao diện Web PWA (Internet of Medical Things) hiển thị và giám sát dữ liệu thời gian thực dành cho đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"**, kết nối qua giao thức WebSocket Secure (WSS).
 
 ---
 
