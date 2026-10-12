@@ -228,10 +228,10 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 1. Mở Arduino IDE, cắm ESP32-C3 vào cổng COM.
 2. Chọn Board: **ESP32C3 Dev Module** (hoặc ESP32-C3 SuperMini).
 3. Cấu hình Tools: `USB CDC On Boot: Enabled`.
-4. Mở file [ESP32C3 Example/ESP32C3 Example.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32C3%20Example/ESP32C3%20Example.ino) (hoặc thư mục nạp trực tiếp `ESP32C3/ESP32C3.ino` trên máy phát triển) và nhấn **Upload**.
+4. Mở file [ESP32C3 Example/ESP32C3 Example.ino](ESP32C3%20Example/ESP32C3%20Example.ino) (hoặc thư mục nạp trực tiếp `ESP32C3/ESP32C3.ino` trên máy phát triển) và nhấn **Upload**.
 
 ### Bước 2: Nạp Gateway Trung Tâm (ESP32)
-1. Mở file [ESP32 Example/ESP32 Example.ino](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32%20Example/ESP32%20Example.ino) (hoặc cấu hình `secrets.h` từ file mẫu [ESP32 Example/secrets_example.h](file:///c:/Users/TsByin/Documents/Arduino/IoT/ESP32%20Example/secrets_example.h)):
+1. Mở file [ESP32 Example/ESP32 Example.ino](ESP32%20Example/ESP32%20Example.ino) (hoặc cấu hình `secrets.h` từ file mẫu [ESP32 Example/secrets_example.h](ESP32%20Example/secrets_example.h)):
    ```c
    #define SECRET_ROUTER_SSID "Tên_WiFi_Nhà_Bạn"
    #define SECRET_ROUTER_PASS "Mật_Khẩu_WiFi"
@@ -250,7 +250,7 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 6. Màn hình OLED sẽ sáng lên, phát SoftAP `BIOMED_GW`, kết nối Wi-Fi Router, đồng bộ WSS với Cloudflare Tunnel và gửi cảnh báo tự động qua Telegram & Zalo Bot khi phát hiện té ngã.
 
 ### Bước 3: Chạy MATLAB Giám Sát & Phân Tích Thực Nghiệm
-1. Tạo file cấu hình bảo mật `MATLAB/config_private.m` từ file mẫu [MATLAB/config_example.m](file:///c:/Users/TsByin/Documents/Arduino/IoT/MATLAB/config_example.m).
+1. Tạo file cấu hình bảo mật `MATLAB/config_private.m` từ file mẫu [MATLAB/config_example.m](MATLAB/config_example.m).
 2. **Chế độ 1 (Qua cổng USB COM):** Đóng Serial Monitor trong Arduino IDE, mở MATLAB và chạy:
    ```matlab
    run('MATLAB/matlab_serial_ecg_processor.m')

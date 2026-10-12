@@ -49,7 +49,7 @@ Do subdomain `iot.tsbyin.dev` đã được sử dụng cho mục đích khác, 
 ## 🛠️ Hướng dẫn Triển khai nhanh
 
 ### Cách 1: Chạy trực tiếp trên máy cục bộ
-Bạn có thể mở trực tiếp file [index.html](file:///c:/Users/TsByin/Documents/Arduino/IoT/web/index.html) bằng bất kỳ trình duyệt nào (Chrome, Edge, Safari, Firefox) hoặc chạy với VS Code Live Server.
+Bạn có thể mở trực tiếp file [index.html](index.html) bằng bất kỳ trình duyệt nào (Chrome, Edge, Safari, Firefox) hoặc chạy với VS Code Live Server.
 
 ### Cách 2: Triển khai lên Ubuntu Server (1Panel / Nginx) với subdomain `iomt.tsbyin.dev`
 1. Đăng nhập vào 1Panel trên server `192.168.1.36`.
