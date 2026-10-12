@@ -33,13 +33,13 @@ Trong môi trường y tế gia đình, viện dưỡng lão và các cơ sở �
 Hệ thống được thiết kế theo mô hình **Điện toán Biên kết hợp Đám mây (Edge-Cloud Hybrid Architecture)**, cấu thành từ hai phân hệ phần cứng nhúng độc lập, kết hợp hạ tầng Đám mây bảo mật và các nền tảng ứng dụng đa kênh:
 - **Nút cảm biến đeo trên người (Wearable Sensing Node - ESP32-C3):** Thu thập tín hiệu vi điện thế tim (ECG), vector gia tốc chuyển động 3 chiều và thân nhiệt thực tế theo chu kỳ vi giây.
 - **Trạm trung tâm xử lý biên (Edge Computing Gateway - ESP32):** Tiếp nhận gói tin qua sóng vô tuyến nội bộ, thực thi giải thuật lọc số thích nghi (Notch 50Hz, Pan-Tompkins QRS), hiển thị sóng tim 60 FPS, kích hoạt còi báo động khẩn cấp tại chỗ và chuyển tiếp dữ liệu lên Cloud.
-- **Hạ tầng Đám mây & Ứng dụng Bác sĩ (Cloud & Telehealth Layer):** Định tuyến thông điệp qua MQTT Broker mã hóa TLS 1.3, cập nhật Web Dashboard thời gian thực và kích hoạt tin nhắn cấp cứu qua Telegram Bot & Zalo API.
+- **Hạ tầng Đám mây & Giao diện Giám sát Từ xa (Cloud & Remote Monitoring Layer):** Định tuyến thông điệp qua MQTT Broker mã hóa TLS 1.3, cập nhật Web Dashboard thời gian thực cho người thân và kích hoạt tin nhắn cấp cứu qua Telegram Bot & Zalo API.
 
 ```mermaid
 flowchart LR
     A["Node C3 (Cảm biến đeo ngực)"] -->|"UDP Datagram (4ms/mẫu)"| B["Gateway ESP32 (Trạm trung tâm)"]
     B -->|"WSS / TLS 1.3 (Port 443)"| C["EMQX MQTT Broker (Cloud Server)"]
-    C --> D["Web Dashboard Bác sĩ"]
+    C --> D["Web Dashboard Giám sát (Người thân)"]
     C --> E["Telegram / Zalo Alert Bot"]
     B -->|"UART 115200 Baud"| F["MATLAB Analytics Engine"]
 ```
@@ -148,7 +148,7 @@ Kiến trúc phần cứng của hệ thống phân định rõ ràng giữa cá
 
 ## 3. MÔ HÌNH LUỒNG DỮ LIỆU & CHU TRÌNH XỬ LÝ TÍN HIỆU Y SINH
 
-Quy trình tuần tự hóa dữ liệu sinh hiệu từ thời điểm xuất hiện điện thế trên biểu bì da đến khi kết xuất trên giao diện bác sĩ tuân thủ chu trình 5 bước nghiêm ngặt:
+Quy trình tuần tự hóa dữ liệu sinh hiệu từ thời điểm xuất hiện điện thế trên biểu bì da đến khi kết xuất trên giao diện giám sát của người thân tuân thủ chu trình 5 bước nghiêm ngặt:
 
 ```mermaid
 sequenceDiagram
@@ -198,7 +198,7 @@ sequenceDiagram
    - Gateway định dạng gói tin thành chuỗi JSON và truyền phát qua kênh **MQTT over WebSocket Secure (WSS)** cổng 443 thông qua đường hầm Cloudflare Zero Trust.
    - Toàn bộ lưu lượng được bảo vệ bởi giao thức **TLS 1.3** và xác thực chuỗi chứng chỉ gốc **Let's Encrypt (ISRG Root X1)**.
 5. **Bước 5: Trực quan hóa Lâm sàng & Phản hồi Khẩn cấp Đa kênh (Multi-Channel Clinical Action):**
-   - **Giao diện Giám sát Web PWA:** Bác sĩ tiếp nhận luồng dữ liệu thời gian thực qua giao thức WSS nhị phân, kết xuất đồ thị sóng ECG dạng điện tâm đồ chuẩn y tế trên thẻ HTML5 Canvas ở tốc độ $60\text{ FPS}$.
+   - **Giao diện Giám sát Web PWA:** Người thân và người chăm sóc tiếp nhận luồng dữ liệu thời gian thực qua giao thức WSS nhị phân, theo dõi đồ thị sóng ECG trực quan hiển thị trên thẻ HTML5 Canvas ở tốc độ $60\text{ FPS}$.
    - **Kênh Phản hồi Khẩn cấp (Emergency Webhooks):** Khi cờ ngã hoặc loạn nhịp được xác thực, Gateway lập tức gọi đồng thời HTTPS REST API gửi cảnh báo khẩn tới **Telegram Bot** và **Zalo Official Account API**.
 
 ---
@@ -234,7 +234,7 @@ flowchart TD
 | Mô hình Truyền thông | Vị trí Thực thi trong Hệ thống | Cơ chế Hoạt động Kỹ thuật | Ưu điểm & Vai trò Thiết kế |
 | :--- | :--- | :--- | :--- |
 | **1. Push (Đẩy dữ liệu)** | - Node C3 $\rightarrow$ Gateway (UDP)<br>- Gateway $\rightarrow$ Cloud (MQTT Pub)<br>- Cloud $\rightarrow$ Web (WebSocket) | Thiết bị phát chủ động đẩy gói dữ liệu ngay khi vừa tích lũy đủ khung lấy mẫu mà không cần tín hiệu thăm dò (polling) từ phía thu. | Triệt tiêu hoàn toàn độ trễ trễ thăm dò (Polling Latency), đạt tốc độ cập nhật thời gian thực cao ($< 10\text{ ms}$). |
-| **2. Publish / Subscribe (Pub/Sub)** | - Gateway $\leftrightarrow$ EMQX Broker $\leftrightarrow$ Web PWA / MATLAB / Python | Bên phát (Publisher) và các bên nhận (Subscribers) hoàn toàn độc lập logic, chỉ liên kết qua chủ đề tin nhắn (`biomed/patient/data`, `biomed/patient/alert`). | Khả năng mở rộng quy mô (Scalability): Hàng trăm bác sĩ có thể đồng thời theo dõi dữ liệu mà không làm tăng tải tính toán trên Gateway. |
+| **2. Publish / Subscribe (Pub/Sub)** | - Gateway $\leftrightarrow$ EMQX Broker $\leftrightarrow$ Web PWA / MATLAB / Python | Bên phát (Publisher) và các bên nhận (Subscribers) hoàn toàn độc lập logic, chỉ liên kết qua chủ đề tin nhắn (`biomed/patient/data`, `biomed/patient/alert`). | Khả năng mở rộng quy mô (Scalability): Nhiều người thân và người chăm sóc có thể đồng thời theo dõi dữ liệu mà không làm tăng tải tính toán trên Gateway. |
 | **3. Request / Response (Hỏi - Đáp)** | - Trình duyệt tải ứng dụng Web<br>- Gateway gọi API Telegram / Zalo | Bên gửi khởi tạo phiên yêu cầu (Request), phía máy chủ xử lý logic và trả về mã trạng thái cùng nội dung phản hồi (Response 200 OK). | Đảm bảo tính tương thích chuẩn hóa với các nền tảng Webhook và dịch vụ mạng xã hội toàn cầu. |
 | **4. Client - Server (Khách - Chủ)** | - Trình duyệt $\leftrightarrow$ Web Server tĩnh<br>- ESP32 $\leftrightarrow$ NTP Time Servers | Thiết bị khách chủ động kết nối tới máy chủ trung tâm định danh bằng FQDN cố định để yêu cầu dịch vụ hoặc đồng bộ thời gian. | Quản lý tài nguyên tập trung, bảo đảm tính xác thực danh tính và đồng bộ cấu hình hệ thống. |
 | **5. Peer-to-Peer / Point-to-Point (Điểm - Điểm)** | - Node C3 $\leftrightarrow$ Gateway (Kênh SoftAP nội bộ) | Node C3 kết nối trực tiếp vào trạm phát sóng Wi-Fi SoftAP của Gateway (`192.168.4.1`) mà không qua router trung gian hay Internet. | Đảm bảo hệ thống duy trì hoạt động cảnh báo tại chỗ hoàn toàn độc lập ngay cả khi mạng viễn thông gia đình bị tê liệt. |
@@ -426,7 +426,7 @@ flowchart TD
 | **Tầng 1: Cảm nhận & Thu thập** *(Perception Layer)* | - Cảm biến AD8232, MPU-6050, DS18B20<br>- MCU Node đeo ESP32-C3 SuperMini | - Đo đạc trực tiếp các đại lượng vật lý và điện thế sinh học bề mặt da.<br>- Thực hiện biến đổi tương tự - số (ADC 12-bit) và đóng khung nhị phân đồng bộ. |
 | **Tầng 2: Mạng & Truyền dẫn** *(Network Layer)* | - Wi-Fi IEEE 802.11 b/g/n (2.4 GHz)<br>- Giao thức UDP Socket & WSS TCP | - Cung cấp hạ tầng truyền dẫn vô tuyến cự ly ngắn (PAN) và mạng diện rộng (WAN).<br>- Định tuyến các gói tin sinh hiệu với độ trễ thấp và độ tin cậy cao. |
 | **Tầng 3: Trung gian & Xử lý** *(Middleware / Edge Layer)* | - Dual-Core ESP32 Gateway (Core 1 DSP)<br>- Máy chủ EMQX MQTT Broker trên Ubuntu | - Thực thi điện toán biên (Edge Computing): Lọc số IIR Notch 50Hz và thuật toán Pan-Tompkins.<br>- Phân tích động học thẩm định té ngã, quản lý phiên kết nối và kích hoạt còi tại chỗ. |
-| **Tầng 4: Ứng dụng & Nghiệp vụ** *(Application Layer)* | - Web PWA Responsive (Bác sĩ)<br>- Telegram & Zalo Emergency Bots<br>- Môi trường tính toán MATLAB | - Kết xuất đồ thị sóng điện tim trực quan, báo cáo chỉ số lâm sàng.<br>- Gửi thông báo đẩy khẩn cấp đa kênh tới nhân viên y tế và thân nhân. |
+| **Tầng 4: Ứng dụng & Nghiệp vụ** *(Application Layer)* | - Web PWA Responsive (Người thân / Người chăm sóc)<br>- Telegram & Zalo Emergency Bots<br>- Môi trường tính toán MATLAB | - Kết xuất đồ thị sóng điện tim trực quan, báo cáo chỉ số sinh hiệu.<br>- Gửi thông báo đẩy khẩn cấp đa kênh tức thời tới người nhà và người chăm sóc. |
 
 ---
 
@@ -505,7 +505,7 @@ Toàn bộ các thành phần mã nguồn và tài liệu kỹ thuật liên qua
 | **Mã nguồn Trạm Gateway** | [ESP32.ino](ESP32/ESP32.ino) | Firmware Gateway lọc số Pan-Tompkins, hiển thị OLED, còi Buzzer và MQTT WSS TLS 1.3. |
 | **Mã nguồn Mẫu Gateway** | [ESP32 Example.ino](ESP32%20Example/ESP32%20Example.ino) | Bản mẫu phát hành công khai của Gateway với tệp cấu hình bảo mật tách rời. |
 | **Mã nguồn Mẫu Node C3** | [ESP32C3 Example.ino](ESP32C3%20Example/ESP32C3%20Example.ino) | Bản mẫu phát hành công khai của Node cảm biến đeo ngực. |
-| **Giao diện Web Bác sĩ** | [index.html](web/index.html) & [app.js](web/app.js) | Ứng dụng Web PWA hiển thị ECG Canvas 60 FPS, chỉ số sinh hiệu và điều khiển còi từ xa. |
+| **Giao diện Web Giám sát (Người thân)** | [index.html](web/index.html) & [app.js](web/app.js) | Ứng dụng Web PWA hiển thị ECG Canvas 60 FPS, chỉ số sinh hiệu và điều khiển còi từ xa. |
 | **Kịch bản Xử lý MATLAB** | [matlab_serial_ecg_processor.m](MATLAB/matlab_serial_ecg_processor.m) | Công cụ phân tích tín hiệu điện tim và kiểm nghiệm thuật toán qua cổng Serial USB. |
 | **Hướng dẫn Kiểm thử Hệ thống** | [REPORT_GUIDE.md](REPORT_GUIDE.md) | Tài liệu hướng dẫn thiết lập môi trường, kiểm thử thực nghiệm và báo cáo chuyên sâu. |
 | **Đặc tả Kiểm tra Bảo mật** | [SECURITY.md](SECURITY.md) | Chính sách an toàn thông tin, quản lý thông tin xác thực và bảo mật mã nguồn. |
