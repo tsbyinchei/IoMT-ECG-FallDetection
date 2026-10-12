@@ -10,27 +10,6 @@
 
 ---
 
-## 📑 HỆ THỐNG TÀI LIỆU DỰ ÁN (DOCUMENTATION DIRECTORY)
-
-> 💡 **Khám phá tài liệu chuyên sâu:** Bấm vào các liên kết bên dưới để xem trực tiếp các tài liệu kỹ thuật, thuật toán và hướng dẫn làm báo cáo của dự án:
-
-| Tài liệu | Phân loại | Mô tả nội dung chính | Liên kết trực tiếp |
-| :--- | :--- | :--- | :--- |
-| 📋 **PEC.md** | **Đặc tả Kỹ thuật & Lâm sàng** | Tiêu chuẩn ITU-T Y.2060, ANSI/AAMI EC13, bảng thông số ADC/Fs, giao thức UDP/MQTT, dự toán nguồn pin Li-Po. | 👉 **[Xem tài liệu PEC.md](PEC.md)** |
-| 📖 **SYSTEM_ARCHITECTURE.md** | **Kiến trúc Kỹ thuật Hệ thống** | Đặc tả kiến trúc kỹ thuật hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà. | 👉 **[Xem tài liệu SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** |
-| 📐 **ALGORITHM.md** | **Cơ sở Toán học & Thuật toán** | Chi tiết giải thuật Pan-Tompkins 1985 (hàm Z, vi phân, bình phương, MWI) & Động lực học kiểm định té ngã 3 pha. | 👉 **[Xem tài liệu ALGORITHM.md](ALGORITHM.md)** |
-| 📖 **REPORT_GUIDE.md** | **Khung Báo cáo Môn học** | Khung sườn 6 chương chuẩn hóa cho bài báo cáo 25–30 trang môn Thiết kế Hệ thống IoT & Xử lý Tín hiệu Y sinh. | 👉 **[Xem tài liệu REPORT_GUIDE.md](REPORT_GUIDE.md)** |
-| 📜 **LICENSE** | **Giấy phép Bản quyền** | Giấy phép mã nguồn mở MIT License (cho phép tự do sử dụng, chỉnh sửa và phân phối). | 👉 **[Xem giấy phép MIT](LICENSE)** |
-| 🛡️ **SECURITY.md** | **Chính sách An toàn** | Khuyến cáo an toàn điện học y sinh IEC 60601-1, cách ly nguồn pin và bảo mật dữ liệu MQTT qua Cloudflare Tunnel. | 👉 **[Xem tài liệu SECURITY.md](SECURITY.md)** |
-| 🤝 **CONTRIBUTING.md** | **Hướng dẫn Đóng góp** | Quy chuẩn đóng gói code Arduino, tiêu chuẩn xử lý tín hiệu MATLAB và quy trình Pull Request. | 👉 **[Xem tài liệu CONTRIBUTING.md](CONTRIBUTING.md)** |
-| 📜 **CODE_OF_CONDUCT.md** | **Quy tắc Ứng xử** | Bộ quy tắc ứng xử chuẩn Contributor Covenant v2.1 cho cộng đồng nghiên cứu khoa học. | 👉 **[Xem tài liệu CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** |
-| 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 58-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
-| 📟 **ESP32 Example** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32%20Example/ESP32%20Example.ino)** |
-| 📊 **MATLAB Scripts** | **Trạm Xử lý Tín hiệu** | Pan-Tompkins thời gian thực với chấm đỏ đỉnh R, bộ lọc trung vị Median, xuất file .MAT và phân tích HRV. | 👉 **[Xem thư mục MATLAB](MATLAB/)** |
-| 🌐 **Web Dashboard** | **Giao diện Theo dõi Realtime** | Màn hình PWA 60 FPS theo dõi điện tim, thân nhiệt, gia tốc va đập SMV & còi hú Web Audio API cho người thân. | 👉 **[Xem Web Dashboard](web/)** |
-
----
-
 ## 📌 1. TỔNG QUAN HỆ THỐNG (SYSTEM OVERVIEW)
 
 Hệ thống được thiết kế phục vụ đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"**, kết hợp kiến trúc **Internet of Medical Things (IoMT)** và **Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP)**:
@@ -268,32 +247,24 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 
 ---
 
-## 📊 8. KẾT QUẢ THỰC NGHIỆM & HÌNH ẢNH XUẤT BÁO CÁO (300 DPI FIGURES)
+## 📑 HỆ THỐNG TÀI LIỆU DỰ ÁN (DOCUMENTATION DIRECTORY)
 
-Toàn bộ dữ liệu thực nghiệm đã được ghi nhận trong file chuẩn hóa `ECG_Patient_Record.mat` và phân tích tự động:
+> 💡 **Khám phá tài liệu chuyên sâu:** Bấm vào các liên kết bên dưới để xem trực tiếp các tài liệu kỹ thuật, thuật toán và hướng dẫn làm báo cáo của dự án:
 
-### 📑 Bảng số liệu thống kê lâm sàng thực nghiệm:
-
-| Đại lượng đo đạc / Chỉ số Y sinh | Giá trị thực nghiệm đạt được | Ý nghĩa lâm sàng & Kỹ thuật |
-| :--- | :--- | :--- |
-| **Tần số lấy mẫu ($F_s$)** | **$250\text{ Hz}$** ($T_s = 4.0\text{ ms}$) | Chuẩn y tế đo điện tâm đồ ECG |
-| **Tổng thời gian ghi dữ liệu** | **$468.90\text{ giây}$** (~$7.8\text{ phút}$) | Đủ dài để đánh giá ổn định và biến thiên |
-| **Tổng số mẫu tín hiệu ECG** | **$117,225\text{ mẫu}$** | Không bị trượt hoặc mất mẫu qua UDP/MQTT |
-| **Tổng số phức bộ QRS (đỉnh R)** | **$533\text{ đỉnh}$** | Bóc tách chính xác bằng Pan-Tompkins thích ứng |
-| **Nhịp tim trung bình (Mean BPM)** | **$82.1\text{ BPM}$** | Nhịp tim lúc tỉnh táo bình thường ($60 - 100\text{ BPM}$) |
-| **Nhịp tim Min / Max** | **$45.6\text{ BPM}$ / $150.0\text{ BPM}$** | Phản ánh nhịp lúc nghỉ và khi vận động/ngã |
-| **Độ biến thiên nhịp tim (SDNN)** | **$1427.23\text{ ms}$** | Phân tích biến thiên RR toàn phần |
-| **Độ biến thiên nhịp tim (RMSSD)** | **$2046.21\text{ ms}$** | Đánh giá hoạt động hệ thần kinh phó giao cảm |
-| **Chỉ số Poincaré $SD_1$ / $SD_2$** | **$1448.25\text{ ms}$ / $1408.47\text{ ms}$** | Độ phân tán hình elip biến thiên ngắn/dài hạn |
-| **Tỷ số phân tán $SD_1 / SD_2$** | **$1.028$** | Cân bằng điều hòa tim mạch |
-| **Thân nhiệt trung bình** | **$32.46^\circ\text{C}$** | Nhiệt độ đo bề mặt da (cảm biến DS18B20) |
-| **Số lần kích hoạt cảnh báo ngã** | **$121\text{ lần}$** | Ghi nhận chính xác qua thuật toán kiểm định 3 pha |
-
-### 🖼️ Danh mục 4 hình vẽ thực nghiệm chuẩn in ấn (300 DPI) trong thư mục `MATLAB/figures/`:
-* **Hình 1:** [Hinh1_BocTach_QRS_PanTompkins.png](MATLAB/figures/Hinh1_BocTach_QRS_PanTompkins.png) - Tín hiệu ECG thô, tín hiệu sau lọc IIR Bandpass 5-15Hz gắn nhãn đỉnh R màu đỏ và năng lượng tích phân MWI.
-* **Hình 2:** [Hinh2_BieuDo_Poincare_HRV.png](MATLAB/figures/Hinh2_BieuDo_Poincare_HRV.png) - Biểu đồ Poincaré biểu diễn tương quan cặp khoảng $RR_n - RR_{n+1}$ và các trục elip $SD_1, SD_2$.
-* **Hình 3:** [Hinh3_PhoCongSuat_PSD_Welch.png](MATLAB/figures/Hinh3_PhoCongSuat_PSD_Welch.png) - Phổ mật độ công suất Welch PSD chứng minh năng lượng tập trung ở dải $5-15\text{Hz}$ và triệt tiêu hoàn toàn nhiễu lưới $50\text{Hz}$.
-* **Hình 4:** [Hinh4_GiaToc_TeNga_SMV.png](MATLAB/figures/Hinh4_GiaToc_TeNga_SMV.png) - Động lực học véc-tơ gia tốc $SMV$ phân tích 3 pha: Rơi tự do ($<0.6g$) $\to$ Va đập ($>2.5g$) $\to$ Bất động.
+| Tài liệu | Phân loại | Mô tả nội dung chính | Liên kết trực tiếp |
+| :--- | :--- | :--- | :--- |
+| 📋 **PEC.md** | **Đặc tả Kỹ thuật & Lâm sàng** | Tiêu chuẩn ITU-T Y.2060, ANSI/AAMI EC13, bảng thông số ADC/Fs, giao thức UDP/MQTT, dự toán nguồn pin Li-Po. | 👉 **[Xem tài liệu PEC.md](PEC.md)** |
+| 📖 **SYSTEM_ARCHITECTURE.md** | **Kiến trúc Kỹ thuật Hệ thống** | Đặc tả kiến trúc kỹ thuật hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà. | 👉 **[Xem tài liệu SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** |
+| 📐 **ALGORITHM.md** | **Cơ sở Toán học & Thuật toán** | Chi tiết giải thuật Pan-Tompkins 1985 (hàm Z, vi phân, bình phương, MWI) & Động lực học kiểm định té ngã 3 pha. | 👉 **[Xem tài liệu ALGORITHM.md](ALGORITHM.md)** |
+| 📖 **REPORT_GUIDE.md** | **Khung Báo cáo Môn học** | Khung sườn 6 chương chuẩn hóa cho bài báo cáo 25–30 trang môn Thiết kế Hệ thống IoT & Xử lý Tín hiệu Y sinh. | 👉 **[Xem tài liệu REPORT_GUIDE.md](REPORT_GUIDE.md)** |
+| 📜 **LICENSE** | **Giấy phép Bản quyền** | Giấy phép mã nguồn mở MIT License (cho phép tự do sử dụng, chỉnh sửa và phân phối). | 👉 **[Xem giấy phép MIT](LICENSE)** |
+| 🛡️ **SECURITY.md** | **Chính sách An toàn** | Khuyến cáo an toàn điện học y sinh IEC 60601-1, cách ly nguồn pin và bảo mật dữ liệu MQTT qua Cloudflare Tunnel. | 👉 **[Xem tài liệu SECURITY.md](SECURITY.md)** |
+| 🤝 **CONTRIBUTING.md** | **Hướng dẫn Đóng góp** | Quy chuẩn đóng gói code Arduino, tiêu chuẩn xử lý tín hiệu MATLAB và quy trình Pull Request. | 👉 **[Xem tài liệu CONTRIBUTING.md](CONTRIBUTING.md)** |
+| 📜 **CODE_OF_CONDUCT.md** | **Quy tắc Ứng xử** | Bộ quy tắc ứng xử chuẩn Contributor Covenant v2.1 cho cộng đồng nghiên cứu khoa học. | 👉 **[Xem tài liệu CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** |
+| 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 58-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
+| 📟 **ESP32 Example** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32%20Example/ESP32%20Example.ino)** |
+| 📊 **MATLAB Scripts** | **Trạm Xử lý Tín hiệu** | Pan-Tompkins thời gian thực với chấm đỏ đỉnh R, bộ lọc trung vị Median, xuất file .MAT và phân tích HRV. | 👉 **[Xem thư mục MATLAB](MATLAB/)** |
+| 🌐 **Web Dashboard** | **Giao diện Theo dõi Realtime** | Màn hình PWA 60 FPS theo dõi điện tim, thân nhiệt, gia tốc va đập SMV & còi hú Web Audio API cho người thân. | 👉 **[Xem Web Dashboard](web/)** |
 
 ---
 
@@ -301,7 +272,7 @@ Toàn bộ dữ liệu thực nghiệm đã được ghi nhận trong file chu�
 * **Tác giả / Nghiên cứu phát triển:** **TsByinChei**
 * **GitHub:** [@tsbyinchei](https://github.com/tsbyinchei)
 * **Email liên hệ:** [contact@tsbyin.dev](mailto:contact@tsbyin.dev) • [tsbyinchei@gmail.com](mailto:tsbyinchei@gmail.com)
-* **Đề tài:** Hệ thống IoMT Đeo người Giám sát Điện tim & Cảnh báo Té ngã Đa tầng.
+* **Đề tài:** Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà.
 * **Môn học:** Thiết kế Hệ thống IoT & Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP).
 * **Giấy phép:** Toàn bộ mã nguồn và tài liệu được phát hành theo giấy phép mã nguồn mở **[MIT License](LICENSE)** (Copyright © 2026 TsByinChei).
 
