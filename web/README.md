@@ -34,19 +34,6 @@ Giao diện Web PWA (Internet of Medical Things) hiển thị và giám sát d�
 
 ---
 
-## 🌐 Đề xuất Subdomain & Triển khai
-
-Do subdomain `iot.tsbyin.dev` đã được sử dụng cho mục đích khác, đề xuất các subdomain chuẩn cho trang Dashboard này:
-
-| Subdomain đề xuất | Đánh giá | Lý do |
-| :--- | :--- | :--- |
-| ⭐ **`iomt.tsbyin.dev`** | **Tốt nhất (Khuyên dùng)** | Viết tắt chuẩn quốc tế của **Internet of Medical Things**, ngắn gọn, chuyên nghiệp và đúng tinh thần đề tài. |
-| **`biomed.tsbyin.dev`** | Rất tốt | Mang tính học thuật y sinh cao, trùng với tên Wi-Fi AP `BIOMED_GW` của Gateway. |
-| **`ecg.tsbyin.dev`** | Phù hợp | Trực diện vào tính năng theo dõi điện tim. |
-| **`patient.tsbyin.dev`** | Phù hợp | Hướng bệnh viện / theo dõi bệnh nhân gia đình. |
-
----
-
 ## 🛠️ Hướng dẫn Triển khai nhanh
 
 ### Cách 1: Chạy trực tiếp trên máy cục bộ
