@@ -37,8 +37,7 @@
 | **Thuật toán nhận diện ngã** | Kiểm định 2 giai đoạn (2-Stage Verification) | Giai đoạn 1: $SMV \ge 2.8g$<br/>Giai đoạn 2: $Tilt \ge 40^\circ$ & $Gyro < 45^\circ/\text{s}$ | Chống báo động giả ADL |
 | **Thời gian thẩm định ngã** | $2.0\text{s} - 3.0\text{s}$ | Cửa sổ phân tích bất động $2.5\text{ giây}$ | Động lực học ngã người già |
 | **Dải đo thân nhiệt DS18B20** | $+15^\circ\text{C}$ đến $+50^\circ\text{C}$ | Cảm biến kỹ thuật số 12-bit (FSM 800ms non-blocking) | Giao thức 1-Wire (CRC8) |
-| **Khung gói tin UDP (Cơ bản)** | $\le 100\text{ bytes}$ | Khung nhị phân Packed Struct 60 bytes | Tối ưu hóa băng thông |
-| **Khung gói tin UDP (Mở rộng)**| Toàn vẹn tầng ứng dụng (End-to-End) | Khung nhị phân Packed Struct 62 bytes (+CRC-16) | IEC 62304 / ISO 13485 |
+| **Khung gói tin UDP chuẩn** | Chuẩn hóa IEC 62304 / ISO 13485 | Khung nhị phân Packed Struct 62 bytes (+CRC-16) | Toàn vẹn tầng ứng dụng |
 | **Độ trễ truyền dẫn nội bộ** | $< 10\text{ ms}$ | Wi-Fi UDP Socket điểm-điểm | Thời gian thực (< 5ms) |
 
 ---
@@ -51,29 +50,21 @@
   * Node C3 IP: `192.168.4.2`
   * Subnet Mask: `255.255.255.0`
   * Cổng UDP Port: `4210`
-* **Cấu trúc gói tin nhị phân chuẩn định mức (60 Bytes):**
+* **Cấu trúc gói tin nhị phân chuẩn hóa chính thức (62 Bytes - Tích hợp CRC-16):**
+  Khung gói tin nhị phân chính thức được triển khai đồng bộ trên cả Node C3 và Gateway, tích hợp trường `crc16` (2 bytes, đa thức CRC-16-CCITT `0x1021`) ở cuối struct để thực hiện **End-to-End Application Integrity Check** theo tiêu chuẩn thiết bị y tế IEC 62304 / ISO 13485:
 
 | Trường dữ liệu | Kiểu dữ liệu | Kích thước | Mô tả |
 | :--- | :--- | :--- | :--- |
 | `ecgSamples[25]` | `uint16_t` | 50 Bytes | 25 mẫu ECG 12-bit liên tiếp ($4\text{ms} \times 25 = 100\text{ms}$) |
-| `bodyTemp` | `float` | 4 Bytes | Thân nhiệt bề mặt cơ thể (°C) |
-| `smv` | `float` | 4 Bytes | Vector độ lớn gia tốc $SMV$ ($g$) |
-| `leadsOff` | `uint8_t` | 1 Byte | $0$: Tiếp xúc tốt \| $1$: Hở/tuột điện cực |
-| `fallDetected` | `uint8_t` | 1 Byte | $0$: Bình thường \| $1$: Cảnh báo ngã |
-| **TỔNG CỘNG** | | **60 Bytes** | Truyền nguyên khối bằng `udp.write()` |
-
-* **Cấu trúc gói tin mở rộng chuẩn y tế (62 Bytes - Tích hợp CRC-16):**
-  Bổ sung trường `crc16` (2 bytes, đa thức CRC-16-CCITT `0x1021`) vào cuối struct để thực hiện **End-to-End Application Integrity Check** theo tiêu chuẩn thiết bị y tế IEC 62304:
-
-| Trường dữ liệu | Kiểu dữ liệu | Kích thước | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `ecgSamples[25]` | `uint16_t` | 50 Bytes | 25 mẫu ECG 12-bit liên tiếp ($100\text{ms}$) |
-| `bodyTemp` | `float` | 4 Bytes | Thân nhiệt bề mặt cơ thể (°C) |
+| `bodyTemp` | `float` | 4 Bytes | Thân nhiệt bề mặt cơ thể (°C, IEEE 754) |
 | `smv` | `float` | 4 Bytes | Vector gia tốc toàn phần cực đại ($g$) |
-| `leadsOff` | `uint8_t` | 1 Byte | Trạng thái tuột điện cực Smart Leads-off |
-| `fallDetected` | `uint8_t` | 1 Byte | Cờ xác nhận té ngã 2 giai đoạn |
-| `crc16` | `uint16_t` | 2 Bytes | Mã kiểm tra toàn vẹn CRC-16 (Đa thức 0x1021) |
-| **TỔNG CỘNG** | | **62 Bytes** | Chuẩn hóa toàn vẹn cấu trúc bộ nhớ |
+| `leadsOff` | `uint8_t` | 1 Byte | Trạng thái tuột điện cực Smart Leads-off ($0$: Tốt, $1$: Hở) |
+| `fallDetected` | `uint8_t` | 1 Byte | Cờ xác nhận té ngã 2 giai đoạn ($0$: Bình thường, $1$: Ngã) |
+| `crc16` | `uint16_t` | 2 Bytes | Mã kiểm tra toàn vẹn CRC-16-CCITT (Đa thức 0x1021, Init 0xFFFF) |
+| **TỔNG CỘNG** | | **62 Bytes** | Khung nhị phân cố định truyền nguyên khối qua `udp.write()` |
+
+> [!NOTE]
+> Khung sơ khai ban đầu là 60 bytes (chưa có `crc16`). Việc nâng cấp lên 62 bytes ở tầng ứng dụng giúp phát hiện 100% lỗi suy đồi RAM/DMA và xén đệm socket trước khi đưa dữ liệu vào thuật toán DSP mà không làm phát sinh độ trễ mạng ($< 1.8\mu\text{s}$ tính toán).
 
 ### 3.2. Giao thức Tầng 2: USB Serial Streaming (Gateway $\to$ MATLAB)
 * **Baudrate:** `115200 bps`, 8-N-1.

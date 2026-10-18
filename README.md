@@ -14,8 +14,8 @@
 
 Hệ thống được thiết kế phục vụ đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"**, kết hợp kiến trúc **Internet of Medical Things (IoMT)** và **Xử lý Tín hiệu Y sinh (Biomedical Signal Processing - BDSP)**:
 
-* **Node cảm biến đeo người (Wearable Sensor Node):** Sử dụng chip vi điều khiển **ESP32-C3 SuperMini (RISC-V 160MHz)** nhỏ gọn đeo trên ngực người cao tuổi, lấy mẫu điện tim ECG **250 Hz (chu kỳ 4ms)** qua cảm biến sinh học **AD8232**, đọc gia tốc 3 trục từ **MPU-6050** để tính vector gia tốc toàn phần $SMV = \sqrt{a_x^2 + a_y^2 + a_z^2}$, và theo dõi thân nhiệt qua **DS18B20**.
-* **Đóng gói & Truyền thông không dây:** Dữ liệu được gom theo khung **25 mẫu ECG/100ms** thành struct nhị phân 58-byte, truyền không dây qua **Wi-Fi UDP Socket** nội bộ tới Gateway với độ trễ cực thấp ($< 5\text{ms}$).
+* **Node cảm biến đeo người (Wearable Sensor Node):** Sử dụng chip vi điều khiển **ESP32-C3 SuperMini (RISC-V 80MHz tối ưu năng lượng)** nhỏ gọn đeo trên ngực người cao tuổi, lấy mẫu điện tim ECG **250 Hz (chu kỳ 4ms)** qua cảm biến sinh học **AD8232**, đọc gia tốc 3 trục từ **MPU-6050** để tính vector gia tốc toàn phần $SMV = \sqrt{a_x^2 + a_y^2 + a_z^2}$, và theo dõi thân nhiệt qua **DS18B20**.
+* **Đóng gói & Truyền thông không dây:** Dữ liệu được gom theo khung **25 mẫu ECG/100ms** thành struct nhị phân 62-byte (kèm CRC-16-CCITT bảo vệ toàn vẹn), truyền không dây qua **Wi-Fi UDP Socket** nội bộ tới Gateway với độ trễ cực thấp ($< 5\text{ms}$).
 * **Gateway trung tâm (IoT Edge Gateway):** Sử dụng **ESP32 Dev Module (Dual-core Xtensa)** đặt tại nhà, phát mạng SoftAP riêng biệt, chạy thuật toán bóc tách đỉnh R thời gian thực (Edge BPM), hiển thị đa trang trên màn hình **OLED SH1106 1.3"** qua nút nhấn chuyển trang BOOT, còi chíp **Active Buzzer** báo động té ngã và tuột điện cực.
 * **Xử lý tín hiệu chuyên sâu trên MATLAB (BDSP Center):** Thuật toán **Pan-Tompkins** hoàn chỉnh (Lọc dải thông số IIR 5–15Hz $\to$ Đạo hàm $\to$ Bình phương $\to$ Tích phân cửa sổ trượt MWI $\to$ Ngưỡng thích ứng kép với thời gian trơ sinh lý 380ms), bộ lọc trung vị (Median Filter) chống nhiễu co cơ (EMG), phân tích biến thiên nhịp tim HRV (Poincaré Plot, RMSSD, SD1, SD2), mô hình động học té ngã 3 pha và tự động xuất hồ sơ bệnh án chuẩn hóa (`.mat`).
 
@@ -95,7 +95,7 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 |      + AP Mode: BIOMED_GW (Giao tiếp UDP nội bộ 192.168.4.1)                      |
 |      + STA Mode: Đẩy dữ liệu lên Cloud qua wss://mqtt.yourdomain.com/mqtt         |
 |      + Khách thể ngầm: Native esp_mqtt_client FreeRTOS đa luồng                   |
-|    - Giao thức nội bộ: Wi-Fi UDP Socket (Port 4210, 60 bytes/packet)              |
+|    - Giao thức nội bộ: Wi-Fi UDP Socket (Port 4210, 62 bytes/packet)              |
 +===================================================================================+
                                       ▲
                                       │ Gói tin UDP (25 mẫu/packet @ 250Hz)
@@ -149,7 +149,7 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 
 ## 📦 4. CẤU TRÚC GÓI TIN TRUYỀN THÔNG (DATA PACKET FRAME)
 
-Dữ liệu truyền qua Wi-Fi UDP Socket sử dụng cấu trúc `struct` nhị phân packed 60 bytes:
+Dữ liệu truyền qua Wi-Fi UDP Socket sử dụng cấu trúc `struct` nhị phân packed 62 bytes (kèm CRC-16 bảo vệ toàn vẹn y tế):
 
 ```cpp
 typedef struct __attribute__((packed)) struct_message {
@@ -158,7 +158,8 @@ typedef struct __attribute__((packed)) struct_message {
   float smv;                // 4 bytes: Signal Magnitude Vector gia tốc (g)
   uint8_t leadsOff;         // 1 byte: 1 = Hở điện cực | 0 = Bình thường
   uint8_t fallDetected;     // 1 byte: 1 = Phát hiện té ngã | 0 = Bình thường
-} struct_message;           // Tổng kích thước: Đúng 60 bytes
+  uint16_t crc16;           // 2 bytes: CRC-16-CCITT kiểm tra toàn vẹn gói tin
+} struct_message;           // Tổng kích thước: Đúng 62 bytes
 ```
 
 Định dạng bản tin xuất qua cổng Serial cho MATLAB:
@@ -261,7 +262,7 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 | 🛡️ **SECURITY.md** | **Chính sách An toàn** | Khuyến cáo an toàn điện học y sinh IEC 60601-1, cách ly nguồn pin và bảo mật dữ liệu MQTT qua Cloudflare Tunnel. | 👉 **[Xem tài liệu SECURITY.md](SECURITY.md)** |
 | 🤝 **CONTRIBUTING.md** | **Hướng dẫn Đóng góp** | Quy chuẩn đóng gói code Arduino, tiêu chuẩn xử lý tín hiệu MATLAB và quy trình Pull Request. | 👉 **[Xem tài liệu CONTRIBUTING.md](CONTRIBUTING.md)** |
 | 📜 **CODE_OF_CONDUCT.md** | **Quy tắc Ứng xử** | Bộ quy tắc ứng xử chuẩn Contributor Covenant v2.1 cho cộng đồng nghiên cứu khoa học. | 👉 **[Xem tài liệu CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** |
-| 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 58-byte, tự động kết nối lại. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
+| 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 62-byte (CRC-16), hạ xung 80MHz tiết kiệm pin. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
 | 📟 **ESP32 Example** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32%20Example/ESP32%20Example.ino)** |
 | 📊 **MATLAB Scripts** | **Trạm Xử lý Tín hiệu** | Pan-Tompkins thời gian thực với chấm đỏ đỉnh R, bộ lọc trung vị Median, xuất file .MAT và phân tích HRV. | 👉 **[Xem thư mục MATLAB](MATLAB/)** |
 | 🌐 **Web Dashboard** | **Giao diện Theo dõi Realtime** | Màn hình PWA 60 FPS theo dõi điện tim, thân nhiệt, gia tốc va đập SMV & còi hú Web Audio API cho người thân. | 👉 **[Xem Web Dashboard](web/)** |

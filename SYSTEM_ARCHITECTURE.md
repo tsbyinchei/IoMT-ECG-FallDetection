@@ -76,7 +76,7 @@ Kiến trúc phần cứng của hệ thống phân định rõ ràng giữa cá
 - **Trách nhiệm Hệ thống:**
   1. Duy trì bộ định thời chính xác bằng hàm vi giây nội tại (`micros()`) để lấy mẫu ECG cố định tại $250\text{ Hz}$ (sai số $< 5\mu\text{s}$).
   2. Vận hành máy trạng thái bất đồng bộ (Non-blocking State Machine) đọc DS18B20 nhằm loại bỏ hoàn toàn hiện tượng nghẽn CPU $750\text{ ms}$ khi cảm biến chuyển đổi nhiệt độ.
-  3. Gom bộ đệm nhị phân 25 mẫu ECG thành khung truyền dữ liệu cố định **58 bytes** và truyền phát qua giao thức UDP Datagram Socket.
+  3. Gom bộ đệm nhị phân 25 mẫu ECG thành khung truyền dữ liệu cố định **62 bytes** (tích hợp CRC-16-CCITT) và truyền phát qua giao thức UDP Datagram Socket.
 
 #### B. Vi điều khiển Trạm Biên Xử lý: [ESP32 Gateway (Xtensa Dual-Core LX6)](ESP32%20Example/ESP32%20Example.ino)
 - **Kiến trúc Vi xử lý:** 2 nhân xử lý độc lập (Core 0 và Core 1) kiến trúc Tensilica Xtensa LX6 32-bit, xung nhịp $240\text{ MHz}$, tích hợp $520\text{ KB}$ SRAM.
@@ -261,7 +261,7 @@ flowchart TD
 | Phân tầng Giao thức | Giao thức Ứng dụng | Cổng Mạng / Băng tần | Định dạng Dữ liệu | Mục đích Triển khai |
 | :--- | :--- | :--- | :--- | :--- |
 | **Giao diện Ngoại vi** | I2C, 1-Wire, UART | Bus vi mạch trên bo | Nhị phân / Thanh ghi số | Giao tiếp phần cứng cảm biến MPU-6050, OLED, DS18B20 và cổng Serial MATLAB. |
-| **Tầng Vận chuyển** | **UDP (Datagram Socket)** | Cổng 4210 | Cấu trúc nhị phân 58 bytes | Truyền luồng mẫu sinh hiệu thô tốc độ cao giữa Node C3 và Gateway. |
+| **Tầng Vận chuyển** | **UDP (Datagram Socket)** | Cổng 4210 | Cấu trúc nhị phân 62 bytes (+CRC16) | Truyền luồng mẫu sinh hiệu thô tốc độ cao giữa Node C3 và Gateway. |
 | **Tầng Vận chuyển** | **TCP (Stream Socket)** | Cổng 443 | Byte stream | Đảm bảo tính toàn vẹn của kết nối WSS từ Gateway lên Cloud Broker. |
 | **Tầng Bảo mật** | **TLS 1.3 / mbedTLS** | Cổng 443 | Mã hóa khóa công khai & đối xứng | Bảo vệ an toàn dữ liệu y tế, chứng thực danh tính máy chủ qua chứng chỉ Let's Encrypt. |
 | **Tầng Ứng dụng** | **MQTT v3.1.1 over WSS** | URI: `/mqtt` | Chuỗi JSON định dạng chuẩn | Đóng gói sinh hiệu y tế (ECG, HR, Temp, SMV) và điều khiển Gateway từ xa. |
@@ -424,10 +424,10 @@ flowchart TD
         S1["Cảm biến Điện tim AD8232 (Biopotential Analog Front-End)"]
         S2["Cảm biến Đo Quán tính MPU-6050 (6-DOF Accel / Gyroscope)"]
         S3["Cảm biến Thân nhiệt Kỹ thuật số DS18B20 (1-Wire Bus)"]
-        S4["Vi điều khiển Thu thập Biên ESP32-C3 SuperMini (RISC-V 160MHz)"]
+        S4["Vi điều khiển Thu thập Biên ESP32-C3 SuperMini (RISC-V 80MHz)"]
     end
 
-    L1 -->|"Truyền dữ liệu thô (UDP 58 bytes / 100ms)"| L2
+    L1 -->|"Truyền dữ liệu thô (UDP 62 bytes / 100ms kèm CRC-16)"| L2
     L2 -->|"Chuyển tiếp gói tin số hóa"| L3
     L3 -->|"Phân phối dữ liệu sinh hiệu sạch & Cảnh báo"| L4
 ```

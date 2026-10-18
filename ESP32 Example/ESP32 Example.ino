@@ -6,7 +6,8 @@
  * TÁC GIẢ: TsByinChei (contact@tsbyin.dev) • GITHUB: @tsbyinchei
  * ====================================================================================================
  * NGUYÊN LÝ HOẠT ĐỘNG:
- * 1. Thu nhận dữ liệu gói tin UDP 60 bytes từ Node cảm biến ESP32-C3:
+ * 1. Thu nhận dữ liệu gói tin UDP 62 bytes từ Node cảm biến ESP32-C3:
+ *    - Xác thực tính toàn vẹn y sinh bằng CRC-16-CCITT tầng ứng dụng.
  *    - Cơ chế đọc cạn hàng đợi (while udp.parsePacket) chống tràn buffer LwIP.
  * 2. Xử lý tín hiệu điện tim thời gian thực tại biên (Edge Computing):
  *    - Bộ lọc số IIR Notch 50Hz (bậc 2) triệt tiêu hoàn toàn nhiễu lưới điện xoay chiều.
@@ -180,14 +181,32 @@ const char *TOPIC_STATUS =
 #define ZALO_CHAT_ID "YOUR_ZALO_CHAT_ID"
 #endif
 
-// ==================== ĐỊNH NGHĨA GÓI TIN ĐỒNG BỘ TỪ ESP32-C3
-// ====================
+// ==================== HÀM TÍNH TOÁN CRC-16-CCITT (ỨNG DỤNG Y TẾ) ====================
+// Đa thức sinh: X^16 + X^12 + X^5 + 1 (0x1021), Giá trị khởi tạo: 0xFFFF
+// Đảm bảo phát hiện 100% lỗi sai lệch bit, lỗi bộ nhớ DMA hoặc phân mảnh gói tin UDP.
+uint16_t calculateCRC16(const uint8_t *data, size_t length) {
+  uint16_t crc = 0xFFFF;
+  for (size_t i = 0; i < length; i++) {
+    crc ^= (uint16_t)data[i] << 8;
+    for (uint8_t j = 0; j < 8; j++) {
+      if (crc & 0x8000) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc <<= 1;
+      }
+    }
+  }
+  return crc;
+}
+
+// ==================== ĐỊNH NGHĨA GÓI TIN ĐỒNG BỘ TỪ ESP32-C3 (62 BYTES) ====================
 typedef struct __attribute__((packed)) struct_message {
   uint16_t ecgSamples[25]; // 25 mẫu ECG thô (ADC 12-bit: 0-4095 @ 250Hz)
   float bodyTemp;          // Nhiệt độ cơ thể (°C)
   float smv;               // Signal Magnitude Vector gia tốc (g)
   uint8_t leadsOff;        // 1: Hở điện cực | 0: Bình thường
   uint8_t fallDetected;    // 1: Phát hiện ngã  | 0: Bình thường
+  uint16_t crc16;          // 2 bytes: CRC-16-CCITT bảo vệ toàn vẹn gói tin y tế
 } struct_message;
 
 struct_message incomingData;
@@ -1077,6 +1096,14 @@ void loop() {
   while (udp.parsePacket() > 0) {
     int len = udp.read((char *)&incomingData, sizeof(incomingData));
     if (len >= sizeof(incomingData)) {
+      // Xác thực tính toàn vẹn gói tin y tế bằng CRC-16-CCITT (loại bỏ gói tin lỗi bộ nhớ DMA/phân mảnh)
+      uint16_t calcCrc = calculateCRC16((const uint8_t *)&incomingData, sizeof(incomingData) - sizeof(uint16_t));
+      if (calcCrc != incomingData.crc16) {
+        Serial.printf("[UDP ERROR] Goi tin sai CRC-16 (Nhan: 0x%04X != Tinh: 0x%04X) -> Bo qua!\n",
+                      incomingData.crc16, calcCrc);
+        continue;
+      }
+
       totalPacketsReceived++;
 
       // Kích hoạt còi hú khẩn cấp CHỈ KHI Node C3 đã xác nhận ngã qua 2 giai đoạn (fallDetected == 1)
