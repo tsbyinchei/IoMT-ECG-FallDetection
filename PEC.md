@@ -25,19 +25,20 @@
 
 | Tham số kỹ thuật | Yêu cầu thiết kế | Cấu hình định mức / Giải pháp | Tiêu chuẩn áp dụng |
 | :--- | :--- | :--- | :--- |
-| **Vi điều khiển Node** | Gọn nhẹ, hỗ trợ Wi-Fi & Timer phần cứng | ESP32-C3 SuperMini (RISC-V 160MHz) | Chuẩn nhúng IoT |
+| **Vi điều khiển Node** | Gọn nhẹ, hỗ trợ Wi-Fi & Timer phần cứng | ESP32-C3 SuperMini (RISC-V 160MHz / 80MHz) | Chuẩn nhúng IoT |
 | **Vi điều khiển Gateway** | Đa nhân, xử lý song song SoftAP & MQTT | ESP32-WROOM-32 (Dual-core 240MHz) | FreeRTOS đa luồng |
-| **Tần số lấy mẫu ECG ($F_s$)** | $250\text{ Hz}$ ($4.0\text{ ms}$/mẫu) | Định thời Hardware Timer ngắt $4.0\text{ms}$ | ANSI/AAMI EC13 |
-| **Độ phân giải ADC** | $\ge 10\text{-bit}$ | $12\text{-bit}$ (0 – 4095 mức lượng tử) | ADC SAR nội chip |
+| **Tần số lấy mẫu ECG ($F_s$)** | $250\text{ Hz}$ ($4.0\text{ ms}$/mẫu) | Định thời vi sai `micros()` chính xác cao | ANSI/AAMI EC13 |
+| **Độ phân giải ADC** | $\ge 10\text{-bit}$ | $12\text{-bit}$ (0 – 4095 mức lượng tử) | ADC SAR nội chip (ADC1) |
 | **Dải điện áp sinh lý** | $0\text{V} - 3.3\text{V}$ ($V_{REF} \approx 1.65\text{V}$) | Mạch tiền khuếch đại vi sai AD8232 | Chuẩn Analog Front-End |
 | **Băng thông lọc số ECG** | $5\text{ Hz} - 15\text{ Hz}$ (Bandpass) | Lọc IIR Butterworth dải thông bậc 2 | Khử trôi đường đẳng điện |
 | **Thời gian trơ sinh lý** | $300\text{ms} - 400\text{ms}$ | $380\text{ms}$ (95 mẫu @ 250Hz) | Chuẩn Pan-Tompkins 1985 |
-| **Dải đo gia tốc MPU-6050** | $\pm 2g$ hoặc $\pm 4g$ | Cấu hình dải $\pm 2g$ (Độ nhạy 16384 LSB/g) | Giao tiếp I2C 100kHz |
-| **Tần số quét MPU-6050** | $\ge 50\text{ Hz}$ ($20\text{ ms}$) | Lấy mẫu đồng bộ mỗi 5 chu kỳ ECG | Nhận diện xung va đập |
-| **Ngưỡng cảnh báo té ngã** | $2.0g - 3.0g$ | Ngưỡng kích hoạt $SMV \ge 2.5g$ | Động lực học rơi tự do |
-| **Thời gian chốt cảnh báo ngã** | $\ge 2.0\text{ giây}$ | Cửa sổ kiểm định bất động $2.0\text{ giây}$ | Chống báo động giả |
-| **Dải đo thân nhiệt DS18B20** | $+15^\circ\text{C}$ đến $+50^\circ\text{C}$ | Cảm biến kỹ thuật số phân giải 12-bit | Giao thức 1-Wire |
-| **Kích thước khung gói tin UDP** | $\le 100\text{ bytes}$ | Khung nhị phân Packed Struct 60 bytes | Tối ưu hóa băng thông |
+| **Dải đo gia tốc MPU-6050** | $\pm 8g$ (bắt trọn xung va đập) | Cấu hình AFS_SEL = 2 ($\pm 8g$, 4096 LSB/g) | Giao tiếp I2C 400kHz |
+| **Tần số quét MPU-6050** | $\ge 100\text{ Hz}$ | $125\text{ Hz}$ ($8.0\text{ ms}$, đồng bộ 2 mẫu ECG) | Bắt trọn xung lực tiếp đất |
+| **Thuật toán nhận diện ngã** | Kiểm định 2 giai đoạn (2-Stage Verification) | Giai đoạn 1: $SMV \ge 2.8g$<br/>Giai đoạn 2: $Tilt \ge 40^\circ$ & $Gyro < 45^\circ/\text{s}$ | Chống báo động giả ADL |
+| **Thời gian thẩm định ngã** | $2.0\text{s} - 3.0\text{s}$ | Cửa sổ phân tích bất động $2.5\text{ giây}$ | Động lực học ngã người già |
+| **Dải đo thân nhiệt DS18B20** | $+15^\circ\text{C}$ đến $+50^\circ\text{C}$ | Cảm biến kỹ thuật số 12-bit (FSM 800ms non-blocking) | Giao thức 1-Wire (CRC8) |
+| **Khung gói tin UDP (Cơ bản)** | $\le 100\text{ bytes}$ | Khung nhị phân Packed Struct 60 bytes | Tối ưu hóa băng thông |
+| **Khung gói tin UDP (Mở rộng)**| Toàn vẹn tầng ứng dụng (End-to-End) | Khung nhị phân Packed Struct 62 bytes (+CRC-16) | IEC 62304 / ISO 13485 |
 | **Độ trễ truyền dẫn nội bộ** | $< 10\text{ ms}$ | Wi-Fi UDP Socket điểm-điểm | Thời gian thực (< 5ms) |
 
 ---
@@ -50,7 +51,7 @@
   * Node C3 IP: `192.168.4.2`
   * Subnet Mask: `255.255.255.0`
   * Cổng UDP Port: `4210`
-* **Cấu trúc nhị phân (Binary Packed Struct):**
+* **Cấu trúc gói tin nhị phân chuẩn định mức (60 Bytes):**
 
 | Trường dữ liệu | Kiểu dữ liệu | Kích thước | Mô tả |
 | :--- | :--- | :--- | :--- |
@@ -60,6 +61,19 @@
 | `leadsOff` | `uint8_t` | 1 Byte | $0$: Tiếp xúc tốt \| $1$: Hở/tuột điện cực |
 | `fallDetected` | `uint8_t` | 1 Byte | $0$: Bình thường \| $1$: Cảnh báo ngã |
 | **TỔNG CỘNG** | | **60 Bytes** | Truyền nguyên khối bằng `udp.write()` |
+
+* **Cấu trúc gói tin mở rộng chuẩn y tế (62 Bytes - Tích hợp CRC-16):**
+  Bổ sung trường `crc16` (2 bytes, đa thức CRC-16-CCITT `0x1021`) vào cuối struct để thực hiện **End-to-End Application Integrity Check** theo tiêu chuẩn thiết bị y tế IEC 62304:
+
+| Trường dữ liệu | Kiểu dữ liệu | Kích thước | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `ecgSamples[25]` | `uint16_t` | 50 Bytes | 25 mẫu ECG 12-bit liên tiếp ($100\text{ms}$) |
+| `bodyTemp` | `float` | 4 Bytes | Thân nhiệt bề mặt cơ thể (°C) |
+| `smv` | `float` | 4 Bytes | Vector gia tốc toàn phần cực đại ($g$) |
+| `leadsOff` | `uint8_t` | 1 Byte | Trạng thái tuột điện cực Smart Leads-off |
+| `fallDetected` | `uint8_t` | 1 Byte | Cờ xác nhận té ngã 2 giai đoạn |
+| `crc16` | `uint16_t` | 2 Bytes | Mã kiểm tra toàn vẹn CRC-16 (Đa thức 0x1021) |
+| **TỔNG CỘNG** | | **62 Bytes** | Chuẩn hóa toàn vẹn cấu trúc bộ nhớ |
 
 ### 3.2. Giao thức Tầng 2: USB Serial Streaming (Gateway $\to$ MATLAB)
 * **Baudrate:** `115200 bps`, 8-N-1.
@@ -120,16 +134,26 @@
 
 ## 🔋 5. PHÂN TÍCH NĂNG LƯỢNG & DỰ TOÁN PIN (POWER BUDGET)
 
-* **Điện áp hoạt động:** $3.3\text{V}$ (hoặc Pin LiPo 1S $3.7\text{V} - 4.2\text{V}$ qua mạch hạ áp LDO).
-* **Dòng điện tiêu thụ trung bình:**
-  * ESP32-C3 (Bật Wi-Fi phát UDP liên tục): $\approx 85\text{mA}$.
-  * MPU-6050 (Chế độ đo gia tốc liên tục): $\approx 3.8\text{mA}$.
-  * AD8232 (IC khuếch đại sinh học): $\approx 0.17\text{mA}$.
-  * DS18B20 (Chuyển đổi nhiệt độ 12-bit): $\approx 1.0\text{mA}$.
-  * **Tổng dòng điện tiêu thụ Node C3:** $\approx 90\text{mA} - 100\text{mA}$.
-* **Dự toán thời lượng pin:**
-  * Sử dụng pin sạc Li-Po dung lượng $1000\text{mAh}$: Thiết bị hoạt động liên tục **$10 - 11\text{ giờ}$** trước khi cần sạc lại.
-  * Nếu áp dụng cơ chế Modem Sleep / DTIM giữa các chu kỳ bắn UDP: Thời lượng pin có thể nâng lên $> 24\text{ giờ}$.
+### 5.1. Bảng Dòng Điện Tiêu Thụ Từng Khối Phần Cứng
+* **Điện áp danh định:** $3.3\text{V}$ (hoặc Pin Li-Po 1S $3.7\text{V} - 4.2\text{V}$ qua IC ổn áp LDO ME6211 dung sai thấp).
+* **Chi tiết tiêu thụ dòng điện thành phần (Node C3):**
+  * MPU-6050 (Chế độ đo gia tốc liên tục $125\text{ Hz}$): $\approx 3.8\text{ mA}$.
+  * AD8232 (IC khuếch đại điện sinh học AFE): $\approx 0.17\text{ mA}$.
+  * DS18B20 (Chuyển đổi nhiệt độ định kỳ, FSM non-blocking): $\approx 1.0\text{ mA}$.
+  * ESP32-C3 (Xung nhịp $160\text{ MHz}$, phát Wi-Fi liên tục $100\text{ ms}$/lần): $\approx 85\text{ mA}$.
+
+### 5.2. So Sánh Thời Lượng Vận Hành Theo 2 Cấu Hình Kỹ Thuật
+
+| Cấu hình kỹ thuật | Xung nhịp CPU | Chế độ Wi-Fi | Dòng TB ($I_{avg}$) | Thời lượng pin Li-Po 1000mAh |
+| :--- | :---: | :---: | :---: | :---: |
+| **Cấu hình 1 (Mặc định)** | $160\text{ MHz}$ | Wi-Fi Active liên tục | $\approx 90\text{ mA}$ | **$8.8 - 10.0\text{ giờ}$** |
+| **Cấu hình 2 (Tối ưu hóa)** | **$80\text{ MHz}$** | **Modem-sleep + Tắt BT** | **$\approx 55\text{ mA}$** | **$\approx 14.5\text{ giờ}$** |
+
+* **Công thức tính thời lượng pin thực tế:**
+  Áp dụng hệ số xả an toàn của pin Li-Po ($k_{safe} = 0.8$ nhằm bảo vệ tế bào pin không bị kiệt dưới ngưỡng $3.2\text{V}$):
+  $$T_{life} = \frac{C_{pin} \times k_{safe}}{I_{avg}} = \frac{1000\text{ mAh} \times 0.8}{55\text{ mA}} \approx 14.55\text{ giờ}$$
+  * **Ý nghĩa thực tiễn:** Thời lượng $14.5\text{ giờ}$ đáp ứng hoàn hảo chu kỳ sinh hoạt trọn vẹn 1 ngày của người cao tuổi (đeo ban ngày từ 6:00 sáng đến 20:30 tối, ban đêm đặt lên dock sạc nam châm).
+  * **Định hướng thế hệ kế tiếp (Next-gen BLE 5.0):** Để nâng tuổi thọ pin lên nhiều ngày ($> 3 - 5\text{ ngày}$), hệ thống cần chuyển tầng vật lý từ Wi-Fi sang **Bluetooth Low Energy (BLE 5.0 Coded PHY)** với mức tiêu thụ trung bình chỉ $5 - 8\text{ mA}$.
 
 ---
 
@@ -139,10 +163,10 @@
 
 | Hạng mục kiểm thử | Tiêu chí nghiệm thu kỹ thuật | Phương pháp kiểm tra |
 | :--- | :--- | :--- |
-| **Độ ổn định chu kỳ lấy mẫu** | Tần số lấy mẫu ECG đạt $250\text{ Hz} \pm 1\%$ (chu kỳ $4.0\text{ ms}$) | Đo kiểm xung nhịp Hardware Timer qua ngắt nội |
-| **Hiệu năng bóc tách đỉnh R** | Thuật toán Pan-Tompkins nhận diện chính xác đỉnh R, không đếm lặp sóng T | Đối chiếu biểu đồ nhãn đỉnh R trên MATLAB |
-| **Kiểm định lọc nhiễu ECG** | Triệt tiêu hoàn toàn trôi baseline do hô hấp và nhiễu xoay chiều 50Hz | Phân tích mật độ phổ công suất PSD Welch |
-| **Độ nhạy phát hiện té ngã** | Kích hoạt cảnh báo khi $SMV \ge 2.5g$ và giữ trạng thái bất động sau va đập | Thử nghiệm các kịch bản va chạm mô phỏng |
-| **Khả năng chống báo động giả** | Tự động hủy cảnh báo nếu người dùng đứng dậy vận động bình thường trong vòng 2s | Kiểm tra góc nghiêng thân $Tilt$ và vận tốc góc $Gyro$ |
+| **Độ ổn định chu kỳ lấy mẫu** | Tần số lấy mẫu ECG đạt $250\text{ Hz} \pm 1\%$ (chu kỳ $4.0\text{ ms}$) | Đo kiểm định thời vi sai `micros()` qua Serial Monitor |
+| **Hiệu năng bóc tách đỉnh R** | Thuật toán Pan-Tompkins nhận diện chính xác đỉnh R, không đếm lặp sóng T | Đối chiếu biểu đồ nhãn đỉnh R trên MATLAB và OLED |
+| **Kiểm định lọc nhiễu ECG** | Triệt tiêu hoàn toàn trôi baseline do hô hấp và nhiễu xoay chiều 50Hz | Phân tích bộ lọc số IIR Biquad Notch 50Hz + Bandpass |
+| **Độ nhạy phát hiện té ngã** | Kích hoạt cảnh báo khi $SMV \ge 2.8g$ và góc nghiêng nằm sàn $Tilt \ge 40^\circ$ | Thử nghiệm mô phỏng va chạm và kiểm tra chốt 2.5s |
+| **Khả năng chống báo động giả** | Tự động hủy cảnh báo nếu người dùng cử động bình thường ($Gyro \ge 45^\circ/\text{s}$) | Kiểm tra ngưỡng triệt tiêu báo động giả ADL |
 | **Độ trễ kênh cảnh báo khẩn** | Tin nhắn khẩn cấp gửi đến Telegram Bot & Zalo Bot trong vòng $< 1.0\text{s}$ | Ghi log thời gian gửi HTTP POST trên Gateway |
-| **Độ tin cậy truyền nhận UDP** | Tỷ lệ mất gói tin nội bộ $< 0.5\%$ trong phạm vi không gian sinh hoạt gia đình | Đối chiếu số thứ tự gói tin giữa Node và Gateway |
+| **Độ tin cậy truyền nhận UDP** | Hàng đợi LwIP được rút cạn liên tục, tỷ lệ mất gói tin $< 0.5\%$ | Vòng lặp `while (udp.parsePacket() > 0)` trên Gateway |

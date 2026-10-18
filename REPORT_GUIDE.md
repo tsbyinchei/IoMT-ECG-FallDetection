@@ -104,12 +104,27 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
 ---
 
 ### CHƯƠNG 6: KẾT LUẬN & HƯỚNG PHÁT TRIỂN (1–2 trang)
-6.1. Những kết quả đã đạt được của đề tài.  
-6.2. Hạn chế còn tồn tại (vấn đề nhiễu khi vận động mạnh, kích thước breadboard).  
-6.3. Hướng phát triển trong tương lai:
-   - Đóng gói mạch in PCB 2 lớp nhỏ gọn dạng hộp đồng hồ đeo ngực.
-   - Ứng dụng mô hình học sâu (TinyML / CNN 1D) nhận diện loạn nhịp tim (Arrhythmia classification) trực tiếp trên ESP32.
-   - Kết nối cơ sở dữ liệu bệnh viện đám mây (HL7/FHIR Standard).
+6.1. Những kết quả đã đạt được của đề tài:
+   - Hiện thực hóa thành công chuỗi thu nhận tín hiệu y sinh đa kênh (ECG $250\text{ Hz}$, Thân nhiệt $1\text{s}$, Gia tốc $125\text{ Hz}$) với độ trễ truyền dẫn nội vi $< 5\text{ ms}$.
+   - Triển khai thuật toán xử lý tín hiệu tại biên (Edge DSP): Lọc nhiễu IIR Notch 50Hz, Pan-Tompkins bóc tách đỉnh R tính nhịp tim thời gian thực và thuật toán kiểm định té ngã 2 giai đoạn (SMV $\ge 2.8g$ kết hợp $Tilt \ge 40^\circ$ và $Gyro < 45^\circ/\text{s}$).
+   - Xây dựng hệ sinh thái giám sát đám mây bảo mật: MQTT WSS TLS 1.3 qua Cloudflare Zero Trust Tunnel, Web Dashboard PWA Canvas 60 FPS và cảnh báo khẩn cấp tức thời qua Telegram Bot & Zalo API.
+
+6.2. Hạn chế còn tồn tại:
+   - Nhiễu rung cơ (EMG Artifacts) và dịch chuyển điện cực khi người bệnh vận động mạnh hoặc thay đổi tư thế đột ngột.
+   - Thiết bị hiện tại mới dừng ở mức mô hình thực nghiệm trên Breadboard và Kit phát triển, kích thước chưa tối ưu cho việc đeo liên tục 24/7.
+
+6.3. Hướng phát triển trong tương lai (Future Technical Roadmap):
+   - **Tối ưu Hóa Năng lượng & Kéo dài Tuổi thọ Pin Node đeo:**
+     - Áp dụng kỹ thuật hạ xung nhịp CPU động (Dynamic Frequency Scaling) xuống $80\text{ MHz}$ kết hợp chế độ Wi-Fi Modem-sleep và tắt Bluetooth nội vi, giúp pin Li-Po $1000\text{ mAh}$ đạt thời gian vận hành liên tục $\approx 14.5\text{ giờ}$ (đáp ứng chu kỳ 1 ngày sinh hoạt ban ngày, sạc đêm).
+     - Định hướng thế hệ tiếp theo: Chuyển đổi tầng vật lý vô tuyến từ Wi-Fi sang **Bluetooth Low Energy (BLE 5.0 Coded PHY)** với mức tiêu thụ dòng cực thấp ($5 - 8\text{ mA}$) để nâng tuổi thọ pin lên $> 3 - 5\text{ ngày}$ liên tục.
+   - **Đảm bảo Toàn vẹn Dữ liệu Tầng Ứng dụng (Application-Layer CRC-16):**
+     - Nâng cấp cấu trúc khung nhị phân từ 60 bytes lên 62 bytes, tích hợp trường mã kiểm tra **CRC-16-CCITT (Đa thức 0x1021)** ở cuối gói tin nhằm tuân thủ tiêu chuẩn phần mềm thiết bị y tế **IEC 62304 / ISO 13485**, loại bỏ triệt để nguy cơ sai lệch dữ liệu do suy đồi bộ nhớ RAM hoặc xén đệm socket LwIP.
+   - **Cơ sở Dữ liệu Chuỗi Thời gian & Giải pháp Chống Bùng nổ Dữ liệu (TSDB Tiered Storage):**
+     - Giải quyết bài toán lưu trữ dài hạn trước áp lực dữ liệu khổng lồ ($21,600,000\text{ mẫu ECG/ngày/bệnh nhân}$):
+       + **Tầng 1 (Chỉ số tổng hợp):** Lưu trữ nhịp tim (BPM), thân nhiệt và gia tốc SMV định kỳ $5\text{ giây}$/lần vào **InfluxDB v2**, kết xuất biểu đồ xu hướng nhiều tuần/tháng trên **Grafana Dashboard** phục vụ người thân và người giám hộ theo dõi hồi cứu.
+       + **Tầng 2 (Bắt vết biến cố - Event-Triggered Ring Buffer):** Gateway duy trì bộ đệm tròn $15\text{ KB SRAM}$ ($7,500\text{ mẫu} = 30\text{s}$ trước sự cố). Khi phát hiện té ngã hoặc rối loạn nhịp tim (BPM $< 50$ hoặc BPM $> 120$), Gateway ghi tiếp $30\text{s}$ sau sự cố và lưu trữ trọn vẹn dải sóng $60\text{ giây}$ chất lượng cao làm bằng chứng y sinh phục vụ phân tích lâm sàng.
+   - **Trí tuệ Nhân tạo Biên (TinyML):** Nhúng mô hình học sâu 1D-CNN hoặc mạng nơ-ron trọng số thấp trực tiếp lên ESP32 để phân loại tự động các dạng loạn nhịp tim nguy hiểm (Rung nhĩ - AFib, Ngoại tâm thu thất - PVC).
+   - **Đóng gói Cơ khí Y tế:** Thiết kế vỏ bảo vệ in 3D chống nước chuẩn IP67 và mạch in PCB 2 lớp siêu nhỏ gọn dạng hộp đeo ngực (Chest Strap / Wearable Patch).
 
 ---
 

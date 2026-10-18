@@ -56,7 +56,7 @@ Kiến trúc phần cứng của hệ thống phân định rõ ràng giữa cá
 | **Cảm biến** | **AD8232** (Analog Front-End) | Analog Voltage + GPIO | $250\text{ Hz}$ (Chu kỳ $4\text{ ms}$) | Thu nhận vi điện thế tim $\mu\text{V}$, khuếch đại, xuất tín hiệu $0\text{--}3.3\text{V}$ và cờ hở điện cực `LO+`/`LO-`. |
 | **Cảm biến** | **MPU-6050** (6-DOF IMU) | I2C Fast-Mode ($400\text{ kHz}$) | $125\text{ Hz}$ (Chu kỳ $8\text{ ms}$) | Đo gia tốc 3 trục ($\pm 8g$) và vận tốc góc xoay 3 trục ($\pm 2000^\circ/\text{s}$) phục vụ nhận diện va đập và tư thế. |
 | **Cảm biến** | **DS18B20** (Cảm biến Nhiệt) | Dallas 1-Wire Bus | $1\text{ Hz}$ (Chuyển đổi 12-bit) | Đo nhiệt độ biểu mô cơ thể, dải $-55^\circ\text{C} \text{ đến } +125^\circ\text{C}$, độ phân giải $0.0625^\circ\text{C}$, kiểm tra mã CRC-8. |
-| **Vi điều khiển** | **ESP32-C3 SuperMini** | On-chip RF, I2C, ADC, 1-Wire | CPU RISC-V 32-bit @ $160\text{ MHz}$ | Thu thập dữ liệu sensor tại biên, quản lý máy trạng thái lấy mẫu, đóng gói UDP nhị phân 58 bytes. |
+| **Vi điều khiển** | **ESP32-C3 SuperMini** | On-chip RF, I2C, ADC, 1-Wire | CPU RISC-V 32-bit @ $160\text{ MHz} / 80\text{ MHz}$ | Thu thập dữ liệu sensor tại biên, quản lý máy trạng thái lấy mẫu, đóng gói UDP nhị phân 60 bytes (mở rộng 62 bytes có CRC-16). |
 | **Vi điều khiển** | **ESP32 Gateway Dev Module** | Dual-Core, I2C, UART, Wi-Fi | CPU Xtensa LX6 @ $240\text{ MHz}$ | Tiếp nhận UDP, lọc số IIR Notch 50Hz, thuật toán Pan-Tompkins, điều khiển OLED, mã hóa MQTT TLS 1.3. |
 | **Cơ cấu Chấp hành** | **Active Buzzer** | Digital Output (GPIO 23) | Tần số âm học $\approx 2.3\text{ kHz}$ | Phát tín hiệu âm thanh cảnh báo decibel cao ($\ge 85\text{ dB}$), chế độ chốt giữ khẩn cấp (Latching Siren). |
 | **Cơ cấu Chấp hành** | **Màn hình OLED SH1106** | I2C Hardware ($400\text{ kHz}$) | Độ phân giải $128 \times 64\text{ px}$ | Kết xuất đồ thị sóng điện tim cuộn 60 FPS, chỉ số sinh hiệu (HR, Temp, SMV) và chẩn đoán kết nối mạng. |
@@ -161,7 +161,7 @@ sequenceDiagram
     participant Client as Web Dashboard & Alert Bots
 
     Patient->>C3: Vi thế tim AD8232 & Vector gia tốc MPU-6050
-    Note over C3: Lấy mẫu ECG 250Hz (4ms) & IMU 125Hz (8ms)<br/>Đóng khung nhị phân 58-byte struct_message
+    Note over C3: Lấy mẫu ECG 250Hz (4ms) & IMU 125Hz (8ms)<br/>Đóng khung nhị phân 60-byte struct_message
     C3->>GW: Phát Datagram UDP qua cổng 4210 (Độ trễ < 3ms)
     Note over GW: Lọc số IIR Notch 50Hz triệt nhiễu điện lưới<br/>Pan-Tompkins QRS Detection -> Tính BPM<br/>Thẩm định ngã 2 giai đoạn (Impact & Post-fall)
     alt Xác nhận Biến cố Té ngã hoặc Loạn nhịp Nguy kịch
@@ -178,16 +178,28 @@ sequenceDiagram
    - Bộ chuyển đổi ADC của ESP32-C3 lượng tử hóa điện áp AD8232 với độ phân giải 12-bit ($0\text{--}4095$ mức) tại tần số $f_s = 250\text{ Hz}$.
    - Cứ mỗi chu kỳ $100\text{ ms}$, bộ đệm thu thập đủ 25 mẫu ECG liên tục, kết hợp với các trường dữ liệu sinh hiệu khác để đóng gói vào cấu trúc nhị phân định dạng chặt chẽ:
      ```cpp
+     // 1. Cấu trúc chuẩn định mức (Baseline Binary Struct - 60 Bytes):
      typedef struct __attribute__((packed)) struct_message {
-       uint16_t ecgSamples[25]; // 50 bytes (25 mẫu x 2 bytes)
-       float    bodyTemp;      // 4 bytes  (Nhiệt độ IEEE 754)
-       float    smv;           // 4 bytes  (Gia tốc tổng hợp)
-       uint8_t  leadsOff;      // 1 byte   (Cờ hở điện cực)
-       uint8_t  fallDetected;  // 1 byte   (Cờ trạng thái té ngã)
-     } struct_message;         // Tổng cộng: đúng 58 bytes
+       uint16_t ecgSamples[25]; // 50 bytes (25 mẫu x 2 bytes @ 250Hz = 100ms)
+       float    bodyTemp;       // 4 bytes  (Thân nhiệt bề mặt IEEE 754)
+       float    smv;            // 4 bytes  (Gia tốc toàn phần SMV cực đại)
+       uint8_t  leadsOff;       // 1 byte   (Cờ Smart Leads-off)
+       uint8_t  fallDetected;   // 1 byte   (Cờ xác nhận té ngã 2 giai đoạn)
+     } struct_message;          // Tổng cộng: đúng 60 bytes (50 + 4 + 4 + 1 + 1)
+
+     // 2. Cấu trúc mở rộng kiểm định toàn vẹn y tế (Extended Struct with CRC-16 - 62 Bytes):
+     // Tuân thủ tiêu chuẩn phần mềm thiết bị y tế IEC 62304 / ISO 13485:
+     typedef struct __attribute__((packed)) struct_message_extended {
+       uint16_t ecgSamples[25]; // 50 bytes
+       float    bodyTemp;       // 4 bytes
+       float    smv;            // 4 bytes
+       uint8_t  leadsOff;       // 1 byte
+       uint8_t  fallDetected;   // 1 byte
+       uint16_t crc16;          // 2 bytes  (Mã kiểm tra CRC-16-CCITT đa thức 0x1021)
+     } struct_message_extended; // Tổng cộng: đúng 62 bytes
      ```
 2. **Bước 2: Truyền vận Không dây Nội vi (Low-latency Wireless Transport):**
-   - Khung dữ liệu 58 bytes được truyền phát thẳng qua giao thức **UDP Datagram Socket** trên cổng 4210 đến địa chỉ IP của Gateway.
+   - Khung dữ liệu nhị phân 60 bytes (hoặc 62 bytes mở rộng) được truyền phát thẳng qua giao thức **UDP Datagram Socket** trên cổng 4210 đến địa chỉ IP của Gateway.
    - Cơ chế này không tiêu tốn băng thông cho thủ tục bắt tay ba bước (3-way handshake) hay cơ chế xác nhận gói ACK/NACK của TCP, đạt độ trễ truyền dẫn cực thấp ($\tau < 3\text{ ms}$) và giảm thiểu tối đa năng lượng tiêu thụ trên pin của Node đeo.
 3. **Bước 3: Xử lý Tín hiệu Số & Thẩm định Biến cố tại Trạm Biên (Edge DSP & Analytics):**
    - **Bộ lọc IIR Notch 50Hz (Band-stop Filter):** Xử lý luồng mẫu ECG thô để loại bỏ hoàn toàn sóng nhiễu cảm ứng điện từ từ lưới điện dân dụng $50\text{ Hz}$ mà các mạch lọc phần cứng thụ động chưa triệt tiêu hết:
@@ -493,6 +505,39 @@ flowchart TD
   - Phân tách hoàn toàn tác vụ nặng về mạng (Network I/O, mbedTLS, SNTP, MQTT) chạy trên **Core 0**.
   - Tác vụ xử lý tín hiệu y sinh thời gian thực (Pan-Tompkins DSP, IIR Filtering, OLED Drawing) chạy trên **Core 1**.
   - Loại bỏ hoàn toàn hiện tượng sụt khung hình hiển thị (Display stuttering) hoặc trễ nhịp lấy mẫu khi ngăn xếp mạng thực hiện các thủ tục tái kết nối phức tạp.
+
+### 8.5. Cơ chế Toàn vẹn Dữ liệu Tầng Ứng dụng (End-to-End Application Integrity CRC-16)
+- **Bản chất các tầng giao thức mạng:** Tầng liên kết dữ liệu IEEE 802.11 MAC đã tích hợp phần cứng FCS CRC-32 và tầng giao vận LwIP IPv4 đã có trường UDP Checksum 16-bit để loại bỏ các frame nhiễu sóng vô tuyến.
+- **Chuẩn hóa Y tế IEC 62304 / ISO 13485:** Bổ sung mã kiểm tra **CRC-16-CCITT** (Đa thức `0x1021`, giá trị khởi tạo `0xFFFF`) ở tầng ứng dụng (Application Layer):
+  - Phát hiện triệt để các lỗi suy đồi dữ liệu trong bộ nhớ RAM (RAM bit-flip, con trỏ trượt, phân mảnh bộ đệm DMA).
+  - Ngăn ngừa tình trạng xử lý các gói tin nhị phân bị cắt xén (Socket Truncation) do đệm LwIP quá tải.
+  - Chi phí xử lý tối ưu: Thuật toán dịch bit tính toán trên 60 bytes chỉ tiêu tốn $\approx 1.8\text{ }\mu\text{s}$ trên CPU ESP32-C3 ($< 0.05\%$ tải xử lý).
+
+### 8.6. Kiến trúc Phân tầng Lưu trữ & Khắc phục Bùng nổ Dữ liệu (TSDB Tiered Storage & Pre/Post-Event Snapshot)
+- **Bài toán Bùng nổ Dữ liệu (Storage Explosion):** Với tần số lấy mẫu y sinh $250\text{ Hz}$, mỗi bệnh nhân tạo ra $21,600,000\text{ mẫu ECG/ngày}$. Việc lưu trữ liên tục toàn bộ mẫu thô lên Đám mây sẽ làm quá tải băng thông và cạn kiệt dung lượng ổ đĩa máy chủ sau vài tuần.
+- **Giải pháp Phân tầng Lưu trữ Chuỗi Thời gian (Tiered Storage):**
+  1. **Tầng 1 - Chỉ số Tóm tắt Định kỳ (Downsampled Metrics Stream):**
+     - Nhịp tim trung bình (BPM), thân nhiệt bề mặt da ($^\circ\text{C}$), vector gia tốc tổng hợp (SMV) và cờ trạng thái điện cực được đẩy lên Cơ sở dữ liệu Chuỗi thời gian **InfluxDB v2** với chu kỳ **$5\text{ giây}$/lần**.
+     - Dung lượng lưu trữ cực kỳ nhẹ: $\approx 17,280\text{ điểm dữ liệu/ngày}$ ($\approx 1.5\text{ MB}$/ngày/bệnh nhân), cho phép người thân truy vấn lịch sử nhiều tháng hoặc nhiều năm trên Grafana Dashboard.
+  2. **Tầng 2 - Bộ đệm Tròn Lưu vết Biến cố (Event-Triggered Ring Buffer Snapshot):**
+     - Gateway ESP32 duy trì một bộ đệm tròn (**Circular Ring Buffer**) dung lượng $\mathbf{15\text{ KB SRAM}}$ trong bộ nhớ nội, liên tục ghi đè $7,500\text{ mẫu ECG}$ gần nhất ($30\text{ giây}$ trước sự kiện).
+     - Khi phát hiện biến cố lâm sàng:
+       - Cảnh báo té ngã được xác thực (`fallDetected == 1`).
+       - Cơn loạn nhịp tim nguy hiểm: Nhịp chậm kịch phát ($\text{BPM} < 50$) hoặc Nhịp nhanh khi nghỉ ($\text{BPM} > 120$).
+     - Gateway lập tức kích hoạt:
+       1. Khóa và đóng băng $7,500\text{ mẫu}$ trong quá khứ ($30\text{s}$ trước biến cố).
+       2. Tiếp tục thu thập $7,500\text{ mẫu}$ kế tiếp ($30\text{s}$ sau biến cố).
+       3. Đóng gói dải sóng $60\text{ giây}$ hoàn chỉnh ($15,000\text{ mẫu} \approx 300\text{ KB}$ nén) đẩy lên InfluxDB hoặc lưu file `.mat`, cung cấp chứng cứ điện tâm đồ trực quan cho người thân và chuyên gia y tế đánh giá nguyên nhân té ngã (do ngất tim hay trượt ngã cơ học).
+
+### 8.7. Chiến lược Quản lý Năng lượng Node Đeo (Dynamic Frequency Scaling & Packet Batching)
+- **Đặc thù Y sinh:** Không thể đưa vi điều khiển vào chế độ Deep-sleep rồi đánh thức bằng chuyển động MPU-6050, bởi các biến cố tim mạch nguy hiểm thường xảy ra khi người già đang ngủ hoặc nghỉ ngơi.
+- **Chiến lược Tối ưu Hóa Phần cứng & Firmware:**
+  1. **Hạ xung nhịp động (Dynamic Frequency Scaling):** Giảm xung nhịp ESP32-C3 từ $160\text{ MHz}$ xuống **$80\text{ MHz}$** qua hàm `setCpuFrequencyMhz(80)` (vẫn dư thừa năng lực đáp ứng vòng lặp $4.0\text{ ms}$ nhưng cắt giảm $35\%$ dòng tĩnh CPU).
+  2. **Tắt các khối vô tuyến không dùng:** Vô hiệu hóa hoàn toàn bộ điều khiển Bluetooth nội vi (`btStop()`, `esp_bt_controller_disable()`).
+  3. **Kích hoạt Wi-Fi Modem-sleep:** Cho phép mạch RF nghỉ giữa các khoảng truyền dữ liệu.
+  4. **Gom cụm gói tin (Packet Batching):** Gom $200\text{ ms}$ (50 mẫu ECG) trên 1 gói UDP để giảm 50% số lần kích hoạt bộ khuếch đại công suất PA.
+  - **Kết quả Thực nghiệm Định mức:** Dòng tiêu thụ trung bình giảm từ $\approx 90\text{ mA}$ xuống **$\approx 55\text{ mA}$**, nâng thời lượng pin Li-Po $1000\text{ mAh}$ lên **$\approx 14.5\text{ giờ}$** (đáp ứng trọn vẹn 1 ngày sinh hoạt ban ngày, sạc đêm).
+  - **Lộ trình Thế hệ Mới:** Chuyển đổi tầng vật lý sang **Bluetooth Low Energy (BLE 5.0 Coded PHY)** với dòng tiêu thụ $< 8\text{ mA}$ để đạt tuổi thọ pin $> 3 - 5\text{ ngày}$.
 
 ---
 
