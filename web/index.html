@@ -18,7 +18,7 @@
   <link rel="icon" type="image/webp" href="assets/icon-192.webp">
   <link rel="apple-touch-icon" href="assets/icon-192.webp">
   <link rel="apple-touch-startup-image" href="assets/splash.webp">
-  <link rel="stylesheet" href="style.css?v=1.7">
+  <link rel="stylesheet" href="style.css?v=1.8">
   <!-- MQTT.js qua CDN an toàn -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
@@ -192,80 +192,132 @@
       </div>
     </section>
 
-    <!-- CỘT 2: Thông Số Sinh Hiệu & Trạng Thái Bệnh Nhân (Vitals Grid) -->
-    <section class="vitals-column">
-      <!-- Thẻ Nhịp Tim -->
-      <article class="card vital-card">
-        <div class="vital-header">
-          <span class="vital-label">NHỊP TIM (HR)</span>
-          <span class="heart-pulse-icon" id="heartPulse">❤️</span>
-        </div>
-        <div class="vital-body">
-          <span id="bpmVal" class="vital-number mono">--</span>
-          <span class="vital-unit">BPM</span>
-        </div>
-        <div class="vital-status" id="bpmStatus">Đang chờ tín hiệu...</div>
-        <div class="vital-range">Chuẩn AHA: 60 - 100 BPM</div>
-      </article>
-
-      <!-- Thẻ Thân Nhiệt -->
-      <article class="card vital-card">
-        <div class="vital-header">
-          <span class="vital-label">THÂN NHIỆT (DS18B20)</span>
-          <span class="vital-icon">🌡️</span>
-        </div>
-        <div class="vital-body">
-          <span id="tempVal" class="vital-number mono">--.-</span>
-          <span class="vital-unit">°C</span>
-        </div>
-        <div class="vital-status" id="tempStatus">Nhiệt độ bình thường</div>
-        <div class="vital-range">Chuẩn bề mặt da: 31.5 - 34.5°C</div>
-      </article>
-
-      <!-- Thẻ Gia Tốc SMV & Té Ngã -->
-      <article class="card vital-card">
-        <div class="vital-header">
-          <span class="vital-label">GIA TỐC VA ĐẬP (SMV)</span>
-          <span class="vital-icon">🏃</span>
-        </div>
-        <div class="vital-body">
-          <span id="smvVal" class="vital-number mono">1.00</span>
-          <span class="vital-unit">g</span>
-        </div>
-        <!-- Thanh đo lực SMV -->
-        <div class="gauge-container">
-          <div class="gauge-bar" id="smvGauge" style="width: 25%;"></div>
-          <div class="gauge-threshold" style="left: 55%;" title="Ngưỡng té ngã 2.2g"></div>
-        </div>
-        <div class="gauge-labels">
-          <span>0g</span>
-          <span class="text-warning">Ngưỡng ngã: 2.2g</span>
-          <span>4.0g</span>
-        </div>
-        <div class="vital-status text-ok" id="fallStatus">Tư thế ổn định (Bình thường)</div>
-      </article>
-
-      <!-- Thẻ Đếm Sự Kiện & Thống Kê -->
-      <article class="card vital-card stats-card">
-        <div class="vital-header">
-          <span class="vital-label">THỐNG KÊ HỆ THỐNG</span>
-          <span class="vital-icon">📊</span>
-        </div>
-        <div class="stats-list">
-          <div class="stat-row">
-            <span>Số lần ngã ghi nhận:</span>
-            <strong id="fallCountVal" class="mono text-danger">0 lần</strong>
-          </div>
-          <div class="stat-row">
-            <span>Gói tin IoT nhận được:</span>
-            <strong id="packetCountVal" class="mono">0</strong>
-          </div>
-          <div class="stat-row">
-            <span>Kênh cảnh báo tự động:</span>
-            <strong class="text-success">Telegram & Zalo</strong>
+    <!-- CỘT 2: Băng Đo Sinh Hiệu Lâm Sàng (Clinical Telemetry HUD) -->
+    <section class="telemetry-panel card">
+      <div class="card-header telemetry-header">
+        <div class="header-left">
+          <span class="telemetry-badge-pulse" title="Telemetry Realtime Active"></span>
+          <div>
+            <h2 class="card-title">Sinh Hiệu Lâm Sàng (Telemetry HUD)</h2>
+            <span class="card-sub">Theo dõi liên tục • Đồng bộ thời gian thực</span>
           </div>
         </div>
-      </article>
+        <div class="header-right">
+          <span class="tag tag-ok">Sensor Hub: Online</span>
+        </div>
+      </div>
+
+      <div class="telemetry-body">
+        <!-- Khối 1: Tần số tim & Nhịp học (Cardiology HUD) -->
+        <article class="telemetry-card vital-card-hr">
+          <div class="vital-top-row">
+            <div class="vital-label-wrap">
+              <span class="vital-label">TẦN SỐ TIM (HEART RATE)</span>
+              <span class="vital-range-text">AHA: 60 - 100 BPM</span>
+            </div>
+            <div class="vital-pulse-node" id="heartPulse" title="Xung QRS đồng bộ">
+              <span class="pulse-ring"></span>
+              <span class="pulse-core"></span>
+            </div>
+          </div>
+
+          <div class="vital-metric-row">
+            <div class="vital-value-group">
+              <span id="bpmVal" class="vital-number mono">--</span>
+              <span class="vital-unit">BPM</span>
+            </div>
+            <div class="vital-status-pill text-dim" id="bpmStatus">Đang chờ tín hiệu...</div>
+          </div>
+
+          <!-- Micro Pulse Level Bar -->
+          <div class="vital-mini-progress">
+            <div class="mini-progress-fill" id="bpmPulseBar" style="width: 0%;"></div>
+          </div>
+        </article>
+
+        <!-- Khối 2: Thân nhiệt lâm sàng (Body Temperature) -->
+        <article class="telemetry-card vital-card-temp">
+          <div class="vital-top-row">
+            <div class="vital-label-wrap">
+              <span class="vital-label">THÂN NHIỆT (DS18B20)</span>
+              <span class="vital-range-text">Bề mặt da: 31.5 - 34.5°C</span>
+            </div>
+            <span class="status-micro-tag" id="tempStatusPill">Chuẩn</span>
+          </div>
+
+          <div class="vital-metric-row">
+            <div class="vital-value-group">
+              <span id="tempVal" class="vital-number mono">--.-</span>
+              <span class="vital-unit">°C</span>
+            </div>
+            <div class="vital-status-pill text-ok" id="tempStatus">Nhiệt độ bình thường</div>
+          </div>
+
+          <!-- Clinical Thermometer Range Ribbon (30°C - 40°C) -->
+          <div class="thermo-scale-container">
+            <div class="thermo-track">
+              <div class="thermo-zone zone-hypo" title="Hạ nhiệt <31.5°C"></div>
+              <div class="thermo-zone zone-normal" title="Bình thường 31.5 - 34.5°C"></div>
+              <div class="thermo-zone zone-fever" title="Sốt >37.5°C"></div>
+              <div class="thermo-needle" id="tempNeedle" style="left: 35%;"></div>
+            </div>
+            <div class="thermo-labels">
+              <span>30°C</span>
+              <span class="text-ok">Vùng an toàn</span>
+              <span>40°C</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Khối 3: Gia tốc va đập & Phát hiện té ngã (SMV & Fall Detection) -->
+        <article class="telemetry-card vital-card-smv">
+          <div class="vital-top-row">
+            <div class="vital-label-wrap">
+              <span class="vital-label">GIA TỐC VA ĐẬP (SMV)</span>
+              <span class="vital-range-text">Ngưỡng cảnh báo: 2.2g</span>
+            </div>
+            <span class="status-micro-tag pill-ok" id="smvPill">1.00g Chuẩn</span>
+          </div>
+
+          <div class="vital-metric-row">
+            <div class="vital-value-group">
+              <span id="smvVal" class="vital-number mono">1.00</span>
+              <span class="vital-unit">g</span>
+            </div>
+            <div class="vital-status-pill text-ok" id="fallStatus">Tư thế ổn định (Bình thường)</div>
+          </div>
+
+          <!-- Precision 2-Stage Acceleration Gauge -->
+          <div class="gauge-container precision-gauge">
+            <div class="gauge-bar" id="smvGauge" style="width: 25%;"></div>
+            <div class="gauge-baseline" style="left: 25%;" title="Trọng trường tĩnh 1.0g"></div>
+            <div class="gauge-threshold" style="left: 55%;" title="Ngưỡng té ngã 2.2g"></div>
+          </div>
+          <div class="gauge-labels">
+            <span>0g (Rơi tự do)</span>
+            <span class="text-warning">Ngưỡng ngã: 2.2g</span>
+            <span>4.0g</span>
+          </div>
+        </article>
+      </div>
+
+      <!-- Dải Giám Sát Hệ Thống & Sự Kiện (Compact Telemetry Strip) -->
+      <div class="telemetry-system-strip">
+        <div class="sys-item">
+          <span class="sys-label">Số lần ngã:</span>
+          <strong id="fallCountVal" class="mono text-danger">0 lần</strong>
+        </div>
+        <div class="sys-divider"></div>
+        <div class="sys-item">
+          <span class="sys-label">Gói tin IoT:</span>
+          <strong id="packetCountVal" class="mono">0</strong>
+        </div>
+        <div class="sys-divider"></div>
+        <div class="sys-item">
+          <span class="sys-label">Cảnh báo:</span>
+          <strong class="text-success sys-channels">Telegram & Zalo</strong>
+        </div>
+      </div>
     </section>
 
     <!-- HÀNG DƯỚI: Nhật Ký Sự Kiện Khẩn Cấp (Event Log) -->
@@ -446,6 +498,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=1.7"></script>
+  <script src="app.js?v=1.8"></script>
 </body>
 </html>

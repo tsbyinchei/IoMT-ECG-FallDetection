@@ -44,6 +44,8 @@ ESP32C3/
 projectthamkhao/
 docker/
 ESP32_OLED_Name/
+.agents/
+
 # Python cache
 __pycache__/
 *.pyc

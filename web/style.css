@@ -538,98 +538,311 @@ body {
   font-weight: 600;
 }
 
-/* Vitals Column */
-.vitals-column {
+/* ==================== CLINICAL TELEMETRY HUD (ICU MONITOR STRIP) ==================== */
+.telemetry-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  background: var(--bg-card);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  height: 100%;
 }
 
-.vital-card {
-  padding: 16px 20px;
-  border-left: 4px solid var(--cyan-accent);
+.telemetry-header {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 14px 20px;
 }
 
-.vital-header {
+.telemetry-badge-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ecg-green);
+  box-shadow: 0 0 10px var(--ecg-green);
+  animation: pulse-ring-glow 2s infinite ease-in-out;
+  flex-shrink: 0;
+}
+
+@keyframes pulse-ring-glow {
+  0% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 6px var(--ecg-green); }
+  50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 14px var(--ecg-green); }
+  100% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 6px var(--ecg-green); }
+}
+
+.telemetry-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+/* Individual Telemetry Vitals Card */
+.telemetry-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.telemetry-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  opacity: 0.6;
+  transition: opacity 0.25s ease;
+}
+
+.vital-card-hr::before { background: var(--danger-red); }
+.vital-card-temp::before { background: var(--amber-warning); }
+.vital-card-smv::before { background: var(--cyan-accent); }
+
+.telemetry-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+.telemetry-card:hover::before {
+  opacity: 1;
+}
+
+.vital-top-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+}
+
+.vital-label-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .vital-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--text-sub);
+  text-transform: uppercase;
 }
 
-.vital-body {
+.vital-range-text {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+/* Pulse Node (Realtime QRS Synchronization Node) */
+.vital-pulse-node {
+  width: 22px;
+  height: 22px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--danger-red);
+  opacity: 0.3;
+  transform: scale(0.8);
+  transition: all 0.2s ease;
+}
+
+.pulse-core {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger-red);
+  box-shadow: 0 0 6px var(--danger-red);
+  transition: all 0.15s ease;
+}
+
+.vital-pulse-node.heart-beat .pulse-ring {
+  transform: scale(1.6);
+  opacity: 0.9;
+  border-color: #ff4d79;
+}
+
+.vital-pulse-node.heart-beat .pulse-core {
+  transform: scale(1.3);
+  background: #ffffff;
+  box-shadow: 0 0 12px var(--danger-red);
+}
+
+/* Status Micro Tag */
+.status-micro-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 255, 136, 0.12);
+  color: var(--ecg-green);
+  border: 1px solid rgba(0, 255, 136, 0.25);
+  font-family: var(--font-mono);
+}
+
+.status-micro-tag.pill-warning {
+  background: rgba(255, 184, 0, 0.15);
+  color: var(--amber-warning);
+  border-color: rgba(255, 184, 0, 0.35);
+}
+
+.status-micro-tag.pill-danger {
+  background: rgba(255, 51, 102, 0.15);
+  color: var(--danger-red);
+  border-color: rgba(255, 51, 102, 0.35);
+}
+
+/* Vital Value Metric Row */
+.vital-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.vital-value-group {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin-bottom: 6px;
 }
 
 .vital-number {
-  font-size: 2.5rem;
+  font-size: 2.3rem;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
 }
 
 .vital-unit {
-  font-size: 0.9rem;
-  color: var(--text-sub);
-  font-weight: 500;
-}
-
-.vital-status {
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--text-sub);
 }
 
-.vital-range {
-  font-size: 0.68rem;
-  color: var(--text-dim);
+.vital-status-pill {
+  font-size: 0.76rem;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+
+/* Micro Pulse Animation Bar */
+.vital-mini-progress {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
   margin-top: 2px;
 }
 
-/* Pulsing Heart Animation */
-.heart-pulse-icon {
-  font-size: 1.3rem;
-  display: inline-block;
-  transform: scale(1);
-  transition: transform 0.1s ease;
+.mini-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--danger-red), var(--ecg-green));
+  border-radius: 2px;
+  transition: width 0.3s ease;
 }
 
-.heart-beat {
-  animation: heart-thump 0.35s ease-out;
-}
-
-@keyframes heart-thump {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
-  100% { transform: scale(1); }
-}
-
-/* Gauge Level Bar for SMV */
-.gauge-container {
+/* Clinical Thermometer Range Ribbon */
+.thermo-scale-container {
   width: 100%;
-  height: 10px;
+  margin-top: 4px;
+}
+
+.thermo-track {
+  height: 8px;
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
+  border-radius: 4px;
+  position: relative;
+  display: flex;
+  overflow: hidden;
+}
+
+.thermo-zone {
+  height: 100%;
+}
+
+.zone-hypo {
+  width: 15%;
+  background: rgba(0, 240, 255, 0.35);
+}
+
+.zone-normal {
+  width: 60%;
+  background: linear-gradient(90deg, rgba(0, 255, 136, 0.4), rgba(0, 255, 136, 0.6));
+}
+
+.zone-fever {
+  width: 25%;
+  background: linear-gradient(90deg, rgba(255, 184, 0, 0.5), rgba(255, 51, 102, 0.7));
+}
+
+.thermo-needle {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 3px;
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
+  border-radius: 1px;
+  transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.thermo-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  margin-top: 3px;
+}
+
+/* Precision Acceleration Gauge for SMV */
+.precision-gauge {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
   position: relative;
   overflow: hidden;
-  margin: 10px 0 4px;
+  margin: 6px 0 3px;
 }
 
 .gauge-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--ecg-green) 0%, var(--amber-warning) 60%, var(--danger-red) 100%);
-  border-radius: 5px;
+  background: linear-gradient(90deg, var(--ecg-green) 0%, var(--amber-warning) 50%, var(--danger-red) 100%);
+  border-radius: 4px;
   transition: width 0.15s ease-out;
+}
+
+.gauge-baseline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .gauge-threshold {
@@ -644,25 +857,40 @@ body {
 .gauge-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   color: var(--text-dim);
   font-family: var(--font-mono);
 }
 
-/* Stats Card */
-.stats-list {
+/* Compact Telemetry System Strip */
+.telemetry-system-strip {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 8px;
+  align-items: center;
+  justify-content: space-around;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.74rem;
 }
 
-.stat-row {
+.sys-item {
   display: flex;
-  justify-content: space-between;
-  font-size: 0.82rem;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  align-items: center;
+  gap: 6px;
+}
+
+.sys-label {
+  color: var(--text-sub);
+}
+
+.sys-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border-subtle);
+}
+
+.sys-channels {
+  font-weight: 600;
 }
 
 /* Event Log Table */
@@ -834,50 +1062,55 @@ body {
 /* Toast Notifications (Medical HUD Floating Alerts) */
 .toast-container {
   position: fixed;
-  bottom: 24px;
+  top: 76px;
   right: 24px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   z-index: 9999;
   pointer-events: none;
+  max-width: 440px;
 }
 
 .toast {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(18, 24, 38, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--cyan-accent);
+  gap: 12px;
+  background: rgba(13, 17, 23, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 3px solid var(--cyan-accent);
   color: var(--text-main);
   padding: 12px 18px;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  transform: translateY(20px);
+  border-radius: var(--radius-md);
+  font-size: 0.84rem;
+  font-weight: 500;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), 0 0 15px rgba(0, 240, 255, 0.1);
+  transform: translateY(-15px) scale(0.97);
   opacity: 0;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .toast.show {
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
   opacity: 1;
 }
 
 .toast.toast-warning {
   border-left-color: var(--amber-warning);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), 0 0 15px rgba(255, 184, 0, 0.15);
 }
 
 .toast.toast-danger {
   border-left-color: var(--danger-red);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), 0 0 15px rgba(255, 51, 102, 0.2);
 }
 
 .toast.toast-success {
   border-left-color: var(--ecg-green);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), 0 0 15px rgba(0, 255, 136, 0.15);
 }
 
 /* Bottom Footer */
@@ -1156,6 +1389,38 @@ body {
 
   .form-row {
     grid-template-columns: 1fr;
+  }
+
+  .telemetry-panel {
+    margin-top: 0;
+  }
+
+  .telemetry-body {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .telemetry-card {
+    padding: 11px 13px;
+  }
+
+  .vital-number {
+    font-size: 1.85rem;
+  }
+
+  .toast-container {
+    top: 64px;
+    left: 14px;
+    right: 14px;
+    max-width: none;
+    align-items: center;
+  }
+
+  .toast {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 0.8rem;
+    padding: 10px 14px;
   }
 }
 
