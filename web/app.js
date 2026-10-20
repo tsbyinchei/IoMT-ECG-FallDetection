@@ -262,8 +262,12 @@ let audioCtx = null;
 const elements = {
   statusBadge: document.getElementById('connectionStatus'),
   statusText: document.getElementById('statusText'),
+  statusTextShort: document.getElementById('statusTextShort'),
   dbStatus: document.getElementById('dbStatus'),
   dbStatusText: document.getElementById('dbStatusText'),
+  dbStatusTextShort: document.getElementById('dbStatusTextShort'),
+  drawerMqttText: document.getElementById('drawerMqttText'),
+  drawerDbText: document.getElementById('drawerDbText'),
   testDbBtn: document.getElementById('testDbBtn'),
   testDbResult: document.getElementById('testDbResult'),
   mobileMenuBtn: document.getElementById('mobileMenuBtn'),
@@ -589,13 +593,35 @@ function connectMQTT() {
 
 function updateConnectionStatus(type, text) {
   elements.statusBadge.className = 'status-badge ' + type;
-  elements.statusText.textContent = text;
+  if (elements.statusText) elements.statusText.textContent = text;
+  
+  if (elements.statusTextShort) {
+    if (type === 'connected') elements.statusTextShort.textContent = 'WSS';
+    else if (type === 'demo') elements.statusTextShort.textContent = 'DEMO';
+    else if (type === 'connecting') elements.statusTextShort.textContent = 'WSS...';
+    else elements.statusTextShort.textContent = 'MQTT';
+  }
+
+  if (elements.drawerMqttText) {
+    elements.drawerMqttText.textContent = text;
+    elements.drawerMqttText.className = 'drawer-status-val ' + (type === 'connected' ? 'text-ok' : (type === 'demo' ? 'text-cyan' : 'text-danger'));
+  }
 }
 
 function updateDbStatus(type, text) {
-  if (!elements.dbStatus || !elements.dbStatusText) return;
-  elements.dbStatus.className = 'status-badge ' + type;
-  elements.dbStatusText.textContent = text;
+  if (elements.dbStatus) elements.dbStatus.className = 'status-badge ' + type;
+  if (elements.dbStatusText) elements.dbStatusText.textContent = text;
+
+  if (elements.dbStatusTextShort) {
+    if (type === 'connected') elements.dbStatusTextShort.textContent = 'TSDB';
+    else if (type === 'connecting') elements.dbStatusTextShort.textContent = 'TSDB...';
+    else elements.dbStatusTextShort.textContent = 'TSDB';
+  }
+
+  if (elements.drawerDbText) {
+    elements.drawerDbText.textContent = text;
+    elements.drawerDbText.className = 'drawer-status-val ' + (type === 'connected' ? 'text-ok' : 'text-danger');
+  }
 }
 
 /**

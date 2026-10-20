@@ -83,7 +83,7 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1050;
 }
 
 .brand {
@@ -162,13 +162,24 @@ body {
   font-size: 0.8rem;
   font-weight: 500;
   border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.3s ease;
+}
+
+.badge-text-full {
+  display: inline;
+}
+
+.badge-text-short {
+  display: none;
 }
 
 .status-indicator {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .status-badge.connected {
@@ -429,6 +440,8 @@ body {
   padding: 3px 8px;
   border-radius: var(--radius-sm);
   font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tag-ok {
@@ -903,16 +916,16 @@ body {
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(4, 7, 12, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 1040;
   opacity: 1;
   transition: opacity 0.3s ease;
 }
 
 .drawer-backdrop.hidden {
-  display: none;
+  display: none !important;
   opacity: 0;
 }
 
@@ -931,15 +944,17 @@ body {
   .mobile-menu-toggle {
     display: inline-flex !important;
     align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    font-size: 0.85rem;
+    gap: 4px;
+    padding: 5px 10px;
+    font-size: 0.8rem;
     font-weight: 600;
     border-radius: var(--radius-sm);
     background: rgba(0, 240, 255, 0.12);
     border: 1px solid rgba(0, 240, 255, 0.35);
     color: var(--cyan-accent);
     cursor: pointer;
+    white-space: nowrap !important;
+    flex-shrink: 0;
     transition: all 0.2s ease;
   }
 
@@ -952,38 +967,70 @@ body {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 16px;
+    padding: 8px 12px;
     gap: 8px;
+    height: 56px;
+    box-sizing: border-box;
+    z-index: 1050;
   }
 
   .brand {
-    gap: 10px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .brand-logo-container {
+    width: 32px;
+    height: 32px;
   }
 
   .brand-logo-img {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
   }
 
   .brand-title {
-    font-size: 1.05rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    white-space: nowrap !important;
   }
 
   .brand-subtitle {
-    display: none;
+    display: none !important;
   }
 
   .nav-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Ẩn text dài, chỉ hiện text ngắn (WSS, TSDB) trên mobile */
+  .badge-text-full {
+    display: none !important;
+  }
+
+  .badge-text-short {
+    display: inline !important;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.5px;
   }
 
   .status-badge {
-    padding: 4px 10px;
-    font-size: 0.74rem;
-    gap: 6px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    gap: 5px;
+    border-radius: 12px;
+    white-space: nowrap !important;
+    flex-shrink: 0;
+  }
+
+  .status-indicator {
+    width: 6px;
+    height: 6px;
   }
 
   /* Chuyển navActionGroup thành Drawer trượt từ phải sang */
@@ -991,21 +1038,19 @@ body {
     position: fixed;
     top: 0;
     right: 0;
-    width: min(320px, 85vw);
+    width: min(300px, 80vw);
     height: 100vh;
     height: 100dvh;
-    background: rgba(13, 17, 23, 0.95);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    background: #0d1117; /* Nền đen obsidian nguyên khối, không bị bóng mờ */
     border-left: 1px solid var(--border-glow);
     padding: 20px 18px;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    z-index: 1050;
+    z-index: 1060;
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: -12px 0 35px rgba(0, 0, 0, 0.85);
+    box-shadow: -15px 0 40px rgba(0, 0, 0, 0.9);
     overflow-y: auto;
   }
 
@@ -1025,8 +1070,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 14px;
-    margin-bottom: 8px;
+    padding-bottom: 12px;
+    margin-bottom: 4px;
     border-bottom: 1px solid var(--border-subtle);
   }
 
@@ -1037,6 +1082,63 @@ body {
     font-weight: 700;
     color: var(--text-main);
     font-size: 1.05rem;
+  }
+
+  .drawer-status-summary {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .drawer-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+  }
+
+  .drawer-status-label {
+    color: var(--text-sub);
+  }
+
+  .drawer-status-val {
+    font-weight: 600;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .header-left {
+    width: 100%;
+  }
+
+  .card-title {
+    font-size: 0.9rem;
+    white-space: normal;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .tag {
+    white-space: nowrap !important;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    padding: 4px 8px;
   }
 
   .dashboard-grid {

@@ -39,12 +39,14 @@
     <div class="nav-controls">
       <div id="connectionStatus" class="status-badge disconnected" title="Trạng thái kết nối máy chủ MQTT Broker">
         <span class="status-indicator"></span>
-        <span id="statusText">MQTT: Chưa kết nối</span>
+        <span id="statusText" class="badge-text-full">Chưa kết nối Broker</span>
+        <span id="statusTextShort" class="badge-text-short">MQTT</span>
       </div>
 
       <div id="dbStatus" class="status-badge connecting" title="Trạng thái kết nối máy chủ cơ sở dữ liệu InfluxDB v2">
         <span class="status-indicator"></span>
-        <span id="dbStatusText">TSDB: Đang kiểm tra</span>
+        <span id="dbStatusText" class="badge-text-full">TSDB: Đang kiểm tra</span>
+        <span id="dbStatusTextShort" class="badge-text-short">TSDB</span>
       </div>
 
       <!-- Nút mở Menu thanh bên trên Mobile -->
@@ -61,6 +63,17 @@
             <span class="drawer-title">Bảng Điều Khiển</span>
           </div>
           <button id="closeDrawerBtn" class="modal-close" aria-label="Đóng thanh bên">&times;</button>
+        </div>
+
+        <div class="drawer-status-summary mobile-only">
+          <div class="drawer-status-row">
+            <span class="drawer-status-label">MQTT Broker:</span>
+            <span id="drawerMqttText" class="drawer-status-val text-dim">Chưa kết nối</span>
+          </div>
+          <div class="drawer-status-row">
+            <span class="drawer-status-label">InfluxDB TSDB:</span>
+            <span id="drawerDbText" class="drawer-status-val text-cyan">Đang kiểm tra...</span>
+          </div>
         </div>
 
         <button id="pwaInstallBtn" class="btn btn-secondary hidden" title="Cài đặt ứng dụng lên màn hình chính">
