@@ -9,7 +9,6 @@ services:
     container_name: biomed_bridge
     restart: always
     command: >
-      sh -c "mkdir -p /app && cd /app &&
-             pip install --no-cache-dir paho-mqtt influxdb-client &&
-             wget -q https://raw.githubusercontent.com/tsbyinchei/IoMT-ECG-FallDetection/main/tools/mqtt_to_influxdb.py -O mqtt_to_influxdb.py &&
-             python -u mqtt_to_influxdb.py"
+      sh -c "pip install --no-cache-dir paho-mqtt influxdb-client &&
+             wget -q https://raw.githubusercontent.com/tsbyinchei/IoMT-ECG-FallDetection/main/tools/mqtt_to_influxdb.py -O /root/mqtt_to_influxdb.py &&
+             python -u /root/mqtt_to_influxdb.py"
