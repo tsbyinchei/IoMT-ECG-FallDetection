@@ -1471,19 +1471,19 @@ function stopReplay() {
   addEventLog('THOÁT REPLAY', '--', '--', '--', 'Trở lại Live', 'INFO');
 }
 
+// ==================== MOBILE DRAWER CONTROLLER ====================
+function openMobileDrawer() {
+  if (elements.navActionGroup) elements.navActionGroup.classList.add('open');
+  if (elements.drawerBackdrop) elements.drawerBackdrop.classList.remove('hidden');
+}
+
+function closeMobileDrawer() {
+  if (elements.navActionGroup) elements.navActionGroup.classList.remove('open');
+  if (elements.drawerBackdrop) elements.drawerBackdrop.classList.add('hidden');
+}
+
 // ==================== EVENT LISTENERS & SETUP ====================
 function initEventListeners() {
-  // Đóng / mở Drawer trên Mobile
-  function openMobileDrawer() {
-    if (elements.navActionGroup) elements.navActionGroup.classList.add('open');
-    if (elements.drawerBackdrop) elements.drawerBackdrop.classList.remove('hidden');
-  }
-
-  function closeMobileDrawer() {
-    if (elements.navActionGroup) elements.navActionGroup.classList.remove('open');
-    if (elements.drawerBackdrop) elements.drawerBackdrop.classList.add('hidden');
-  }
-
   if (elements.mobileMenuBtn) {
     elements.mobileMenuBtn.addEventListener('click', openMobileDrawer);
   }
@@ -1716,14 +1716,31 @@ function initEventListeners() {
     elements.logTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-dim">Nhật ký đã được xóa</td></tr>';
   });
 
-  // Tự động điều chỉnh kích thước Canvas
-  window.addEventListener('resize', resizeCanvas);
+  // Tự động điều chỉnh kích thước Canvas và giải phóng trạng thái Drawer khi chuyển đổi thiết bị
+  window.addEventListener('resize', onWindowResize);
+}
+
+let resizePending = false;
+function onWindowResize() {
+  if (window.innerWidth > 1024) {
+    closeMobileDrawer();
+  }
+  if (!resizePending) {
+    resizePending = true;
+    requestAnimationFrame(() => {
+      resizeCanvas();
+      resizePending = false;
+    });
+  }
 }
 
 function resizeCanvas() {
+  if (!elements.ecgCanvas) return;
   const rect = elements.ecgCanvas.getBoundingClientRect();
-  elements.ecgCanvas.width = rect.width * (window.devicePixelRatio || 1);
-  elements.ecgCanvas.height = rect.height * (window.devicePixelRatio || 1);
+  if (rect.width > 0 && rect.height > 0) {
+    elements.ecgCanvas.width = Math.round(rect.width * (window.devicePixelRatio || 1));
+    elements.ecgCanvas.height = Math.round(rect.height * (window.devicePixelRatio || 1));
+  }
 }
 
 // ==================== PWA SERVICE WORKER & CÀI ĐẶT APP ====================
@@ -1733,7 +1750,7 @@ function initPWA() {
   // 1. Đăng ký Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=1.8')
+      navigator.serviceWorker.register('./sw.js?v=1.9')
         .then((reg) => {
           console.log('[PWA] Service Worker đăng ký thành công:', reg.scope);
           reg.update(); // Chủ động kiểm tra cập nhật bản mới nhất

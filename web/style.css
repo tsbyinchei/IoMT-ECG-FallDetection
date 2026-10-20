@@ -1157,17 +1157,19 @@ body {
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 1040;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 99990;
   opacity: 1;
-  transition: opacity 0.3s ease;
+  visibility: visible;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  pointer-events: auto;
 }
 
 .drawer-backdrop.hidden {
   display: none !important;
-  opacity: 0;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* ==================== RESPONSIVE BREAKPOINTS (ALL DEVICE TIERS) ==================== */
@@ -1182,6 +1184,9 @@ body {
   }
   .drawer-backdrop {
     display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
   .nav-action-group {
     display: flex !important;
@@ -1249,7 +1254,7 @@ body {
     gap: 8px;
     height: 56px;
     box-sizing: border-box;
-    z-index: 1050;
+    z-index: 100000 !important;
     background: #0d1117 !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -1332,7 +1337,7 @@ body {
     display: flex !important;
     flex-direction: column !important;
     gap: 12px !important;
-    z-index: 99999 !important;
+    z-index: 100001 !important;
     transform: translateX(100%) !important;
     visibility: hidden !important;
     pointer-events: none !important;
@@ -1352,6 +1357,9 @@ body {
 
   .drawer-backdrop {
     z-index: 99990 !important;
+    background: rgba(0, 0, 0, 0.72) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   .nav-action-group .btn {
