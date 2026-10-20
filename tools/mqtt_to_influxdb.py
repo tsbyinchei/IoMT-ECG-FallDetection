@@ -55,7 +55,10 @@ logger = logging.getLogger("MQTT-InfluxDB-Bridge")
 DEFAULT_CONFIG = {
     # Cấu hình MQTT Broker
     "mqtt_host": "mqtt.tsbyin.dev",
-    "mqtt_port": 1883,           # Hoặc 8883 (TLS), hoặc dùng 1883 nội bộ LAN/Docker
+    "mqtt_port": 443,            # Cloudflare Tunnel WSS cổng 443 (hoặc 1883 TCP nội bộ)
+    "mqtt_transport": "websockets", # 'websockets' hoặc 'tcp'
+    "mqtt_path": "/mqtt",
+    "mqtt_use_ssl": True,
     "mqtt_user": "TsByin",
     "mqtt_pass": "Chei@@@182728",
     "topic_data": "biomed/patient/data",
@@ -117,10 +120,31 @@ class BiomedicalDataBridge:
             logger.info("👉 Gợi ý: Hãy đảm bảo Docker InfluxDB đang chạy (docker compose up -d)")
 
     def init_mqtt(self):
-        """Khởi tạo kết nối MQTT Client"""
+        """Khởi tạo kết nối MQTT Client (Hỗ trợ cả WebSocket TLS và TCP chuẩn)"""
+        import ssl
         client_id = f"biomed_bridge_{int(time.time())}"
-        self.mqtt_client = mqtt.Client(client_id=client_id, protocol=mqtt.MQTTv311)
+        transport = self.cfg.get('mqtt_transport', 'tcp')
         
+        # Tự động chọn WebSocket nếu dùng cổng 443 hoặc domain tsbyin.dev
+        if self.cfg.get('mqtt_port') == 443 or "tsbyin.dev" in self.cfg.get('mqtt_host', ''):
+            transport = "websockets"
+            self.cfg['mqtt_port'] = 443
+            self.cfg['mqtt_use_ssl'] = True
+            
+        try:
+            # Tương thích paho-mqtt v2 và v1
+            self.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id, transport=transport)
+        except AttributeError:
+            self.mqtt_client = mqtt.Client(client_id=client_id, protocol=mqtt.MQTTv311, transport=transport)
+        
+        if transport == "websockets":
+            path = self.cfg.get('mqtt_path', '/mqtt')
+            self.mqtt_client.ws_set_options(path=path)
+            
+        if self.cfg.get('mqtt_use_ssl', False):
+            self.mqtt_client.tls_set(cert_reqs=ssl.CERT_NONE)
+            self.mqtt_client.tls_insecure_set(True)
+            
         if self.cfg.get('mqtt_user'):
             self.mqtt_client.username_pw_set(self.cfg['mqtt_user'], self.cfg.get('mqtt_pass', ''))
             
@@ -128,7 +152,7 @@ class BiomedicalDataBridge:
         self.mqtt_client.on_message = self.on_mqtt_message
         self.mqtt_client.on_disconnect = self.on_mqtt_disconnect
         
-        logger.info(f"Đang kết nối MQTT Broker tại {self.cfg['mqtt_host']}:{self.cfg['mqtt_port']}...")
+        logger.info(f"Đang kết nối MQTT Broker tại {self.cfg['mqtt_host']}:{self.cfg['mqtt_port']} (Giao thức: {transport})...")
         try:
             self.mqtt_client.connect(self.cfg['mqtt_host'], self.cfg['mqtt_port'], keepalive=60)
             self.mqtt_client.loop_start()
