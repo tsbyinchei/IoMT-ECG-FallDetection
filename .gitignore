@@ -47,3 +47,5 @@ projectthamkhao/
 __pycache__/
 *.pyc
 .venv/
+
+ESP32_OLED_Name/

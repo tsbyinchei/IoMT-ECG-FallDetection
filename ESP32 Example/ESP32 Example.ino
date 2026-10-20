@@ -215,11 +215,20 @@ WiFiUDP udp;
 esp_mqtt_client_handle_t mqtt_client = NULL;
 bool mqtt_connected = false;
 
-// ==================== BIẾN BỘ ĐỆM ĐỒ THỊ & TÍNH BPM TẠI BIÊN (EDGE)
-// ====================
+// ==================== BIẾN BỘ ĐỆM ĐỒ THỊ & TÍNH BPM TẠI BIÊN (EDGE) ====================
 #define WAVE_WIDTH 128
 uint8_t waveBuffer[WAVE_WIDTH]; // Bộ đệm vẽ đồ thị sóng ECG mini cuộn trên OLED
 uint8_t waveWriteIdx = 0;
+
+// ==================== BỘ ĐỆM TRÒN LƯU VẾT BIẾN CỐ Y SINH (15 KB SRAM TSDB SNAPSHOT) ====================
+// ESP32 duy trì 7,500 mẫu ECG gần nhất (30 giây @ 250Hz = 15,000 bytes) trong bộ nhớ SRAM nội.
+// Khi phát hiện biến cố ngã (fallDetected == 1) hoặc loạn nhịp tim, Gateway đóng băng 30s trước sự cố
+// và thu thập tiếp 30s sau sự cố để tạo dải sóng 60 giây hoàn chỉnh cung cấp chứng cứ y sinh.
+#define PRE_EVENT_SAMPLES 7500
+static uint16_t ecgRingBuffer[PRE_EVENT_SAMPLES];
+static size_t ringHead = 0;
+static bool snapshotCapturing = false;
+static uint16_t postEventSamplesCollected = 0;
 
 int edgeBpm = 0;
 unsigned long lastPeakTime = 0;
@@ -1106,10 +1115,18 @@ void loop() {
 
       totalPacketsReceived++;
 
+      // Ghi tuần hoàn 25 mẫu ECG vào bộ đệm tròn 15KB SRAM (30s @ 250Hz phục vụ TSDB snapshot)
+      for (int i = 0; i < 25; i++) {
+        ecgRingBuffer[ringHead] = incomingData.ecgSamples[i];
+        ringHead = (ringHead + 1) % PRE_EVENT_SAMPLES;
+      }
+
       // Kích hoạt còi hú khẩn cấp CHỈ KHI Node C3 đã xác nhận ngã qua 2 giai đoạn (fallDetected == 1)
       bool isCurrentFall = (incomingData.fallDetected == 1);
       if (isCurrentFall && !prevFallState) {
         totalFallsCount++;
+        snapshotCapturing = true;
+        postEventSamplesCollected = 0;
         fallAlarmActive = true; // Kích hoạt còi hú liên tục không ngừng cho đến khi người nhà bấm tắt!
         buzzerMuted = false;    // Tự động giải trừ cờ tắt còi nếu trước đó người dùng từng bấm tắt
         digitalWrite(BUZZER_PIN, HIGH);

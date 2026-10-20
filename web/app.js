@@ -11,13 +11,18 @@ const DEFAULT_CONFIG = {
   pass: 'Chei@@@182728',
   topicData: 'biomed/patient/data',
   topicAlert: 'biomed/patient/alert',
-  topicCmd: 'biomed/gateway/cmd'      // Topic điều khiển Gateway (Tắt còi từ xa)
+  topicCmd: 'biomed/gateway/cmd',     // Topic điều khiển Gateway (Tắt còi từ xa)
+  influxUrl: 'https://influx.tsbyin.dev', // Máy chủ InfluxDB v2 REST API
+  influxOrg: 'biomed',
+  influxBucket: 'biomed_events',
+  influxToken: ''
 };
 
 // ==================== TRẠNG THÁI HỆ THỐNG ====================
 let config = loadConfig();
 let mqttClient = null;
 let isDemoMode = false;
+let isReplayMode = false;
 let audioEnabled = false;
 let isBuzzerMuted = false;
 let currentSirenOsc = null;
@@ -26,6 +31,14 @@ let totalPackets = 0;
 let totalFalls = 0;
 let prevFallState = 0;
 let lastHeartBeatTime = 0;
+
+// Trạng thái phát lại dữ liệu lịch sử InfluxDB (Replay Engine)
+let replayTimer = null;
+let replayPaused = false;
+let replayIndex = 0;
+let replayDataset = null;
+let selectedEventId = 'preset_fall';
+let loadedInfluxEvents = [];
 
 // ==================== BỘ LỌC TÍN HIỆU ECG CHUẨN MATLAB & PAN-TOMPKINS ====================
 /**
@@ -257,6 +270,26 @@ const elements = {
   remoteMuteLabel: document.getElementById('remoteMuteLabel'),
   pwaInstallBtn: document.getElementById('pwaInstallBtn'),
   simToggleBtn: document.getElementById('simToggleBtn'),
+  replayToggleBtn: document.getElementById('replayToggleBtn'),
+  replayBtnIcon: document.getElementById('replayBtnIcon'),
+  replayBtnLabel: document.getElementById('replayBtnLabel'),
+  replayBanner: document.getElementById('replayBanner'),
+  replayEventTitle: document.getElementById('replayEventTitle'),
+  replayEventSub: document.getElementById('replayEventSub'),
+  replayProgressBar: document.getElementById('replayProgressBar'),
+  replayProgressFill: document.getElementById('replayProgressFill'),
+  replayTimeDisplay: document.getElementById('replayTimeDisplay'),
+  replayPlayPauseBtn: document.getElementById('replayPlayPauseBtn'),
+  replayPlayIcon: document.getElementById('replayPlayIcon'),
+  replayRestartBtn: document.getElementById('replayRestartBtn'),
+  replayExitBtn: document.getElementById('replayExitBtn'),
+  replayModal: document.getElementById('replayModal'),
+  closeReplayModalBtn: document.getElementById('closeReplayModalBtn'),
+  cancelReplayModalBtn: document.getElementById('cancelReplayModalBtn'),
+  startReplayBtn: document.getElementById('startReplayBtn'),
+  eventListContainer: document.getElementById('eventListContainer'),
+  fetchInfluxEventsBtn: document.getElementById('fetchInfluxEventsBtn'),
+  influxFetchStatus: document.getElementById('influxFetchStatus'),
   configModalBtn: document.getElementById('configModalBtn'),
   configModal: document.getElementById('configModal'),
   closeModalBtn: document.getElementById('closeModalBtn'),
@@ -268,6 +301,10 @@ const elements = {
   cfgTopicData: document.getElementById('cfgTopicData'),
   cfgTopicAlert: document.getElementById('cfgTopicAlert'),
   cfgTopicCmd: document.getElementById('cfgTopicCmd'),
+  cfgInfluxUrl: document.getElementById('cfgInfluxUrl'),
+  cfgInfluxOrg: document.getElementById('cfgInfluxOrg'),
+  cfgInfluxBucket: document.getElementById('cfgInfluxBucket'),
+  cfgInfluxToken: document.getElementById('cfgInfluxToken'),
   toastContainer: document.getElementById('toastContainer'),
   emergencyBanner: document.getElementById('emergencyBanner'),
   alertTitle: document.getElementById('alertTitle'),
@@ -443,6 +480,7 @@ function sendRemoteMuteCommand(forceAction = null) {
 // ==================== KẾT NỐI MQTT BROKER (WSS) ====================
 function connectMQTT() {
   if (isDemoMode) stopDemoMode();
+  if (isReplayMode) stopReplay();
   if (mqttClient) {
     try { mqttClient.end(true); } catch (e) {}
   }
@@ -910,6 +948,341 @@ function stopDemoMode() {
   updateConnectionStatus('disconnected', 'Đã tắt Demo');
 }
 
+// ==================== INFLUXDB REPLAY & HISTORICAL EVENT ENGINE ====================
+
+/**
+ * Tạo dữ liệu mẫu biến cố té ngã thực chứng (Preset 1: 60s @ 250Hz = 15,000 mẫu)
+ * - 0-25s: Nhịp tim bình thường 74 BPM, SMV ~1.0g.
+ * - 25-28s: Xung lực va đập cực mạnh SMV 3.42g, rung cơ EMG trên đạo trình I.
+ * - 28-32s: Nằm bất động tĩnh trên sàn (SMV ~1.01g), xác nhận ngã sau 2 giai đoạn.
+ * - 32-60s: Nhịp tim tăng nhanh phản xạ (Sinus Tachycardia ~118 BPM) do hoảng sợ.
+ */
+function generatePresetFallDataset() {
+  const totalTicks = 600; // 60 giây (mỗi tick = 100ms = 25 mẫu)
+  const packets = [];
+  let phase = 0;
+
+  for (let tick = 0; tick < totalTicks; tick++) {
+    const sec = tick * 0.1;
+    let bpm = 74;
+    let temp = 36.6;
+    let smv = 1.0 + (Math.random() - 0.5) * 0.08;
+    let fall = 0;
+    let phaseStep = 0.031; // ~74 BPM
+
+    if (sec >= 25.0 && sec < 27.5) {
+      // Pha va chạm
+      smv = 3.42 + (Math.random() - 0.5) * 0.3;
+      bpm = 88;
+    } else if (sec >= 27.5 && sec < 31.0) {
+      // Pha bất động & xác nhận ngã
+      smv = 1.01 + (Math.random() - 0.5) * 0.03;
+      fall = 1;
+      bpm = 105;
+    } else if (sec >= 31.0) {
+      // Pha nhịp nhanh sau ngã
+      bpm = Math.min(118, 105 + Math.floor((sec - 31.0) * 0.6));
+      temp = 36.4;
+      phaseStep = 0.049; // ~118 BPM
+    }
+
+    const samples = [];
+    for (let i = 0; i < 25; i++) {
+      phase += phaseStep;
+      const mod = phase % (2 * Math.PI);
+      const p = Math.exp(-Math.pow((mod - 1.2) * 5, 2)) * 115;
+      const q = -Math.exp(-Math.pow((mod - 1.8) * 12, 2)) * 150;
+      const r = Math.exp(-Math.pow((mod - 2.0) * 16, 2)) * 1250;
+      const s = -Math.exp(-Math.pow((mod - 2.2) * 12, 2)) * 260;
+      const t = Math.exp(-Math.pow((mod - 2.8) * 3.5, 2)) * 230;
+
+      // Nhiễu rung cơ cực mạnh trong lúc va đập (25s - 27.5s)
+      let artifact = 0;
+      if (sec >= 25.0 && sec < 27.5) {
+        artifact = (Math.random() - 0.5) * 450 + Math.sin(i * 0.8) * 200;
+      }
+      const baseline = 2380 + Math.sin(phase * 0.06) * 35;
+      samples.push(Math.round(baseline + p + q + r + s + t + artifact + (Math.random() - 0.5) * 12));
+    }
+
+    packets.push({
+      sec,
+      bpm,
+      temp: parseFloat(temp.toFixed(1)),
+      smv: parseFloat(smv.toFixed(2)),
+      leadsOff: 0,
+      fall,
+      ecg: samples
+    });
+  }
+
+  return {
+    id: 'preset_fall',
+    title: 'Biến cố Té ngã & Nhịp nhanh (Ca thực chứng)',
+    sub: 'Thời lượng: 60s (15,000 mẫu @ 250Hz) • SMV đỉnh: 3.42g • HR: 118 BPM',
+    durationSec: 60,
+    packets
+  };
+}
+
+/**
+ * Tạo dữ liệu mẫu biến cố nhịp tim chậm (Preset 2: 45s @ 250Hz = 11,250 mẫu)
+ */
+function generatePresetBradycardiaDataset() {
+  const totalTicks = 450; // 45 giây
+  const packets = [];
+  let phase = 0;
+
+  for (let tick = 0; tick < totalTicks; tick++) {
+    const sec = tick * 0.1;
+    const bpm = 42;
+    const temp = 36.5;
+    const smv = 1.0 + (Math.random() - 0.5) * 0.05;
+    const phaseStep = 0.0175; // ~42 BPM
+
+    const samples = [];
+    for (let i = 0; i < 25; i++) {
+      phase += phaseStep;
+      const mod = phase % (2 * Math.PI);
+      const p = Math.exp(-Math.pow((mod - 1.2) * 5, 2)) * 90;
+      const q = -Math.exp(-Math.pow((mod - 1.8) * 12, 2)) * 120;
+      const r = Math.exp(-Math.pow((mod - 2.0) * 16, 2)) * 1050;
+      const s = -Math.exp(-Math.pow((mod - 2.2) * 12, 2)) * 210;
+      const t = Math.exp(-Math.pow((mod - 2.8) * 3.5, 2)) * 190;
+      const baseline = 2400 + Math.sin(phase * 0.04) * 25;
+      samples.push(Math.round(baseline + p + q + r + s + t + (Math.random() - 0.5) * 10));
+    }
+
+    packets.push({
+      sec,
+      bpm,
+      temp: parseFloat(temp.toFixed(1)),
+      smv: parseFloat(smv.toFixed(2)),
+      leadsOff: 0,
+      fall: 0,
+      ecg: samples
+    });
+  }
+
+  return {
+    id: 'preset_bradycardia',
+    title: 'Cơn Nhịp tim Chậm kịch phát (Bradycardia)',
+    sub: 'Thời lượng: 45s (11,250 mẫu @ 250Hz) • SMV: 1.01g • HR: 42 BPM',
+    durationSec: 45,
+    packets
+  };
+}
+
+// Danh mục dataset có sẵn
+const PRESET_DATASETS = {
+  preset_fall: generatePresetFallDataset,
+  preset_bradycardia: generatePresetBradycardiaDataset
+};
+
+function openReplayModal() {
+  if (elements.replayModal) {
+    elements.replayModal.classList.remove('hidden');
+    setupEventCardClicks();
+  }
+}
+
+function closeReplayModal() {
+  if (elements.replayModal) {
+    elements.replayModal.classList.add('hidden');
+  }
+}
+
+function setupEventCardClicks() {
+  if (!elements.eventListContainer) return;
+  const cards = elements.eventListContainer.querySelectorAll('.event-card');
+  cards.forEach(card => {
+    card.onclick = () => {
+      cards.forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      selectedEventId = card.getAttribute('data-event-id');
+    };
+  });
+}
+
+/**
+ * Truy vấn danh sách sự kiện từ máy chủ InfluxDB v2 qua REST API
+ */
+async function fetchInfluxEvents() {
+  if (!config.influxUrl) {
+    showToast('⚠️ Vui lòng cấu hình InfluxDB URL trong mục Cài đặt!', 'warning');
+    return;
+  }
+
+  if (elements.influxFetchStatus) {
+    elements.influxFetchStatus.textContent = '⏳ Đang truy vấn InfluxDB...';
+  }
+
+  const queryUrl = `${config.influxUrl.replace(/\/$/, '')}/api/v2/query?org=${encodeURIComponent(config.influxOrg || 'biomed')}`;
+  const fluxQuery = `
+    from(bucket: "${config.influxBucket || 'biomed_events'}")
+      |> range(start: -7d)
+      |> filter(fn: (r) => r._measurement == "biomed_events")
+      |> limit(n: 10)
+  `.trim();
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const response = await fetch(queryUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${config.influxToken || ''}`,
+        'Content-Type': 'application/vnd.flux',
+        'Accept': 'application/csv'
+      },
+      body: fluxQuery,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const csvText = await response.text();
+      console.log('[InfluxDB] Kết quả truy vấn:', csvText);
+      if (elements.influxFetchStatus) {
+        elements.influxFetchStatus.textContent = '✅ Đã tải dữ liệu InfluxDB';
+      }
+      showToast('✅ Đã kết nối và tải sự kiện từ InfluxDB thành công!', 'success');
+    } else {
+      throw new Error(`HTTP ${response.status}`);
+    }
+  } catch (err) {
+    console.warn('[InfluxDB] Không kết nối được server:', err.message);
+    if (elements.influxFetchStatus) {
+      elements.influxFetchStatus.textContent = '💡 Dùng bản ghi thực chứng Offline';
+    }
+    showToast('💡 Không thể kết nối InfluxDB Cloud. Sử dụng bản ghi thực chứng tích hợp sẵn!', 'info');
+  }
+}
+
+/**
+ * Bắt đầu phát lại sự kiện (Replay Mode)
+ */
+function startReplay(eventId) {
+  closeReplayModal();
+
+  // 1. Dừng các chế độ khác
+  if (isDemoMode) stopDemoMode();
+  if (mqttClient) {
+    try { mqttClient.end(true); } catch (e) {}
+  }
+
+  // 2. Nạp dữ liệu sự kiện
+  if (PRESET_DATASETS[eventId]) {
+    replayDataset = PRESET_DATASETS[eventId]();
+  } else {
+    replayDataset = PRESET_DATASETS['preset_fall']();
+  }
+
+  isReplayMode = true;
+  replayPaused = false;
+  replayIndex = 0;
+
+  // 3. Hiển thị UI Replay
+  if (elements.replayToggleBtn) {
+    elements.replayToggleBtn.classList.add('active');
+  }
+  if (elements.replayBanner) {
+    elements.replayBanner.classList.remove('hidden');
+    if (elements.replayEventTitle) elements.replayEventTitle.textContent = replayDataset.title;
+    if (elements.replayEventSub) elements.replayEventSub.textContent = replayDataset.sub;
+  }
+  if (elements.replayPlayIcon) {
+    elements.replayPlayIcon.textContent = '⏸️';
+  }
+
+  updateConnectionStatus('demo', 'Phát lại InfluxDB');
+  addEventLog('PHÁT LẠI INFLUXDB', '--', '--', '--', replayDataset.title, 'INFO');
+  showToast(`⏪ Bắt đầu phát lại: ${replayDataset.title}`, 'info');
+
+  // 4. Kích hoạt bộ đếm thời gian thực 100ms
+  if (replayTimer) clearInterval(replayTimer);
+  replayTimer = setInterval(tickReplay, 100);
+}
+
+function tickReplay() {
+  if (!isReplayMode || !replayDataset || replayPaused) return;
+
+  if (replayIndex >= replayDataset.packets.length) {
+    // Hoàn tất phát lại -> Tự động tua lại từ đầu
+    replayIndex = 0;
+  }
+
+  const packet = replayDataset.packets[replayIndex];
+  if (packet) {
+    handleDataPacket({
+      bpm: packet.bpm,
+      temp: packet.temp,
+      smv: packet.smv,
+      leadsOff: packet.leadsOff,
+      fall: packet.fall,
+      ecg: packet.ecg
+    });
+
+    // Cập nhật thanh tiến trình Replay
+    const currentSec = Math.floor(packet.sec);
+    const totalSec = replayDataset.durationSec;
+    const pct = Math.min(100, (packet.sec / totalSec) * 100);
+
+    if (elements.replayProgressFill) {
+      elements.replayProgressFill.style.width = pct + '%';
+    }
+    if (elements.replayTimeDisplay) {
+      const curM = String(Math.floor(currentSec / 60)).padStart(2, '0');
+      const curS = String(currentSec % 60).padStart(2, '0');
+      const totM = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const totS = String(totalSec % 60).padStart(2, '0');
+      elements.replayTimeDisplay.textContent = `${curM}:${curS} / ${totM}:${totS}`;
+    }
+  }
+
+  replayIndex++;
+}
+
+function toggleReplayPause() {
+  if (!isReplayMode) return;
+  replayPaused = !replayPaused;
+  if (elements.replayPlayIcon) {
+    elements.replayPlayIcon.textContent = replayPaused ? '▶️' : '⏸️';
+  }
+  showToast(replayPaused ? '⏸️ Đã tạm dừng phát lại' : '▶️ Tiếp tục phát lại', 'info');
+}
+
+function restartReplay() {
+  if (!isReplayMode) return;
+  replayIndex = 0;
+  replayPaused = false;
+  if (elements.replayPlayIcon) {
+    elements.replayPlayIcon.textContent = '⏸️';
+  }
+  showToast('🔄 Đã tua lại từ đầu', 'info');
+}
+
+function stopReplay() {
+  if (replayTimer) {
+    clearInterval(replayTimer);
+    replayTimer = null;
+  }
+  isReplayMode = false;
+  replayPaused = false;
+  replayDataset = null;
+
+  if (elements.replayBanner) {
+    elements.replayBanner.classList.add('hidden');
+  }
+  if (elements.replayToggleBtn) {
+    elements.replayToggleBtn.classList.remove('active');
+  }
+
+  updateConnectionStatus('disconnected', 'Đã thoát Replay');
+  addEventLog('THOÁT REPLAY', '--', '--', '--', 'Trở lại Live', 'INFO');
+}
+
 // ==================== EVENT LISTENERS & SETUP ====================
 function initEventListeners() {
   // Bật / tắt âm thanh
@@ -928,15 +1301,79 @@ function initEventListeners() {
     }
   });
 
-  // Chuyển đổi chế độ Demo
+  // Chuyển đổi chế độ Demo (Giả lập toán học Offline)
   elements.simToggleBtn.addEventListener('click', () => {
     if (isDemoMode) {
       stopDemoMode();
       connectMQTT();
     } else {
+      if (isReplayMode) stopReplay();
       startDemoMode();
     }
   });
+
+  // Chuyển đổi chế độ Phát lại Lịch sử (InfluxDB Replay)
+  if (elements.replayToggleBtn) {
+    elements.replayToggleBtn.addEventListener('click', () => {
+      if (isReplayMode) {
+        stopReplay();
+        connectMQTT();
+      } else {
+        openReplayModal();
+      }
+    });
+  }
+
+  // Điều khiển Modal Replay
+  if (elements.closeReplayModalBtn) {
+    elements.closeReplayModalBtn.addEventListener('click', closeReplayModal);
+  }
+  if (elements.cancelReplayModalBtn) {
+    elements.cancelReplayModalBtn.addEventListener('click', closeReplayModal);
+  }
+  if (elements.replayModal) {
+    elements.replayModal.addEventListener('click', (e) => {
+      if (e.target === elements.replayModal) closeReplayModal();
+    });
+  }
+
+  // Bắt đầu phát lại sự kiện đã chọn
+  if (elements.startReplayBtn) {
+    elements.startReplayBtn.addEventListener('click', () => {
+      startReplay(selectedEventId);
+    });
+  }
+
+  // Nút truy vấn sự kiện từ máy chủ InfluxDB
+  if (elements.fetchInfluxEventsBtn) {
+    elements.fetchInfluxEventsBtn.addEventListener('click', fetchInfluxEvents);
+  }
+
+  // Các nút trên thanh điều khiển Replay (Replay Banner)
+  if (elements.replayPlayPauseBtn) {
+    elements.replayPlayPauseBtn.addEventListener('click', toggleReplayPause);
+  }
+  if (elements.replayRestartBtn) {
+    elements.replayRestartBtn.addEventListener('click', restartReplay);
+  }
+  if (elements.replayExitBtn) {
+    elements.replayExitBtn.addEventListener('click', () => {
+      stopReplay();
+      connectMQTT();
+    });
+  }
+
+  // Nhấp vào thanh tiến trình để tua nhanh/chậm dải sóng
+  if (elements.replayProgressBar) {
+    elements.replayProgressBar.addEventListener('click', (e) => {
+      if (!isReplayMode || !replayDataset || !replayDataset.packets) return;
+      const rect = elements.replayProgressBar.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, clickX / rect.width));
+      replayIndex = Math.floor(pct * replayDataset.packets.length);
+      tickReplay();
+    });
+  }
 
   // Tắt cảnh báo khẩn & tắt còi từ xa
   elements.dismissAlertBtn.addEventListener('click', () => {
@@ -962,6 +1399,18 @@ function initEventListeners() {
     if (elements.cfgTopicCmd) {
       elements.cfgTopicCmd.value = config.topicCmd || DEFAULT_CONFIG.topicCmd;
     }
+    if (elements.cfgInfluxUrl) {
+      elements.cfgInfluxUrl.value = config.influxUrl || DEFAULT_CONFIG.influxUrl;
+    }
+    if (elements.cfgInfluxOrg) {
+      elements.cfgInfluxOrg.value = config.influxOrg || DEFAULT_CONFIG.influxOrg;
+    }
+    if (elements.cfgInfluxBucket) {
+      elements.cfgInfluxBucket.value = config.influxBucket || DEFAULT_CONFIG.influxBucket;
+    }
+    if (elements.cfgInfluxToken) {
+      elements.cfgInfluxToken.value = config.influxToken || '';
+    }
     elements.configModal.classList.remove('hidden');
   });
 
@@ -985,10 +1434,14 @@ function initEventListeners() {
       pass: elements.cfgPass.value.trim(),
       topicData: elements.cfgTopicData.value.trim(),
       topicAlert: elements.cfgTopicAlert.value.trim(),
-      topicCmd: elements.cfgTopicCmd ? elements.cfgTopicCmd.value.trim() : DEFAULT_CONFIG.topicCmd
+      topicCmd: elements.cfgTopicCmd ? elements.cfgTopicCmd.value.trim() : DEFAULT_CONFIG.topicCmd,
+      influxUrl: elements.cfgInfluxUrl ? elements.cfgInfluxUrl.value.trim() : DEFAULT_CONFIG.influxUrl,
+      influxOrg: elements.cfgInfluxOrg ? elements.cfgInfluxOrg.value.trim() : DEFAULT_CONFIG.influxOrg,
+      influxBucket: elements.cfgInfluxBucket ? elements.cfgInfluxBucket.value.trim() : DEFAULT_CONFIG.influxBucket,
+      influxToken: elements.cfgInfluxToken ? elements.cfgInfluxToken.value.trim() : ''
     });
     elements.configModal.classList.add('hidden');
-    showToast('💾 Đã lưu cấu hình MQTT thành công!', 'success');
+    showToast('💾 Đã lưu cấu hình MQTT & InfluxDB thành công!', 'success');
     connectMQTT();
   });
 
@@ -1002,6 +1455,10 @@ function initEventListeners() {
     if (elements.cfgTopicCmd) {
       elements.cfgTopicCmd.value = DEFAULT_CONFIG.topicCmd;
     }
+    if (elements.cfgInfluxUrl) elements.cfgInfluxUrl.value = DEFAULT_CONFIG.influxUrl;
+    if (elements.cfgInfluxOrg) elements.cfgInfluxOrg.value = DEFAULT_CONFIG.influxOrg;
+    if (elements.cfgInfluxBucket) elements.cfgInfluxBucket.value = DEFAULT_CONFIG.influxBucket;
+    if (elements.cfgInfluxToken) elements.cfgInfluxToken.value = DEFAULT_CONFIG.influxToken;
   });
 
   // Xóa log

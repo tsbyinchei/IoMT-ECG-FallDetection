@@ -1,0 +1,52 @@
+# ==============================================================================
+# HỆ THỐNG LƯU TRỮ CHUỖI THỜI GIAN Y TẾ (TIME-SERIES DATABASE & DASHBOARD STACK)
+# Đề tài: Hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa
+# Thành phần: InfluxDB v2 (Lưu trữ chuỗi thời gian) + Grafana OSS (Trực quan hóa)
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # 1. Cơ sở dữ liệu Chuỗi thời gian InfluxDB v2
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: biomed_influxdb
+    restart: always
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./influxdb_data:/var/lib/influxdb2
+      - ./influxdb_config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=StrongPassword123@
+      - DOCKER_INFLUXDB_INIT_ORG=biomed
+      - DOCKER_INFLUXDB_INIT_BUCKET=biomed_metrics
+      - DOCKER_INFLUXDB_INIT_RETENTION=365d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=biomed_super_secret_admin_token_2026
+    networks:
+      - biomed_net
+
+  # 2. Nền tảng Trực quan hóa Dữ liệu Grafana
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: biomed_grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=GrafanaAdmin2026@
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/
+    depends_on:
+      - influxdb
+    networks:
+      - biomed_net
+
+networks:
+  biomed_net:
+    driver: bridge

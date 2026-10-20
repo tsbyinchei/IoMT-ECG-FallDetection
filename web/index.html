@@ -60,11 +60,44 @@
         <span>🧪 Chế độ Demo</span>
       </button>
 
-      <button id="configModalBtn" class="btn btn-primary" title="Cấu hình kết nối MQTT Broker">
+      <button id="replayToggleBtn" class="btn btn-replay" title="Xem lại hoặc phát lại dữ liệu biến cố từ InfluxDB">
+        <span id="replayBtnIcon">⏪</span>
+        <span id="replayBtnLabel">Phát lại InfluxDB</span>
+      </button>
+
+      <button id="configModalBtn" class="btn btn-primary" title="Cấu hình kết nối MQTT Broker & InfluxDB">
         <span>⚙️ Cấu hình</span>
       </button>
     </div>
   </header>
+
+  <!-- Banner Phát Lại Lịch Sử InfluxDB (Hiện khi đang ở Replay Mode) -->
+  <aside id="replayBanner" class="replay-banner hidden" role="region" aria-label="Thanh điều khiển phát lại lịch sử">
+    <div class="replay-info">
+      <span class="replay-badge">⏪ INFLUXDB REPLAY</span>
+      <div class="replay-text-group">
+        <span id="replayEventTitle" class="replay-title">Biến cố Té ngã Khẩn cấp (60s)</span>
+        <span id="replayEventSub" class="replay-sub">Thời điểm: 2026-10-18 19:42:15 • Đỉnh va chạm: 3.42g • Nhịp tim: 118 BPM</span>
+      </div>
+    </div>
+    <div class="replay-controls">
+      <div class="replay-progress-wrapper">
+        <div id="replayProgressBar" class="replay-progress-bar" title="Nhấp để tua nhanh/chậm">
+          <div id="replayProgressFill" class="replay-progress-fill"></div>
+        </div>
+        <span id="replayTimeDisplay" class="replay-time">00:00 / 01:00</span>
+      </div>
+      <button id="replayPlayPauseBtn" class="btn btn-sm btn-secondary" title="Tạm dừng / Tiếp tục phát lại">
+        <span id="replayPlayIcon">⏸️</span>
+      </button>
+      <button id="replayRestartBtn" class="btn btn-sm btn-ghost" title="Phát lại từ đầu">
+        <span>🔄 Tua lại</span>
+      </button>
+      <button id="replayExitBtn" class="btn btn-sm btn-danger" title="Thoát chế độ Replay và trở về Live MQTT">
+        <span>⏹️ Thoát Replay</span>
+      </button>
+    </div>
+  </aside>
 
   <!-- Banner Cảnh Báo Khẩn Cấp (Hiện ra khi có té ngã hoặc hở điện cực) -->
   <aside id="emergencyBanner" class="alert-banner hidden" role="alert">
@@ -275,11 +308,84 @@
           <input type="text" id="cfgTopicCmd" value="biomed/gateway/cmd" required>
         </div>
 
+        <hr class="form-divider">
+        <div class="form-section-title">📊 Cấu Hình Cơ Sở Dữ Liệu InfluxDB v2</div>
+        <div class="form-group">
+          <label for="cfgInfluxUrl">InfluxDB API URL:</label>
+          <input type="text" id="cfgInfluxUrl" placeholder="https://influx.yourdomain.com:8086 hoặc http://localhost:8086">
+          <small class="form-tip">Địa chỉ máy chủ InfluxDB v2 (HTTP / HTTPS REST API)</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cfgInfluxOrg">Organization:</label>
+            <input type="text" id="cfgInfluxOrg" placeholder="biomed" value="biomed">
+          </div>
+          <div class="form-group">
+            <label for="cfgInfluxBucket">Events Bucket:</label>
+            <input type="text" id="cfgInfluxBucket" placeholder="biomed_events" value="biomed_events">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="cfgInfluxToken">API Token (Read-Only):</label>
+          <input type="password" id="cfgInfluxToken" placeholder="Token xác thực truy vấn InfluxDB v2">
+        </div>
+
         <div class="modal-actions">
           <button type="button" id="resetConfigBtn" class="btn btn-ghost">Mặc định</button>
           <button type="submit" class="btn btn-primary">Lưu & Kết Nối</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal Chọn Biến Cố InfluxDB Replay -->
+  <div id="replayModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">⏪ Chọn Bản Ghi Lịch Sử InfluxDB</h3>
+        <button id="closeReplayModalBtn" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-tip" style="margin-bottom: 12px;">
+          Chọn một bản ghi biến cố y sinh để nạp vào Oscilloscope và phát lại với tần số thực 250 Hz chuẩn Holter:
+        </p>
+
+        <div class="event-list" id="eventListContainer">
+          <!-- Preset 1: Té ngã khẩn cấp có sóng va đập -->
+          <div class="event-card selected" data-event-id="preset_fall">
+            <div class="event-meta">
+              <span class="event-name">🚨 Biến cố Té ngã &amp; Nhịp nhanh (Ca thực chứng)</span>
+              <span class="event-details">Thời lượng: 60s (15,000 mẫu @ 250Hz) • SMV đỉnh: 3.42g • HR: 118 BPM</span>
+            </div>
+            <span class="event-tag event-tag-danger">CRITICAL FALL</span>
+          </div>
+
+          <!-- Preset 2: Rối loạn nhịp tim chậm -->
+          <div class="event-card" data-event-id="preset_bradycardia">
+            <div class="event-meta">
+              <span class="event-name">⚠️ Cơn Nhịp tim Chậm kịch phát (Bradycardia)</span>
+              <span class="event-details">Thời lượng: 45s (11,250 mẫu @ 250Hz) • SMV: 1.01g • HR: 42 BPM</span>
+            </div>
+            <span class="event-tag event-tag-warning">BRADYCARDIA</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 8px;">
+          <button id="fetchInfluxEventsBtn" type="button" class="btn btn-sm btn-secondary" title="Truy vấn danh sách sự kiện mới nhất từ máy chủ InfluxDB qua API">
+            <span>🔄 Tải từ InfluxDB Server</span>
+          </button>
+          <span id="influxFetchStatus" class="form-tip">Sẵn sàng phát lại</span>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 16px;">
+          <button type="button" id="cancelReplayModalBtn" class="btn btn-ghost">Đóng</button>
+          <button type="button" id="startReplayBtn" class="btn btn-primary" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(0, 240, 255, 0.4));">
+            ▶️ Bắt Đầu Phát Lại
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

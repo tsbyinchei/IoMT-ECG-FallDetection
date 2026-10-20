@@ -23,8 +23,10 @@ Giao diện Web PWA (Internet of Medical Things) hiển thị và giám sát d�
    - Tự động tái kích hoạt còi khi người bệnh hồi phục và kết thúc sự cố (tuân thủ tiêu chuẩn an toàn cảnh báo y tế).
 5. **Bảng kiểm định lâm sàng (Clinical Audit Trail):**
    - Nhật ký ghi lại toàn bộ các biến cố với mốc thời gian chi tiết.
-6. **Chế độ Demo (Simulator Mode):**
-   - Cho phép mô phỏng phát sóng điện tim P-QRS-T và kích hoạt té ngã thử nghiệm mà không cần cắm kit phần cứng.
+6. **Vận hành song song 3 Chế độ (Tri-Mode Operation):**
+   - **Trực tiếp (Live MQTT Stream):** Giám sát thời gian thực từ trạm Gateway ESP32 qua WSS TLS 1.3.
+   - **Giả lập Toán học (Math Simulator Demo):** Mô phỏng dải sóng P-QRS-T và kích hoạt kiểm định té ngã thử nghiệm offline khi không có phần cứng và mạng.
+   - **Phát lại Lịch sử (InfluxDB Replay):** Kết nối InfluxDB v2 REST API (`/api/v2/query`), tải dải sóng 60 giây của các ca biến cố thực tế (30s trước + 30s sau ngã) và phát lại với tần số thực $250\text{ Hz}$ trên Oscilloscope kèm thanh điều khiển Play/Pause/Tua lại.
 7. **Hỗ trợ PWA (Progressive Web App):**
    - Tích hợp trọn bộ icon chuẩn (`48px` - `512px`), splash screen và logo thương hiệu sắc nét `assets/logo.webp`.
    - Cài đặt Service Worker `sw.js` và `manifest.json` cho phép **Cài đặt lên màn hình chính điện thoại/máy tính (Add to Home Screen)** như một ứng dụng native.
