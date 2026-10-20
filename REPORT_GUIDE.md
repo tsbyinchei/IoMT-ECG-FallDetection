@@ -82,11 +82,14 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
 ---
 
 ### CHƯƠNG 5: HƯỚNG DẪN TRÌNH BÀY KẾT QUẢ THỰC NGHIỆM & THẢO LUẬN (4–5 trang)
-5.1. Danh mục 4 đồ thị thực nghiệm cần chèn vào báo cáo (Xuất từ thư mục `MATLAB/figures/`):
-   - **Hình 5.1:** Tín hiệu ECG thô, tín hiệu sau lọc số Pan-Tompkins Bandpass và năng lượng tích phân MWI gán nhãn đỉnh R.
-   - **Hình 5.2:** Biểu đồ Poincaré Plot biểu diễn phân bố elip các cặp khoảng $RR_n - RR_{n+1}$.
-   - **Hình 5.3:** Phổ mật độ công suất PSD Welch chứng minh năng lượng tập trung ở dải $5 - 15\text{Hz}$ và triệt tiêu hoàn toàn nhiễu lưới $50\text{Hz}$.
-   - **Hình 5.4:** Động lực học véc-tơ gia tốc $SMV$ phân tích 3 pha té ngã.
+5.1. Danh mục đồ thị & giao diện thực nghiệm cần chèn vào báo cáo:
+   - **Hình 5.1 (MATLAB):** Tín hiệu ECG thô, tín hiệu sau lọc số Pan-Tompkins Bandpass và năng lượng tích phân MWI gán nhãn đỉnh R.
+   - **Hình 5.2 (MATLAB):** Biểu đồ Poincaré Plot biểu diễn phân bố elip các cặp khoảng $RR_n - RR_{n+1}$.
+   - **Hình 5.3 (MATLAB):** Phổ mật độ công suất PSD Welch chứng minh năng lượng tập trung ở dải $5 - 15\text{Hz}$ và triệt tiêu hoàn toàn nhiễu lưới $50\text{Hz}$.
+   - **Hình 5.4 (MATLAB):** Động lực học véc-tơ gia tốc $SMV$ phân tích 3 pha té ngã.
+   - **Hình 5.5 (Web Dashboard PWA):** Màn hình giám sát trực quan thời gian thực tại [https://iomt.tsbyin.dev](https://iomt.tsbyin.dev) với đồ thị điện tim Oscilloscope tia quét phosphor 60 FPS và dải HUD Sinh hiệu Lâm sàng (Pulse LED, Thân nhiệt, Gia tốc va đập).
+   - **Hình 5.6 (Web Dashboard PWA):** Giao diện bảng điều khiển dạng Drawer trượt trên thiết bị di động, cơ chế cô lập Stacking Context và thanh cảnh báo khẩn cấp té ngã tức thời.
+   - **Hình 5.7 (Web Dashboard Replay):** Giao diện thanh công cụ InfluxDB Replay phát lại dải sóng 60 giây quanh thời điểm té ngã với tần số thực $250\text{ Hz}$.
 5.2. Hướng dẫn lập bảng thống kê chỉ số lâm sàng (Trích xuất từ file kết quả phiên đo thực tế của nhóm):
    - Tần số lấy mẫu thực tế ($F_s$) và tổng thời gian ghi nhận tín hiệu phiên đo.
    - Tổng số mẫu thu nhận và số lượng phức bộ QRS bóc tách được.
@@ -98,8 +101,9 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
    - Đánh giá cơ chế chống báo động giả: Hiệu quả của cửa sổ thẩm định tư thế nghiêng $Tilt$ và trạng thái bất động sau va đập.
    - Thời gian đáp ứng của còi hú Active Buzzer, hiển thị cảnh báo trên màn hình OLED và thời gian đẩy tin nhắn khẩn cấp qua Telegram Bot & Zalo Bot.
 5.4. Đánh giá hiệu năng mạng truyền thông IoT:
-   - Tầng mạng nội bộ (Wi-Fi UDP Socket): Đánh giá độ trễ truyền gói tin điểm-điểm và tỷ lệ mất gói tin.
-   - Tầng đám mây (Cloudflare Tunnel WSS MQTT): Đánh giá thời gian phân phối thông điệp từ Gateway lên Broker và Web Dashboard.
+   - Tầng mạng nội bộ (Wi-Fi UDP Socket): Đánh giá độ trễ truyền gói tin điểm-điểm ($< 5\text{ ms}$) và tỷ lệ mất gói tin ($< 0.2\%$).
+   - Tầng đám mây (Cloudflare Tunnel WSS MQTT): Đánh giá thời gian phân phối thông điệp từ Gateway lên Broker và Web Dashboard ([https://iomt.tsbyin.dev](https://iomt.tsbyin.dev)).
+   - Đánh giá độ ổn định kết nối đa thiết bị (PC, máy tính bảng, điện thoại di động) và cơ chế bộ nhớ đệm ngoại tuyến của PWA Service Worker.
 
 ---
 

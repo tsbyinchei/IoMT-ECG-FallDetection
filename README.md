@@ -73,8 +73,8 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 ```
 +===================================================================================+
 | 4. TẦNG ỨNG DỤNG (Application Layer)                                              |
-|    - Web Dashboard: IoMT Telehealth Monitor (https://iomt.yourdomain.com)         |
-|    - Quản trị Broker: EMQX Console (https://emqx.yourdomain.com)                  |
+|    - Web Dashboard PWA: IoMT Telehealth Monitor (https://iomt.tsbyin.dev)         |
+|    - Quản trị Broker: EMQX Console Dashboard                                      |
 |    - Cảnh báo khẩn cấp tức thời: Telegram Bot (@your_telegram_bot) & Zalo Bot     |
 |    - Phân tích chuyên sâu: MATLAB Biomedical Signal Processing Toolbox            |
 +===================================================================================+
@@ -82,10 +82,11 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
                                       │ WSS / HTTPS (Port 443 - Cloudflare Tunnel)
 +===================================================================================+
 | 3. TẦNG HỖ TRỢ DỊCH VỤ & ỨNG DỤNG (Service & Application Support Layer)           |
-|    - Hạ tầng: Ubuntu Server cá nhân quản lý qua 1Panel (192.168.1.x)              |
-|    - MQTT Broker: EMQX (Cổng WebSocket 8083 -> Domain: wss://mqtt.yourdomain.com) |
-|    - Cơ sở dữ liệu chuỗi thời gian: InfluxDB (Lưu ECG 250Hz, Temp, SMV)           |
-|    - Bảo mật & Chứng chỉ số: Cloudflare Zero Trust SSL/TLS Tunnel                 |
+|    - Hạ tầng: Ubuntu Server cá nhân quản lý qua 1Panel (192.168.1.36)             |
+|    - MQTT Broker: EMQX (Cổng WebSocket 8083 -> Domain: wss://mqtt.tsbyin.dev/mqtt)|
+|    - Cầu nối dữ liệu: tools/mqtt_to_influxdb.py (Docker Bridge Network)           |
+|    - Cơ sở dữ liệu chuỗi thời gian: InfluxDB v2 (Lưu ECG 250Hz, Temp, SMV, Replay)|
+|    - Bảo mật & Chứng chỉ số: Cloudflare Zero Trust SSL/TLS 1.3 Tunnel             |
 +===================================================================================+
                                       ▲
                                       │ MQTT WSS / TCP (Wi-Fi / 4G Hotspot)
@@ -93,7 +94,7 @@ Hoạt động độc lập không cần Internet hay Router ngoài, phục vụ
 | 2. TẦNG MẠNG (Network Layer)                                                      |
 |    - Gateway: ESP32-WROOM-32 (Chế độ Wi-Fi kép AP + STA)                          |
 |      + AP Mode: BIOMED_GW (Giao tiếp UDP nội bộ 192.168.4.1)                      |
-|      + STA Mode: Đẩy dữ liệu lên Cloud qua wss://mqtt.yourdomain.com/mqtt         |
+|      + STA Mode: Đẩy dữ liệu lên Cloud qua wss://mqtt.tsbyin.dev/mqtt             |
 |      + Khách thể ngầm: Native esp_mqtt_client FreeRTOS đa luồng                   |
 |    - Giao thức nội bộ: Wi-Fi UDP Socket (Port 4210, 62 bytes/packet)              |
 +===================================================================================+
@@ -202,7 +203,21 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 
 ---
 
-## 🚀 7. HƯỚNG DẪN CÀI ĐẶT VÀ CHẠY THỬ (STEP-BY-STEP)
+## 🌐 7. GIAO DIỆN WEB PWA & GIÁM SÁT TỪ XA (TELEHEALTH DASHBOARD)
+
+Hệ thống cung cấp giao diện Web PWA chuẩn y tế tại địa chỉ: **[https://iomt.tsbyin.dev](https://iomt.tsbyin.dev)**
+
+* **Đồ thị Điện tim Oscilloscope 60 FPS:** Bộ quét phosphor y tế khử giật lag, tia quét laser dẫn đầu, hỗ trợ tự động co giãn biên độ động (Dynamic Auto-Gain).
+* **Dải HUD Sinh hiệu Lâm sàng (Clinical Telemetry HUD Strip):** Tích hợp đèn xung nhịp tim Visual Pulse LED `#heartPulse`, ruy-băng nhiệt độ lâm sàng `#tempNeedle`, và đồng hồ gia tốc 2 phân tầng `#smvGauge` có vạch báo động té ngã $2.5g$.
+* **Hệ thống Thanh bên Di động (Mobile Drawer System):** Tự động chuyển đổi mượt mà giữa thanh ngang trên Desktop và Drawer trượt trên Mobile ($\le 1024\text{px}$). Cơ chế cô lập Stacking Context (`z-index: 100000 / 100001 / 99990`) và lớp nền phẳng không mờ đảm bảo hiển thị sắc nét tuyệt đối.
+* **Tự động đóng và đồng bộ co giãn (Adaptive Resize Sync):** Tự động giải phóng trạng thái mở khi chuyển đổi màn hình di động $\to$ máy tính và đồng bộ canvas qua `requestAnimationFrame`.
+* **Phát lại Biến cố InfluxDB (60s Fall Event Replay):** Tải và phát lại dải sóng 60 giây quanh thời điểm té ngã với tần số thực $250\text{ Hz}$.
+* **Điều khiển Còi hú từ xa (Remote Mute):** Gửi lệnh MQTT tới topic `biomed/gateway/cmd` dập tắt còi Active Buzzer trên kit Gateway ngay tức thì.
+* **Cài đặt Ứng dụng PWA (v1.9):** Hỗ trợ Add to Home Screen và vận hành offline qua Service Worker `sw.js`.
+
+---
+
+## 🚀 8. HƯỚNG DẪN CÀI ĐẶT VÀ CHẠY THỬ (STEP-BY-STEP)
 
 ### Bước 1: Nạp Node Cảm Biến (ESP32-C3)
 1. Mở Arduino IDE, cắm ESP32-C3 vào cổng COM.
@@ -215,7 +230,7 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
    ```c
    #define SECRET_ROUTER_SSID "Tên_WiFi_Nhà_Bạn"
    #define SECRET_ROUTER_PASS "Mật_Khẩu_WiFi"
-   #define SECRET_MQTT_URI    "wss://mqtt.yourdomain.com/mqtt"
+   #define SECRET_MQTT_URI    "wss://mqtt.tsbyin.dev/mqtt"
    #define SECRET_MQTT_USER   "YOUR_MQTT_USERNAME"
    #define SECRET_MQTT_PASS   "YOUR_MQTT_PASSWORD"
    #define TELEGRAM_BOT_TOKEN "Token_Telegram_Bot_Của_Bạn"
@@ -246,6 +261,15 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
    ```
    MATLAB sẽ tự động tính toán các chỉ số lâm sàng (HRV, SDNN, RMSSD, SD1/SD2) và **tự động xuất 4 đồ thị 300 DPI** vào thư mục `MATLAB/figures/` để dán vào báo cáo!
 
+### Bước 4: Chạy Cầu nối InfluxDB & Mở Web Dashboard
+1. Chạy dịch vụ cầu nối MQTT sang InfluxDB chuỗi thời gian:
+   ```bash
+   python tools/mqtt_to_influxdb.py
+   # hoặc chạy qua Docker:
+   docker compose -f tools/docker/docker-compose-bridge.yml up -d
+   ```
+2. Mở trình duyệt truy cập: **[https://iomt.tsbyin.dev](https://iomt.tsbyin.dev)** để theo dõi trực tiếp dạng sóng ECG 60 FPS, sinh hiệu và nhận cảnh báo té ngã thời gian thực.
+
 ---
 
 ## 📑 HỆ THỐNG TÀI LIỆU DỰ ÁN (DOCUMENTATION DIRECTORY)
@@ -265,7 +289,7 @@ Bấm nút **BOOT (GPIO 0)** trên Gateway ESP32 để chuyển tuần tự 4 tr
 | 💻 **ESP32C3 Example** | **Mã nguồn Node Cảm biến** | Lấy mẫu ECG 250Hz, MPU-6050 SMV, DS18B20 1-Wire, đóng gói UDP 62-byte (CRC-16), hạ xung 80MHz tiết kiệm pin. | 👉 **[Xem code ESP32-C3](ESP32C3%20Example/ESP32C3%20Example.ino)** |
 | 📟 **ESP32 Example** | **Mã nguồn Gateway** | SoftAP UDP Server, giao diện OLED 4 trang, nút BOOT chuyển trang, còi Buzzer GPIO 23, lọc nhịp tim. | 👉 **[Xem code Gateway](ESP32%20Example/ESP32%20Example.ino)** |
 | 📊 **MATLAB Scripts** | **Trạm Xử lý Tín hiệu** | Pan-Tompkins thời gian thực với chấm đỏ đỉnh R, bộ lọc trung vị Median, xuất file .MAT và phân tích HRV. | 👉 **[Xem thư mục MATLAB](MATLAB/)** |
-| 🌐 **Web Dashboard** | **Giao diện Theo dõi Realtime** | Màn hình PWA 60 FPS theo dõi điện tim, thân nhiệt, gia tốc va đập SMV & còi hú Web Audio API cho người thân. | 👉 **[Xem Web Dashboard](web/)** |
+| 🌐 **Web Dashboard** | **Giao diện Theo dõi Realtime** | Màn hình PWA v1.9 60 FPS, dải HUD Sinh hiệu, InfluxDB Replay 60s & còi báo Web Audio API ([https://iomt.tsbyin.dev](https://iomt.tsbyin.dev)). | 👉 **[Xem Web Dashboard](web/)** |
 
 ---
 

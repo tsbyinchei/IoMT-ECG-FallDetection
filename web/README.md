@@ -1,54 +1,59 @@
 # 🌐 IoMT Realtime Telehealth Dashboard
 ## ĐỀ TÀI: "THIẾT KẾ HỆ THỐNG IoT THEO DÕI ĐIỆN TIM, THÂN NHIỆT VÀ CẢNH BÁO TÉ NGÃ TỪ XA CHO NGƯỜI CAO TUỔI TẠI NHÀ"
 
-Giao diện Web PWA (Internet of Medical Things) hiển thị và giám sát dữ liệu thời gian thực dành cho đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"**, kết nối qua giao thức WebSocket Secure (WSS).
+Giao diện Web PWA (Internet of Medical Things) hiển thị và giám sát dữ liệu thời gian thực dành cho đề tài **"Thiết kế hệ thống IoT theo dõi điện tim, thân nhiệt và cảnh báo té ngã từ xa cho người cao tuổi tại nhà"**, kết nối qua giao thức WebSocket Secure (WSS TLS 1.3) tại địa chỉ chính thức: [https://iomt.tsbyin.dev](https://iomt.tsbyin.dev).
 
 ---
 
-## 🚀 Tính năng nổi bật
+## 🚀 Tính năng Kỹ thuật Nổi bật (Phiên bản v1.9)
 
-1. **Đồ thị điện tim ECG 60 FPS (Phosphor Sweep Oscilloscope):**
-   - Bộ quét tia phosphor giống monitor y tế thực tế, khử giật lag, hiển thị dạng sóng 250Hz.
-2. **Theo dõi sinh hiệu đa kênh:**
-   - Nhịp tim tự động (BPM) kèm hoạt ảnh tim đập phập phồng (Visual Heart Pulse) và âm thanh tiếng bíp QRS (Web Audio API).
-   - Thân nhiệt bề mặt da (DS18B20) phân cấp theo tiêu chuẩn lâm sàng.
-   - Thanh đo lực va đập gia tốc $SMV$ ($0 - 4.0g$) kèm vạch cảnh báo té ngã $2.5g$.
-   - Trạng thái hở điện cực (Smart Leads-Off Detection).
-3. **Cảnh báo khẩn cấp tức thời (Emergency Alarm Siren):**
-   - Banner cảnh báo nhấp nháy đỏ rực và âm thanh còi cứu thương khi phát hiện ngã.
-4. **Tắt còi báo động từ xa (Remote Mute):**
-   - Nút **🔕 Tắt còi từ xa** trên thanh điều khiển hoặc ngay trong Banner cảnh báo.
-   - Gửi lệnh MQTT tới topic `biomed/gateway/cmd` để dập tắt tiếng còi chip trên kit Gateway ESP32 ngay tức thì.
-   - Hỗ trợ tắt còi tại chỗ bằng nút cứng **BOOT** trên Gateway ESP32 khi người thân đã tiếp cận bệnh nhân.
-   - Tự động tái kích hoạt còi khi người bệnh hồi phục và kết thúc sự cố (tuân thủ tiêu chuẩn an toàn cảnh báo y tế).
-5. **Bảng kiểm định lâm sàng (Clinical Audit Trail):**
-   - Nhật ký ghi lại toàn bộ các biến cố với mốc thời gian chi tiết.
-6. **Vận hành song song 3 Chế độ (Tri-Mode Operation):**
-   - **Trực tiếp (Live MQTT Stream):** Giám sát thời gian thực từ trạm Gateway ESP32 qua WSS TLS 1.3.
-   - **Giả lập Toán học (Math Simulator Demo):** Mô phỏng dải sóng P-QRS-T và kích hoạt kiểm định té ngã thử nghiệm offline khi không có phần cứng và mạng.
-   - **Phát lại Lịch sử (InfluxDB Replay):** Kết nối InfluxDB v2 REST API (`/api/v2/query`), tải dải sóng 60 giây của các ca biến cố thực tế (30s trước + 30s sau ngã) và phát lại với tần số thực $250\text{ Hz}$ trên Oscilloscope kèm thanh điều khiển Play/Pause/Tua lại.
-7. **Hỗ trợ PWA (Progressive Web App):**
-   - Tích hợp trọn bộ icon chuẩn (`48px` - `512px`), splash screen và logo thương hiệu sắc nét `assets/logo.webp`.
-   - Cài đặt Service Worker `sw.js` và `manifest.json` cho phép **Cài đặt lên màn hình chính điện thoại/máy tính (Add to Home Screen)** như một ứng dụng native.
-   - Hỗ trợ hoạt động ngoại tuyến (Offline Mode) nhờ cơ chế cache tài nguyên thông minh.
-8. **Bảo mật tuyệt đối:**
-   - Cấu hình MQTT Broker, tài khoản và mật khẩu được lưu vào `localStorage` của trình duyệt, không bao giờ hardcode lộ ra bên ngoài.
+### 1. Đồ thị Điện tim ECG 60 FPS (Phosphor Sweep Oscilloscope)
+* **Bộ quét tia Phosphor y tế:** Mô phỏng cơ chế quét phosphor của máy đo điện tim chuyên dụng trong bệnh viện, khử giật lag, kết xuất mượt mà 60 khung hình/giây.
+* **Tần số lấy mẫu y sinh $250\text{ Hz}$:** Tiếp nhận 25 mẫu/100ms từ trạm Gateway ESP32, hiển thị dạng sóng P-QRS-T sắc nét với khe quét xóa dữ liệu cũ (Sweep Erase Gap 26px).
+* **Tự động cân chỉnh biên độ hiển thị (Dynamic Auto-Gain Envelope):** Thu phóng linh hoạt theo biên độ sóng người bệnh, có ngưỡng sàn chống khuếch đại nhiễu tĩnh điện khi chưa dán điện cực.
+* **Tia quét laser & Điểm sáng dẫn đầu (Medical Sweep Cursor):** Đèn quét phát quang gradient neon xanh lục (`#00ff88`) kèm chấm laser trắng chỉ dẫn thời điểm hiện tại.
+
+### 2. Dải HUD Sinh hiệu Lâm sàng Tích hợp (Clinical Telemetry HUD Strip)
+Thay thế hoàn toàn bố cục thẻ card rời rạc trước đây bằng dải giám sát sinh hiệu liên hoàn chuẩn monitor y tế:
+* **Node đèn xung nhịp tim (Visual Pulse LED `#heartPulse`):** Nhấp nháy màu đỏ đồng bộ từng nhát đập của tim khi nhận diện phức bộ QRS, kết hợp âm thanh bíp tim qua Web Audio API.
+* **Ruy-băng nhiệt độ lâm sàng (`#tempNeedle`):** Trực quan hóa thân nhiệt biểu mô từ cảm biến DS18B20 với thang đo từ $30^\circ\text{C}$ đến $42^\circ\text{C}$, vạch cảnh báo sốt $\ge 37.5^\circ\text{C}$ và hạ thân nhiệt $< 35.0^\circ\text{C}$.
+* **Đồng hồ gia tốc 2 phân tầng (`#smvGauge`):** Hiển thị vector gia tốc toàn phần $SMV = \sqrt{a_x^2 + a_y^2 + a_z^2}$ ($0\text{--}4.0g$) kèm vạch chỉ điểm ngưỡng cảnh báo va đập $2.5g$.
+* **Dải phụ đo lường hệ thống (Telemetry Mini Sub-Strip):** Tích hợp bộ đếm mẫu ECG nhận được, số lần phát hiện té ngã, số lần kích hoạt báo động khẩn cấp và độ trễ kết nối.
+
+### 3. Hệ thống Thanh bên Di động & Cách ly Stacking Context (Mobile Drawer System)
+* **Tối ưu hóa đa thiết bị (Responsive Breakpoints):**
+  - **Desktop (> 1024px):** Thanh điều khiển dàn phẳng ngang (horizontal action bar) trong Header.
+  - **Mobile & Tablet ($\le 1024\text{px}$):** Tự động thu gọn vào Drawer trượt từ cạnh phải với hiệu ứng chuyển động mượt mà bằng CSS Hardware Acceleration.
+* **Cách ly Stacking Context (Khắc phục triệt để lỗi mờ & kẹt backdrop):**
+  - Thiết lập phân tầng z-index phân cấp nghiêm ngặt: `.top-nav` đạt `z-index: 100000 !important`, `.nav-action-group` đạt `z-index: 100001 !important`, và `.drawer-backdrop` nằm ở `z-index: 99990 !important`.
+  - Loại bỏ hoàn toàn lớp mờ GPU `backdrop-filter: blur(4px)` trên Mobile Backdrop, chuyển sang màu phủ phẳng `rgba(0, 0, 0, 0.72)`. Nhờ đó, menu Drawer trên điện thoại hiển thị sắc nét 100%, không bị lớp mờ đè lên mặt.
+* **Đồng bộ hóa chuyển đổi màn hình (Adaptive Resize Sync):**
+  - Trình lắng nghe sự kiện `resize` tự động đóng Drawer và giải phóng lớp nền khi màn hình mở rộng trở lại kích thước Desktop (>1024px).
+  - Tự động đồng bộ co giãn kích thước Canvas qua `requestAnimationFrame(resizeCanvas)`, ngăn chặn hiện tượng méo tỷ lệ hoặc kẹt khung khi chuyển đổi qua lại giữa PC và Mobile.
+
+### 4. Vận hành Song song 3 Chế độ (Tri-Mode Operation)
+* **Chế độ Trực tiếp (Live MQTT Stream):** Kết nối liên tục với trạm Gateway ESP32 qua giao thức an toàn `wss://mqtt.tsbyin.dev/mqtt` (TLS 1.3), tự động khôi phục kết nối khi mạng chập chờn.
+* **Chế độ Giả lập Toán học (Math Simulator Demo):** Mô phỏng chuỗi sóng P-QRS-T theo công thức hàm số sinh học và kích hoạt kiểm định té ngã thử nghiệm offline khi không có kit phần cứng.
+* **Chế độ Phát lại Biến cố InfluxDB (60s Fall Event Replay):** Tích hợp trực tiếp với InfluxDB v2 REST API (`/api/v2/query`), truy vấn dải sóng 60 giây của các ca té ngã thực tế (30s trước và 30s sau cú va đập) và phát lại với tần số thực $250\text{ Hz}$ trên Oscilloscope kèm thanh tua nhanh/chậm/tạm dừng.
+
+### 5. Cảnh báo Khẩn cấp & Điều khiển Còi hú Từ xa (Remote Mute)
+* **Emergency Alarm Siren:** Khi phát hiện va chạm té ngã ($SMV \ge 2.8g$), giao diện kích hoạt banner cảnh báo nhấp nháy đỏ rực kèm âm thanh còi cứu thương decibel cao (Web Audio API).
+* **Nút Tắt còi từ xa (Remote Mute):** Gửi lệnh điều khiển MQTT tới topic `biomed/gateway/cmd` để dập tắt tiếng còi hú Active Buzzer trên kit Gateway ESP32 ngay tức thì.
+* **Cơ chế an toàn:** Tự động hoàn nguyên trạng thái còi khi người cao tuổi phục hồi hoặc sau khi sự cố được xác nhận xử lý xong.
+
+### 6. Ứng dụng Web Cấp tiến (PWA - Progressive Web App v1.9)
+* Hỗ trợ cài đặt trực tiếp lên màn hình chính điện thoại hoặc máy tính (Add to Home Screen) mà không cần thông qua kho ứng dụng.
+* Bộ nhớ đệm Service Worker thông minh (`sw.js?v=1.9`) cho phép giao diện hoạt động mượt mà ngay cả khi mất kết nối mạng Internet.
 
 ---
 
-## 🛠️ Hướng dẫn Triển khai nhanh
+## 🛠️ Hướng dẫn Triển khai & Vận hành
 
-### Cách 1: Chạy trực tiếp trên máy cục bộ
-Bạn có thể mở trực tiếp file [index.html](index.html) bằng bất kỳ trình duyệt nào (Chrome, Edge, Safari, Firefox) hoặc chạy với VS Code Live Server.
+### Cách 1: Chạy trực tiếp trên máy phát triển cục bộ
+1. Mở thư mục `web/` bằng VS Code.
+2. Khởi chạy bằng tiện ích mở rộng **Live Server** (Port `5500`) hoặc mở trực tiếp file `index.html` trên trình duyệt Chrome / Edge.
 
-### Cách 2: Triển khai lên Ubuntu Server (1Panel / Nginx) với subdomain `iomt.tsbyin.dev`
-1. Đăng nhập vào 1Panel trên server `192.168.1.36`.
-2. Vào mục **Website** $\to$ **Tạo trang web tĩnh (Static Site)**:
-   - **Tên miền:** `iomt.tsbyin.dev`
-   - **Thư mục gốc:** Tải toàn bộ thư mục `web/` lên.
-3. Trong **Cloudflare Zero Trust Tunnel**:
-   - Thêm Public Hostname mới:
-     - Subdomain: `iomt`
-     - Domain: `tsbyin.dev`
-     - Service: `HTTP` $\to$ `localhost:<Cổng_Port_Nginx_1Panel>` (hoặc IP nội bộ `192.168.1.36:<Port>`).
-4. Truy cập `https://iomt.tsbyin.dev` từ bất kỳ đâu trên thế giới!
+### Cách 2: Triển khai Đám mây qua Ubuntu Server & Cloudflare Tunnel
+1. Đặt mã nguồn thư mục `web/` vào thư mục phục vụ web của Nginx hoặc quản lý qua 1Panel trên máy chủ Ubuntu Server.
+2. Cấu hình dịch vụ Cloudflare Zero Trust Tunnel định tuyến tên miền `iomt.tsbyin.dev` tới cổng HTTP nội bộ của Nginx.
+3. Truy cập an toàn qua giao thức HTTPS: [https://iomt.tsbyin.dev](https://iomt.tsbyin.dev).

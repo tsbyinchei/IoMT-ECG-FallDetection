@@ -71,7 +71,7 @@ Kiến trúc phần cứng của hệ thống phân định rõ ràng giữa cá
 - **Kích thước & Trọng lượng:** Form-factor siêu thu nhỏ ($22.5 \times 18\text{ mm}$), phù hợp tuyệt đối cho thiết bị y sinh đeo ngực (Wearable Holter/Patch).
 - **Hệ thống Thu thập Tín hiệu:**
   - Kênh ADC nội vi 12-bit (chân GPIO 1 / ADC1_CH1) với bộ điều chỉnh điện áp tham chiếu nội suy đa thức, triệt tiêu sai số phi tuyến ở hai đầu biên $0\text{V}$ và $3.3\text{V}$.
-  - Giao diện I2C phần cứng tốc độ $400\text{ kHz}$ kết nối MPU-6050 (SDA: GPIO 2, SCL: GPIO 3).
+  - Giao diện I2C phần cứng tốc độ $400\text{ kHz}$ kết nối MPU-6050 (SDA: GPIO 6, SCL: GPIO 7), các chân GPIO 2 và GPIO 3 sử dụng cho tín hiệu ngõ báo hở điện cực AD8232 (LO-, LO+).
   - Giao diện 1-Wire phần mềm xung nhịp vi giây kết nối cảm biến thân nhiệt DS18B20 (GPIO 4).
 - **Trách nhiệm Hệ thống:**
   1. Duy trì bộ định thời chính xác bằng hàm vi giây nội tại (`micros()`) để lấy mẫu ECG cố định tại $250\text{ Hz}$ (sai số $< 5\mu\text{s}$).
@@ -439,7 +439,7 @@ flowchart TD
 | **Tầng 1: Cảm nhận & Thu thập** *(Perception Layer)* | - Cảm biến AD8232, MPU-6050, DS18B20<br>- MCU Node đeo ESP32-C3 SuperMini | - Đo đạc trực tiếp các đại lượng vật lý và điện thế sinh học bề mặt da.<br>- Thực hiện biến đổi tương tự - số (ADC 12-bit) và đóng khung nhị phân đồng bộ. |
 | **Tầng 2: Mạng & Truyền dẫn** *(Network Layer)* | - Wi-Fi IEEE 802.11 b/g/n (2.4 GHz)<br>- Giao thức UDP Socket & WSS TCP | - Cung cấp hạ tầng truyền dẫn vô tuyến cự ly ngắn (PAN) và mạng diện rộng (WAN).<br>- Định tuyến các gói tin sinh hiệu với độ trễ thấp và độ tin cậy cao. |
 | **Tầng 3: Trung gian & Xử lý** *(Middleware / Edge Layer)* | - Dual-Core ESP32 Gateway (Core 1 DSP)<br>- Máy chủ EMQX MQTT Broker trên Ubuntu | - Thực thi điện toán biên (Edge Computing): Lọc số IIR Notch 50Hz và thuật toán Pan-Tompkins.<br>- Phân tích động học thẩm định té ngã, quản lý phiên kết nối và kích hoạt còi tại chỗ. |
-| **Tầng 4: Ứng dụng & Nghiệp vụ** *(Application Layer)* | - Web PWA Responsive (Người thân / Người chăm sóc)<br>- Telegram & Zalo Emergency Bots<br>- Môi trường tính toán MATLAB | - Kết xuất đồ thị sóng điện tim trực quan, báo cáo chỉ số sinh hiệu.<br>- Gửi thông báo đẩy khẩn cấp đa kênh tức thời tới người nhà và người chăm sóc. |
+| **Tầng 4: Ứng dụng & Nghiệp vụ** *(Application Layer)* | - Web PWA v1.9 (`https://iomt.tsbyin.dev`) tích hợp Clinical Telemetry HUD Strip, Phosphor Sweep Oscilloscope 60 FPS, Mobile Drawer System cách ly Stacking Context và InfluxDB 60s Replay Engine<br>- Telegram & Zalo Emergency Bots<br>- Môi trường tính toán phân tích chuyên sâu MATLAB | - Kết xuất đồ thị sóng điện tim trực quan, dải theo dõi sinh hiệu liên tục (HR Pulse LED, Thân nhiệt, Gia tốc va đập).<br>- Gửi thông báo đẩy khẩn cấp đa kênh tức thời tới người thân và người chăm sóc.<br>- Cung cấp giao diện tua và phát lại dải sóng 60 giây quanh sự cố té ngã với tần số thực $250\text{ Hz}$. |
 
 ---
 
@@ -527,7 +527,7 @@ flowchart TD
      - Gateway lập tức kích hoạt:
        1. Khóa và đóng băng $7,500\text{ mẫu}$ trong quá khứ ($30\text{s}$ trước biến cố).
        2. Tiếp tục thu thập $7,500\text{ mẫu}$ kế tiếp ($30\text{s}$ sau biến cố).
-       3. Đóng gói dải sóng $60\text{ giây}$ hoàn chỉnh ($15,000\text{ mẫu} \approx 300\text{ KB}$ nén) đẩy lên InfluxDB hoặc lưu file `.mat`, cung cấp chứng cứ điện tâm đồ trực quan cho người thân và chuyên gia y tế đánh giá nguyên nhân té ngã (do ngất tim hay trượt ngã cơ học).
+       3. Đóng gói dải sóng $60\text{ giây}$ hoàn chỉnh ($15,000\text{ mẫu} \approx 300\text{ KB}$ nén) đẩy lên InfluxDB hoặc lưu file `.mat`, cung cấp chứng cứ điện tâm đồ trực quan cho người thân và chuyên gia y tế đánh giá nguyên nhân té ngã (do ngất tim hay trượt ngã cơ học). Dữ liệu này được kết nối trực tiếp với **Chế độ InfluxDB Replay trên Web Dashboard** ([https://iomt.tsbyin.dev](https://iomt.tsbyin.dev)), cho phép xem lại dạng sóng 60 giây ở tần số thực $250\text{ Hz}$ kèm thanh trượt tua nhanh/chậm.
 
 ### 8.7. Chiến lược Quản lý Năng lượng Node Đeo (Dynamic Frequency Scaling & Packet Batching)
 - **Đặc thù Y sinh:** Không thể đưa vi điều khiển vào chế độ Deep-sleep rồi đánh thức bằng chuyển động MPU-6050, bởi các biến cố tim mạch nguy hiểm thường xảy ra khi người già đang ngủ hoặc nghỉ ngơi.
