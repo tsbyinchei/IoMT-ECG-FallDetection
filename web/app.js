@@ -662,50 +662,27 @@ async function checkInfluxDBHealth(silent = true) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
 
-    const res = await fetch(healthUrl, {
+    // Sử dụng mode: 'no-cors' để ping kiểm tra liveness InfluxDB qua Cloudflare Tunnel
+    // Không đòi hỏi Access-Control-Allow-Origin, dập tắt 100% lỗi CORS đỏ trong Console trình duyệt
+    await fetch(healthUrl, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' },
+      mode: 'no-cors',
       signal: controller.signal
     });
     clearTimeout(timer);
 
-    if (res.ok || res.status < 400) {
-      updateDbStatus('connected', 'TSDB: Online');
-      if (!silent) {
-        showToast('✅ Máy chủ InfluxDB v2 hoạt động ổn định (Health: Pass)!', 'success');
-      }
-      return { ok: true, msg: 'Máy chủ Online (Health: Pass)' };
-    } else {
-      updateDbStatus('disconnected', `TSDB: HTTP ${res.status}`);
-      if (!silent) {
-        showToast(`⚠️ InfluxDB phản hồi mã lỗi HTTP ${res.status}`, 'warning');
-      }
-      return { ok: false, msg: `Mã lỗi HTTP ${res.status}` };
+    updateDbStatus('connected', 'TSDB: Online');
+    if (!silent) {
+      showToast('✅ Máy chủ InfluxDB v2 đang hoạt động ổn định (Online)!', 'success');
     }
+    return { ok: true, msg: 'Máy chủ InfluxDB Online' };
   } catch (err) {
-    // Thử fallback kiểm tra nếu bị CORS chặn trên browser (chế độ no-cors)
-    try {
-      const fbController = new AbortController();
-      const fbTimer = setTimeout(() => fbController.abort(), 3000);
-      await fetch(healthUrl, {
-        method: 'GET',
-        mode: 'no-cors',
-        signal: fbController.signal
-      });
-      clearTimeout(fbTimer);
-      updateDbStatus('connected', 'TSDB: Online');
-      if (!silent) {
-        showToast('✅ Đã kết nối máy chủ InfluxDB thành công!', 'success');
-      }
-      return { ok: true, msg: 'Máy chủ Online (Cloudflare Proxy)' };
-    } catch (fbErr) {
-      console.warn('[InfluxDB Health Check Error]', err);
-      updateDbStatus('disconnected', 'TSDB: Mất kết nối');
-      if (!silent) {
-        showToast('❌ Không thể kết nối máy chủ InfluxDB (Kiểm tra CORS hoặc mạng)', 'danger');
-      }
-      return { ok: false, msg: err.name === 'AbortError' ? 'Timeout 4s' : 'Mất kết nối server' };
+    console.warn('[InfluxDB Health Check Error]', err);
+    updateDbStatus('disconnected', 'TSDB: Mất kết nối');
+    if (!silent) {
+      showToast('❌ Không thể kết nối máy chủ InfluxDB (Kiểm tra mạng)', 'danger');
     }
+    return { ok: false, msg: err.name === 'AbortError' ? 'Timeout 4s' : 'Mất kết nối server' };
   }
 }
 
@@ -1521,7 +1498,7 @@ function initEventListeners() {
   if (elements.navActionGroup) {
     elements.navActionGroup.querySelectorAll('.btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (window.innerWidth <= 820) {
+        if (window.innerWidth <= 1024) {
           closeMobileDrawer();
         }
       });
@@ -1756,7 +1733,7 @@ function initPWA() {
   // 1. Đăng ký Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=1.7')
+      navigator.serviceWorker.register('./sw.js?v=1.8')
         .then((reg) => {
           console.log('[PWA] Service Worker đăng ký thành công:', reg.scope);
           reg.update(); // Chủ động kiểm tra cập nhật bản mới nhất

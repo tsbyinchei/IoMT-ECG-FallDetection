@@ -3,12 +3,12 @@
  * Cache Shell Assets and handle offline capabilities.
  */
 
-const CACHE_NAME = 'iomt-monitor-v1.7';
+const CACHE_NAME = 'iomt-monitor-v1.8';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './style.css?v=1.7',
-  './app.js?v=1.7',
+  './style.css?v=1.8',
+  './app.js?v=1.8',
   './style.css',
   './app.js',
   './manifest.json',
@@ -59,6 +59,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // CHỈ xử lý tài nguyên nội bộ cùng origin (HTML, CSS, JS, assets tĩnh)
+  // Tuyệt đối không can thiệp API bên ngoài (InfluxDB, MQTT, Cloudflare)
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Đối với hình ảnh và fonts: Cache First
   if (request.destination === 'image' || request.destination === 'font') {
     event.respondWith(
@@ -92,6 +99,7 @@ self.addEventListener('fetch', (event) => {
           if (request.mode === 'navigate') {
             return caches.match('./index.html');
           }
+          return new Response('', { status: 408, statusText: 'Request Timed Out / Offline' });
         });
       })
   );
