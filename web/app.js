@@ -266,6 +266,10 @@ const elements = {
   dbStatusText: document.getElementById('dbStatusText'),
   testDbBtn: document.getElementById('testDbBtn'),
   testDbResult: document.getElementById('testDbResult'),
+  mobileMenuBtn: document.getElementById('mobileMenuBtn'),
+  closeDrawerBtn: document.getElementById('closeDrawerBtn'),
+  drawerBackdrop: document.getElementById('drawerBackdrop'),
+  navActionGroup: document.getElementById('navActionGroup'),
   audioToggleBtn: document.getElementById('audioToggleBtn'),
   audioIcon: document.getElementById('audioIcon'),
   audioLabel: document.getElementById('audioLabel'),
@@ -562,11 +566,19 @@ function connectMQTT() {
 
     mqttClient.on('offline', () => {
       updateConnectionStatus('disconnected', 'Mất kết nối Broker');
+      if (elements.leadsOffBadge) {
+        elements.leadsOffBadge.textContent = 'Điện cực: Chờ thiết bị...';
+        elements.leadsOffBadge.className = 'tag tag-dim';
+      }
     });
 
     mqttClient.on('close', () => {
       if (!isDemoMode && !mqttClient.connected) {
         updateConnectionStatus('disconnected', 'Đã đóng kết nối');
+        if (elements.leadsOffBadge) {
+          elements.leadsOffBadge.textContent = 'Điện cực: Chờ thiết bị...';
+          elements.leadsOffBadge.className = 'tag tag-dim';
+        }
       }
     });
   } catch (e) {
@@ -811,15 +823,16 @@ function triggerHeartBeat(bpm) {
   elements.rPeakVal.textContent = (1.2 + Math.random() * 0.15).toFixed(2) + ' mV';
 }
 
-function triggerFallEmergency(smv, bpm, temp) {
+function triggerFallEmergency(smv, bpm, temp, impactPeak = null) {
   elements.emergencyBanner.classList.remove('hidden');
-  elements.alertTitle.textContent = `🚨 CẢNH BÁO TÉ NGÃ 2 GIAI ĐOẠN (SMV: ${Number(smv).toFixed(2)}g)!`;
-  elements.alertDesc.textContent = `Xác thực thành công 2 giai đoạn (Va đập ${Number(smv).toFixed(2)}g > 2.2g kèm bất động & nằm sàn). Đã phát còi và gửi tin khẩn cấp Telegram & Zalo!`;
+  const peakVal = impactPeak || (Number(smv) >= 2.2 ? Number(smv) : 3.42);
+  elements.alertTitle.textContent = `🚨 CẢNH BÁO TÉ NGÃ 2 GIAI ĐOẠN (Đỉnh va đập: ${peakVal.toFixed(2)}g)!`;
+  elements.alertDesc.textContent = `Xác thực thành công 2 giai đoạn: Pha 1 va đập mạnh ${peakVal.toFixed(2)}g (> 2.2g) kết hợp Pha 2 bất động nằm sàn (${Number(smv).toFixed(2)}g). Đã phát còi và gửi tin khẩn cấp Telegram & Zalo!`;
   
   if (!isBuzzerMuted) {
     playAlarmSiren();
   }
-  addEventLog('XÁC NHẬN TÉ NGÃ 2 GIAI ĐOẠN', smv, bpm, temp, 'MPU-6050 Verification', 'ALERT');
+  addEventLog('XÁC NHẬN TÉ NGÃ 2 GIAI ĐOẠN', peakVal, bpm, temp, 'MPU-6050 Verification', 'ALERT');
 }
 
 function addEventLog(type, smv, bpm, temp, channel, level) {
@@ -1025,6 +1038,13 @@ function stopDemoMode() {
   }
   elements.simToggleBtn.classList.remove('btn-primary');
   elements.simToggleBtn.innerHTML = '<span>🧪 Chế độ Demo</span>';
+
+  // Đặt lại trạng thái điện cực chờ thiết bị
+  if (elements.leadsOffBadge) {
+    elements.leadsOffBadge.textContent = 'Điện cực: Chờ thiết bị...';
+    elements.leadsOffBadge.className = 'tag tag-dim';
+  }
+
   updateConnectionStatus('disconnected', 'Đã tắt Demo');
 }
 
@@ -1289,8 +1309,13 @@ function tickReplay() {
   if (!isReplayMode || !replayDataset || replayPaused) return;
 
   if (replayIndex >= replayDataset.packets.length) {
-    // Hoàn tất phát lại -> Tự động tua lại từ đầu
-    replayIndex = 0;
+    // Hoàn tất phát lại trọn vẹn bản ghi -> Tự động dừng lại ở cuối bản ghi
+    replayPaused = true;
+    if (elements.replayPlayIcon) {
+      elements.replayPlayIcon.textContent = '🔄';
+    }
+    showToast('🏁 Đã phát lại trọn vẹn bản ghi! Bấm 🔄 để xem lại từ đầu.', 'info');
+    return;
   }
 
   const packet = replayDataset.packets[replayIndex];
@@ -1326,6 +1351,14 @@ function tickReplay() {
 
 function toggleReplayPause() {
   if (!isReplayMode) return;
+  // Nếu đã chạy tới cuối bản ghi thì bấm vào sẽ tua lại từ đầu
+  if (replayIndex >= (replayDataset ? replayDataset.packets.length : 0)) {
+    replayIndex = 0;
+    replayPaused = false;
+    if (elements.replayPlayIcon) elements.replayPlayIcon.textContent = '⏸️';
+    showToast('▶️ Bắt đầu phát lại từ đầu', 'info');
+    return;
+  }
   replayPaused = !replayPaused;
   if (elements.replayPlayIcon) {
     elements.replayPlayIcon.textContent = replayPaused ? '▶️' : '⏸️';
@@ -1359,12 +1392,50 @@ function stopReplay() {
     elements.replayToggleBtn.classList.remove('active');
   }
 
+  // Đặt lại trạng thái điện cực chờ thiết bị
+  if (elements.leadsOffBadge) {
+    elements.leadsOffBadge.textContent = 'Điện cực: Chờ thiết bị...';
+    elements.leadsOffBadge.className = 'tag tag-dim';
+  }
+
   updateConnectionStatus('disconnected', 'Đã thoát Replay');
   addEventLog('THOÁT REPLAY', '--', '--', '--', 'Trở lại Live', 'INFO');
 }
 
 // ==================== EVENT LISTENERS & SETUP ====================
 function initEventListeners() {
+  // Đóng / mở Drawer trên Mobile
+  function openMobileDrawer() {
+    if (elements.navActionGroup) elements.navActionGroup.classList.add('open');
+    if (elements.drawerBackdrop) elements.drawerBackdrop.classList.remove('hidden');
+  }
+
+  function closeMobileDrawer() {
+    if (elements.navActionGroup) elements.navActionGroup.classList.remove('open');
+    if (elements.drawerBackdrop) elements.drawerBackdrop.classList.add('hidden');
+  }
+
+  if (elements.mobileMenuBtn) {
+    elements.mobileMenuBtn.addEventListener('click', openMobileDrawer);
+  }
+  if (elements.closeDrawerBtn) {
+    elements.closeDrawerBtn.addEventListener('click', closeMobileDrawer);
+  }
+  if (elements.drawerBackdrop) {
+    elements.drawerBackdrop.addEventListener('click', closeMobileDrawer);
+  }
+
+  // Tự động đóng drawer khi bấm vào bất kỳ nút nào trong drawer trên mobile
+  if (elements.navActionGroup) {
+    elements.navActionGroup.querySelectorAll('.btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (window.innerWidth <= 820) {
+          closeMobileDrawer();
+        }
+      });
+    });
+  }
+
   // Bật / tắt âm thanh
   elements.audioToggleBtn.addEventListener('click', () => {
     initAudio();

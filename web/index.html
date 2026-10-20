@@ -47,34 +47,54 @@
         <span id="dbStatusText">TSDB: Đang kiểm tra</span>
       </div>
 
-      <button id="pwaInstallBtn" class="btn btn-secondary hidden" title="Cài đặt ứng dụng lên màn hình chính">
-        <span>📲 Cài đặt App</span>
+      <!-- Nút mở Menu thanh bên trên Mobile -->
+      <button id="mobileMenuBtn" class="btn btn-icon mobile-menu-toggle" aria-label="Mở bảng điều khiển" title="Mở bảng điều khiển">
+        <span class="hamburger-icon">☰</span>
+        <span class="mobile-menu-label">Menu</span>
       </button>
 
-      <button id="audioToggleBtn" class="btn btn-icon" title="Bật/Tắt âm thanh nhịp tim và báo động">
-        <span id="audioIcon">🔇</span>
-        <span id="audioLabel">Âm thanh: Tắt</span>
-      </button>
+      <!-- Nhóm các nút thao tác (Thanh ngang trên Desktop, Trượt Drawer trên Mobile) -->
+      <div id="navActionGroup" class="nav-action-group">
+        <div class="drawer-header mobile-only">
+          <div class="drawer-title-group">
+            <span class="card-icon">⚡</span>
+            <span class="drawer-title">Bảng Điều Khiển</span>
+          </div>
+          <button id="closeDrawerBtn" class="modal-close" aria-label="Đóng thanh bên">&times;</button>
+        </div>
 
-      <button id="remoteMuteBtn" class="btn btn-warning" title="Tắt / Bật còi báo động Gateway từ xa qua MQTT">
-        <span id="remoteMuteIcon">🔔</span>
-        <span id="remoteMuteLabel">Tắt còi từ xa</span>
-      </button>
+        <button id="pwaInstallBtn" class="btn btn-secondary hidden" title="Cài đặt ứng dụng lên màn hình chính">
+          <span>📲 Cài đặt App</span>
+        </button>
 
-      <button id="simToggleBtn" class="btn btn-secondary" title="Bật chế độ dữ liệu mô phỏng khi không có phần cứng">
-        <span>🧪 Chế độ Demo</span>
-      </button>
+        <button id="audioToggleBtn" class="btn btn-icon" title="Bật/Tắt âm thanh nhịp tim và báo động">
+          <span id="audioIcon">🔇</span>
+          <span id="audioLabel">Âm thanh: Tắt</span>
+        </button>
 
-      <button id="replayToggleBtn" class="btn btn-replay" title="Xem lại hoặc phát lại dữ liệu biến cố từ InfluxDB">
-        <span id="replayBtnIcon">⏪</span>
-        <span id="replayBtnLabel">Phát lại InfluxDB</span>
-      </button>
+        <button id="remoteMuteBtn" class="btn btn-warning" title="Tắt / Bật còi báo động Gateway từ xa qua MQTT">
+          <span id="remoteMuteIcon">🔔</span>
+          <span id="remoteMuteLabel">Tắt còi từ xa</span>
+        </button>
 
-      <button id="configModalBtn" class="btn btn-primary" title="Cấu hình kết nối MQTT Broker & InfluxDB">
-        <span>⚙️ Cấu hình</span>
-      </button>
+        <button id="simToggleBtn" class="btn btn-secondary" title="Bật chế độ dữ liệu mô phỏng khi không có phần cứng">
+          <span>🧪 Chế độ Demo</span>
+        </button>
+
+        <button id="replayToggleBtn" class="btn btn-replay" title="Xem lại hoặc phát lại dữ liệu biến cố từ InfluxDB">
+          <span id="replayBtnIcon">⏪</span>
+          <span id="replayBtnLabel">Phát lại InfluxDB</span>
+        </button>
+
+        <button id="configModalBtn" class="btn btn-primary" title="Cấu hình kết nối MQTT Broker & InfluxDB">
+          <span>⚙️ Cấu hình</span>
+        </button>
+      </div>
     </div>
   </header>
+
+  <!-- Lớp phủ mờ nền khi mở Drawer trên Mobile -->
+  <div id="drawerBackdrop" class="drawer-backdrop hidden"></div>
 
   <!-- Banner Phát Lại Lịch Sử InfluxDB (Hiện khi đang ở Replay Mode) -->
   <aside id="replayBanner" class="replay-banner hidden" role="region" aria-label="Thanh điều khiển phát lại lịch sử">
@@ -131,7 +151,7 @@
           </div>
         </div>
         <div class="header-right">
-          <span id="leadsOffBadge" class="tag tag-ok">Điện cực: Tiếp xúc tốt</span>
+          <span id="leadsOffBadge" class="tag tag-dim">Điện cực: Chờ thiết bị...</span>
           <span class="tag tag-dim">Tần số: 250 Sps</span>
         </div>
       </div>
