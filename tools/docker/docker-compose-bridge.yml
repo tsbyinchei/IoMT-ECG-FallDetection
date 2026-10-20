@@ -1,0 +1,16 @@
+# ==============================================================================
+# BIOMEDICAL MQTT-TO-INFLUXDB BRIDGE (DOCKER COMPOSE CHO 1PANEL)
+# Tự động chạy ngầm 24/7 trên server Ubuntu, tự kết nối EMQX và InfluxDB
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  biomed_bridge:
+    image: python:3.11-alpine
+    container_name: biomed_bridge
+    restart: always
+    command: >
+      sh -c "pip install --no-cache-dir paho-mqtt influxdb-client &&
+             wget -q https://raw.githubusercontent.com/tsbyinchei/IoMT-ECG-FallDetection/main/tools/mqtt_to_influxdb.py -O /app/mqtt_to_influxdb.py &&
+             python -u /app/mqtt_to_influxdb.py"
