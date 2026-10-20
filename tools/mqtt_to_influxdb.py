@@ -63,9 +63,9 @@ DEFAULT_CONFIG = {
     "topic_snapshot": "biomed/gateway/event_snapshot",
     
     # Cấu hình InfluxDB v2
-    "influx_url": "http://localhost:8086",
-    "influx_token": "biomed_super_secret_admin_token_2026",
-    "influx_org": "biomed",
+    "influx_url": "https://influx.tsbyin.dev",
+    "influx_token": "qC_AWPMQx2Tz5sjREW_xBPIr372L1jpujftPLCbUjHDQHG9PQfIU-d41RLx8hhB7hDlK1O0KueWG7-qMDhv6rw==",
+    "influx_org": "influxdb_FSiPrd",
     "bucket_metrics": "biomed_metrics",
     "bucket_events": "biomed_events",
     

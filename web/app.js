@@ -13,9 +13,9 @@ const DEFAULT_CONFIG = {
   topicAlert: 'biomed/patient/alert',
   topicCmd: 'biomed/gateway/cmd',     // Topic điều khiển Gateway (Tắt còi từ xa)
   influxUrl: 'https://influx.tsbyin.dev', // Máy chủ InfluxDB v2 REST API
-  influxOrg: 'biomed',
+  influxOrg: 'influxdb_FSiPrd',
   influxBucket: 'biomed_events',
-  influxToken: ''
+  influxToken: 'qC_AWPMQx2Tz5sjREW_xBPIr372L1jpujftPLCbUjHDQHG9PQfIU-d41RLx8hhB7hDlK1O0KueWG7-qMDhv6rw=='
 };
 
 // ==================== TRẠNG THÁI HỆ THỐNG ====================
@@ -333,8 +333,17 @@ const elements = {
 function loadConfig() {
   const saved = localStorage.getItem('iomt_mqtt_cfg');
   if (saved) {
-    try { return { ...DEFAULT_CONFIG, ...JSON.parse(saved) }; }
-    catch (e) { console.error('Lỗi nạp config:', e); }
+    try {
+      const parsed = JSON.parse(saved);
+      return {
+        ...DEFAULT_CONFIG,
+        ...parsed,
+        influxToken: parsed.influxToken || DEFAULT_CONFIG.influxToken,
+        influxOrg: parsed.influxOrg || DEFAULT_CONFIG.influxOrg
+      };
+    } catch (e) {
+      console.error('Lỗi nạp config:', e);
+    }
   }
   return { ...DEFAULT_CONFIG };
 }
