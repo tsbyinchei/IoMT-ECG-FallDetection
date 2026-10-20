@@ -42,10 +42,11 @@ MATLAB/
 ESP32/
 ESP32C3/
 projectthamkhao/
-
+docker/
+ESP32_OLED_Name/
 # Python cache
 __pycache__/
 *.pyc
 .venv/
+*.py
 
-ESP32_OLED_Name/
