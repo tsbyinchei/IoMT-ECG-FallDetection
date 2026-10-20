@@ -37,9 +37,14 @@
     </div>
 
     <div class="nav-controls">
-      <div id="connectionStatus" class="status-badge disconnected">
+      <div id="connectionStatus" class="status-badge disconnected" title="Trạng thái kết nối máy chủ MQTT Broker">
         <span class="status-indicator"></span>
-        <span id="statusText">Chưa kết nối Broker</span>
+        <span id="statusText">MQTT: Chưa kết nối</span>
+      </div>
+
+      <div id="dbStatus" class="status-badge connecting" title="Trạng thái kết nối máy chủ cơ sở dữ liệu InfluxDB v2">
+        <span class="status-indicator"></span>
+        <span id="dbStatusText">TSDB: Đang kiểm tra</span>
       </div>
 
       <button id="pwaInstallBtn" class="btn btn-secondary hidden" title="Cài đặt ứng dụng lên màn hình chính">
@@ -330,6 +335,13 @@
         <div class="form-group">
           <label for="cfgInfluxToken">API Token (Read-Only):</label>
           <input type="password" id="cfgInfluxToken" placeholder="Token xác thực truy vấn InfluxDB v2">
+        </div>
+
+        <div class="form-row-test">
+          <button type="button" id="testDbBtn" class="btn btn-secondary" title="Kiểm tra kết nối trực tiếp đến InfluxDB v2">
+            <span>🔄 Test Kết Nối InfluxDB</span>
+          </button>
+          <span id="testDbResult" class="form-test-result"></span>
         </div>
 
         <div class="modal-actions">

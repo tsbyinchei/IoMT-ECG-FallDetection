@@ -262,6 +262,10 @@ let audioCtx = null;
 const elements = {
   statusBadge: document.getElementById('connectionStatus'),
   statusText: document.getElementById('statusText'),
+  dbStatus: document.getElementById('dbStatus'),
+  dbStatusText: document.getElementById('dbStatusText'),
+  testDbBtn: document.getElementById('testDbBtn'),
+  testDbResult: document.getElementById('testDbResult'),
   audioToggleBtn: document.getElementById('audioToggleBtn'),
   audioIcon: document.getElementById('audioIcon'),
   audioLabel: document.getElementById('audioLabel'),
@@ -574,6 +578,73 @@ function connectMQTT() {
 function updateConnectionStatus(type, text) {
   elements.statusBadge.className = 'status-badge ' + type;
   elements.statusText.textContent = text;
+}
+
+function updateDbStatus(type, text) {
+  if (!elements.dbStatus || !elements.dbStatusText) return;
+  elements.dbStatus.className = 'status-badge ' + type;
+  elements.dbStatusText.textContent = text;
+}
+
+/**
+ * Kiểm tra kết nối trực tiếp đến máy chủ InfluxDB v2
+ * @param {boolean} silent Nếu true thì không hiển thị toast thông báo
+ */
+async function checkInfluxDBHealth(silent = true) {
+  if (!config.influxUrl) {
+    updateDbStatus('disconnected', 'TSDB: Chưa cấu hình');
+    return { ok: false, msg: 'Chưa cấu hình URL InfluxDB' };
+  }
+
+  updateDbStatus('connecting', 'TSDB: Đang kết nối...');
+
+  const base = config.influxUrl.replace(/\/$/, '');
+  const org = encodeURIComponent(config.influxOrg || 'influxdb_FSiPrd');
+  const checkUrl = `${base}/api/v2/buckets?org=${org}`;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(checkUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Token ${config.influxToken || ''}`,
+        'Accept': 'application/json'
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      const bucketCount = data.buckets ? data.buckets.length : 0;
+      updateDbStatus('connected', 'TSDB: Online');
+      if (!silent) {
+        showToast(`✅ Đã kết nối InfluxDB v2 thành công! (Tìm thấy ${bucketCount} buckets)`, 'success');
+      }
+      return { ok: true, msg: `Kết nối thành công (${bucketCount} buckets)` };
+    } else if (res.status === 401 || res.status === 403) {
+      updateDbStatus('disconnected', 'TSDB: Sai Token');
+      if (!silent) {
+        showToast('❌ Token InfluxDB không hợp lệ hoặc không có quyền truy cập!', 'danger');
+      }
+      return { ok: false, msg: 'Lỗi xác thực Token (401/403)' };
+    } else {
+      updateDbStatus('disconnected', `TSDB: HTTP ${res.status}`);
+      if (!silent) {
+        showToast(`⚠️ InfluxDB phản hồi mã lỗi HTTP ${res.status}`, 'warning');
+      }
+      return { ok: false, msg: `Mã lỗi HTTP ${res.status}` };
+    }
+  } catch (err) {
+    console.warn('[InfluxDB Health Check Error]', err);
+    updateDbStatus('disconnected', 'TSDB: Mất kết nối');
+    if (!silent) {
+      showToast('❌ Không thể kết nối máy chủ InfluxDB (Kiểm tra CORS hoặc mạng)', 'danger');
+    }
+    return { ok: false, msg: err.name === 'AbortError' ? 'Timeout 6s' : 'Mất kết nối server' };
+  }
 }
 
 // ==================== XỬ LÝ DỮ LIỆU SINH HIỆU ====================
@@ -1452,7 +1523,37 @@ function initEventListeners() {
     elements.configModal.classList.add('hidden');
     showToast('💾 Đã lưu cấu hình MQTT & InfluxDB thành công!', 'success');
     connectMQTT();
+    checkInfluxDBHealth(true);
   });
+
+  // Kiểm tra kết nối InfluxDB từ form cấu hình
+  if (elements.testDbBtn) {
+    elements.testDbBtn.addEventListener('click', async () => {
+      if (elements.testDbResult) {
+        elements.testDbResult.className = 'form-test-result loading';
+        elements.testDbResult.textContent = '⏳ Đang kiểm tra...';
+      }
+
+      const prevUrl = config.influxUrl;
+      const prevOrg = config.influxOrg;
+      const prevToken = config.influxToken;
+
+      config.influxUrl = elements.cfgInfluxUrl ? elements.cfgInfluxUrl.value.trim() : config.influxUrl;
+      config.influxOrg = elements.cfgInfluxOrg ? elements.cfgInfluxOrg.value.trim() : config.influxOrg;
+      config.influxToken = elements.cfgInfluxToken ? elements.cfgInfluxToken.value.trim() : config.influxToken;
+
+      const res = await checkInfluxDBHealth(false);
+
+      config.influxUrl = prevUrl;
+      config.influxOrg = prevOrg;
+      config.influxToken = prevToken;
+
+      if (elements.testDbResult) {
+        elements.testDbResult.className = 'form-test-result ' + (res.ok ? 'success' : 'error');
+        elements.testDbResult.textContent = (res.ok ? '✅ ' : '❌ ') + res.msg;
+      }
+    });
+  }
 
   // Khôi phục mặc định
   elements.resetConfigBtn.addEventListener('click', () => {
@@ -1543,4 +1644,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Tự động kết nối MQTT khi tải trang
   connectMQTT();
+
+  // Tự động kiểm tra trạng thái cơ sở dữ liệu InfluxDB
+  checkInfluxDBHealth(true);
+  setInterval(() => {
+    checkInfluxDBHealth(true);
+  }, 30000);
 });
