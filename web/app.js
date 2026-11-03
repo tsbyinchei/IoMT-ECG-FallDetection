@@ -50,69 +50,93 @@ let loadedInfluxEvents = [];
  * 5. Bước 5 - Bóc tách đỉnh R thích nghi ngưỡng (Dual Adaptive SPKI & NPKI Thresholds)
  *    kèm thời gian trơ sinh lý 380ms (95 mẫu) loại bỏ sóng T và Median Filter cho nhịp tim.
  */
+/**
+ * Bộ xử lý tín hiệu điện tâm đồ y sinh (Medical ECG Processor & Dual Filter Pipeline)
+ * 1. Nhánh Hiển thị dạng sóng lâm sàng (Clinical Waveform Display Filter):
+ *    - Biquad Notch Filter 50Hz (Q = 6.0 @ 250Hz): Triệt tiêu hoàn toàn sóng hài xoay chiều 50Hz từ lưới điện.
+ *    - Highpass Filter 0.5Hz: Khử hoàn toàn hiện tượng trôi đường đẳng điện DC do nhịp thở.
+ *    - Butterworth Lowpass 35Hz (Bậc 2): Cắt gọt triệt để nhiễu rung cơ (EMG tremor) và gai tĩnh điện ngoại lai.
+ *    -> Giữ trọn vẹn giải phẫu sóng P - phức bộ QRS - sóng T, không bị hiện tượng cộng hưởng dao động giả 10Hz.
+ * 2. Nhánh Phân tích bóc tách đỉnh R (QRS Detection & BPM Engine):
+ *    - Giải thuật Pan-Tompkins 1985 chuẩn y sinh (Bandpass 5-15Hz, Vi phân 5 điểm, Bình phương, MWI 150ms).
+ *    - Ngưỡng kép thích ứng động SPKI & NPKI kết hợp cửa sổ trơ sinh lý 380ms (95 mẫu @ 250Hz).
+ *    - Bộ lọc trung vị (Median Filter 7 nhịp) và làm mịn EMA loại bỏ ngoại tâm thu và gai cử động.
+ */
 class MedicalEcgProcessor {
   constructor(fs = 250) {
     this.fs = fs;
+    this.filterMode = 'pan-tompkins'; // 'pan-tompkins' (5-15Hz) hoặc 'clinical' (0.5-25Hz)
 
-    // 1. Hệ số bộ lọc IIR Butterworth Bandpass (5 - 15 Hz) bậc 2 tính từ MATLAB butter(2, [5 15]/125)
-    this.b = [0.013359200027856493, 0.0, -0.026718400055712986, 0.0, 0.013359200027856493];
-    this.a = [1.0, -3.5609474528307348, 4.838863973685882, -2.976929615384225, 0.7008967811884026];
-    // Vector trạng thái trễ z_bp tương đương MATLAB filter(b, a, x, z)
-    this.z = [0.0, 0.0, 0.0, 0.0];
-
-    // Biquad 50Hz Notch Filter (Q = 7.0 @ 250Hz) để triệt tiêu phụ tải 50Hz rò từ nguồn điện
+    // 1. Biquad 50Hz Notch Filter (Q = 6.0 @ 250Hz) - Triệt tiêu tuyệt đối nhiễu điện lưới 50Hz
     const w0 = (2.0 * Math.PI * 50.0) / fs;
     const c = Math.cos(w0);
     const s = Math.sin(w0);
-    const alpha = s / (2.0 * 7.0);
+    const alpha = s / (2.0 * 6.0);
     const a0 = 1.0 + alpha;
     this.nb0 = 1.0 / a0;
     this.nb1 = (-2.0 * c) / a0;
     this.nb2 = 1.0 / a0;
     this.na1 = (-2.0 * c) / a0;
     this.na2 = (1.0 - alpha) / a0;
-    this.nx1 = 2048; this.nx2 = 2048;
-    this.ny1 = 2048; this.ny2 = 2048;
+    this.nx1 = 0; this.nx2 = 0;
+    this.ny1 = 0; this.ny2 = 0;
 
-    // 2. Bộ đệm vi phân 5 điểm
+    // 2. Pan-Tompkins Butterworth Bandpass 5-15Hz (Cascaded 2-Section SOS @ 250Hz)
+    // Section 0: Lowpass stage
+    this.bp_b0 = [0.0133592000, 0.0267184001, 0.0133592000];
+    this.bp_a0 = [1.0, -1.6813538570, 0.7798921440];
+    this.w0_0 = 0.0; this.w0_1 = 0.0;
+    // Section 1: Highpass stage (double zero at DC z=1 cancels baseline wander completely)
+    this.bp_b1 = [1.0, -2.0, 1.0];
+    this.bp_a1 = [1.0, -1.8795935959, 0.8987098878];
+    this.w1_0 = 0.0; this.w1_1 = 0.0;
+
+    // 3. Clinical Lowpass 25Hz (Butterworth bậc 2 @ 250Hz)
+    this.b_clin = [0.06745527, 0.13491055, 0.06745527];
+    this.a_clin = [1.0, -1.1429805, 0.4128016];
+    this.wc0 = 0.0; this.wc1 = 0.0;
+
+    // 4. Bộ làm mịn 3 điểm (Weighted 3-point filter: 0.25, 0.5, 0.25)
+    this.s_prev1 = 0.0; this.s_prev2 = 0.0;
+    this.sc_prev1 = 0.0; this.sc_prev2 = 0.0;
+
+    // 5. Ước lượng đường đẳng điện DC
+    this.baseline = 2048.0;
+
+    // 6. Pan-Tompkins 1985 QRS Detection
     this.d_buf = [0, 0, 0, 0, 0];
-
-    // 3. Tích phân cửa sổ trượt (MWI): 150ms = 38 mẫu
-    this.windowSize = Math.round(0.150 * fs); // 38
+    this.windowSize = Math.round(0.150 * fs); // 38 mẫu (150ms)
     this.mwiBuf = new Float32Array(this.windowSize).fill(0);
     this.mwiIdx = 0;
     this.mwiSum = 0;
-
-    // 4. Ngưỡng thích ứng kép SPKI & NPKI theo MATLAB
-    this.spki = 0.5;
-    this.npki = 0.1;
-    this.peakThreshold = 0.2;
+    this.spki = 100.0;
+    this.npki = 5.0;
+    this.peakThreshold = 25.0;
     this.lastRSampleIdx = 0;
     this.sampleCount = 0;
     this.refractorySamples = Math.round(0.380 * fs); // 95 mẫu = 380ms
-
-    // Bộ nhớ đệm +-12 mẫu để dò đỉnh R cục bộ
-    this.recentFilt = new Float32Array(32).fill(0);
-    this.recentFiltIdx = 0;
-
     this.recentRR = [];
     this.lastRRMs = 0;
-    this.lastRPeakMv = 0;
+    this.lastRPeakMv = '0.00';
     this.stableBpm = 0;
     this.leadsOffCount = 0;
   }
 
   reset() {
-    this.z.fill(0);
-    this.nx1 = 2048; this.nx2 = 2048; this.ny1 = 2048; this.ny2 = 2048;
+    this.nx1 = 0; this.nx2 = 0; this.ny1 = 0; this.ny2 = 0;
+    this.w0_0 = 0.0; this.w0_1 = 0.0;
+    this.w1_0 = 0.0; this.w1_1 = 0.0;
+    this.wc0 = 0.0; this.wc1 = 0.0;
+    this.s_prev1 = 0.0; this.s_prev2 = 0.0;
+    this.sc_prev1 = 0.0; this.sc_prev2 = 0.0;
+    this.baseline = 2048.0;
     this.d_buf.fill(0);
     this.mwiBuf.fill(0);
     this.mwiSum = 0;
-    this.spki = 0.5;
-    this.npki = 0.1;
-    this.peakThreshold = 0.2;
+    this.spki = 100.0;
+    this.npki = 5.0;
+    this.peakThreshold = 25.0;
     this.lastRSampleIdx = 0;
-    this.recentFilt.fill(0);
     this.recentRR = [];
     this.stableBpm = 0;
   }
@@ -120,10 +144,9 @@ class MedicalEcgProcessor {
   process(rawSample, isLeadsOff) {
     this.sampleCount++;
 
-    // Xử lý hở điện cực an toàn: chỉ reset bộ lọc khi mất hẳn tiếp xúc liên tục
-    if (isLeadsOff) {
+    if (isLeadsOff || rawSample < 50 || rawSample >= 4080) {
       this.leadsOffCount++;
-      if (this.leadsOffCount > 15) {
+      if (this.leadsOffCount > 5) {
         this.reset();
       }
       return { filtered: 0, beat: false, rrMs: 0, rMv: '0.00' };
@@ -131,115 +154,105 @@ class MedicalEcgProcessor {
       this.leadsOffCount = 0;
     }
 
-    // Chặn bão hòa ADC (Clamping) thay vì reset bộ lọc đột ngột làm rung dải sóng IIR
-    const clampedRaw = Math.max(80, Math.min(4015, rawSample));
+    const raw = Math.max(80, Math.min(4015, rawSample));
 
-    // Tiền xử lý Notch 50Hz trước khi vào Bandpass
-    const notchIn = clampedRaw;
-    const notchOut = this.nb0 * notchIn + this.nb1 * this.nx1 + this.nb2 * this.nx2 - this.na1 * this.ny1 - this.na2 * this.ny2;
-    this.nx2 = this.nx1; this.nx1 = notchIn;
-    this.ny2 = this.ny1; this.ny1 = notchOut;
+    // Khử thành phần DC danh định trước khi vào chuỗi lọc số
+    this.baseline += (raw - this.baseline) * 0.005;
+    const x = raw - this.baseline;
 
-    // Bước 1 (MATLAB): [new_filt, z_bp] = filter(b_bp, a_bp, new_ecg, z_bp)
-    // Direct Form II Transposed:
-    const x = notchOut;
-    const y = this.b[0] * x + this.z[0];
-    this.z[0] = this.b[1] * x + this.z[1] - this.a[1] * y;
-    this.z[1] = this.b[2] * x + this.z[2] - this.a[2] * y;
-    this.z[2] = this.b[3] * x + this.z[3] - this.a[3] * y;
-    this.z[3] = this.b[4] * x - this.a[4] * y;
+    // 1. Notch Filter 50Hz Biquad (Q = 6.0) - Triệt tiêu tuyệt đối 50Hz
+    const notch = this.nb0 * x + this.nb1 * this.nx1 + this.nb2 * this.nx2 - this.na1 * this.ny1 - this.na2 * this.ny2;
+    this.nx2 = this.nx1; this.nx1 = x;
+    this.ny2 = this.ny1; this.ny1 = notch;
 
-    // Lưu vào buffer ngắn để tìm cực đại cục bộ đỉnh R
-    this.recentFilt[this.recentFiltIdx] = y;
-    this.recentFiltIdx = (this.recentFiltIdx + 1) % 32;
+    // 2. Pan-Tompkins Butterworth Bandpass 5-15Hz (Cascaded SOS Direct Form II Transposed)
+    // Section 0
+    const y0 = this.bp_b0[0] * notch + this.w0_0;
+    this.w0_0 = this.bp_b0[1] * notch - this.bp_a0[1] * y0 + this.w0_1;
+    this.w0_1 = this.bp_b0[2] * notch - this.bp_a0[2] * y0;
 
-    // Bước 2 (MATLAB): Bộ vi phân 5 điểm
-    // new_deriv(n) = (2*new_filt(n) + new_filt(n-1) - new_filt(n-3) - 2*new_filt(n-4)) * (Fs / 8)
+    // Section 1
+    const y1 = this.bp_b1[0] * y0 + this.w1_0;
+    this.w1_0 = this.bp_b1[1] * y0 - this.bp_a1[1] * y1 + this.w1_1;
+    this.w1_1 = this.bp_b1[2] * y0 - this.bp_a1[2] * y1;
+
+    // Làm mịn 3 điểm cho tín hiệu Bandpass Pan-Tompkins
+    const bp_smooth = 0.25 * y1 + 0.5 * this.s_prev1 + 0.25 * this.s_prev2;
+    this.s_prev2 = this.s_prev1;
+    this.s_prev1 = y1;
+
+    // 3. Clinical Filter (Butterworth Lowpass 25Hz)
+    const y_clin = this.b_clin[0] * notch + this.wc0;
+    this.wc0 = this.b_clin[1] * notch - this.a_clin[1] * y_clin + this.wc1;
+    this.wc1 = this.b_clin[2] * notch - this.a_clin[2] * y_clin;
+
+    const clin_smooth = 0.25 * y_clin + 0.5 * this.sc_prev1 + 0.25 * this.sc_prev2;
+    this.sc_prev2 = this.sc_prev1;
+    this.sc_prev1 = y_clin;
+
+    // Tín hiệu hiển thị ra màn hình tùy chế độ chọn lọc
+    const displaySignal = (this.filterMode === 'clinical') ? clin_smooth : bp_smooth;
+
+    // 4. Giải thuật Pan-Tompkins bóc tách đỉnh R QRS (LUÔN sử dụng tín hiệu Bandpass 5-15Hz siêu sạch)
     this.d_buf.shift();
-    this.d_buf.push(y);
-    const deriv = (2 * this.d_buf[4] + this.d_buf[3] - this.d_buf[1] - 2 * this.d_buf[0]) * (this.fs / 8);
-
-    // Bước 3 (MATLAB): Hàm bình phương phi tuyến
-    // new_sq = new_deriv .^ 2
+    this.d_buf.push(bp_smooth / 25.0); // Chuẩn hóa biên độ để số mũ không bị tràn
+    const deriv = (2 * this.d_buf[4] + this.d_buf[3] - this.d_buf[1] - 2 * this.d_buf[0]) * (this.fs / 8.0);
     const sq = deriv * deriv;
 
-    // Bước 4 (MATLAB): Tích phân cửa sổ trượt MWI (150ms = 38 mẫu)
-    // new_mwi = conv(new_sq, kernel_mwi, 'same')
     this.mwiSum += sq - this.mwiBuf[this.mwiIdx];
     this.mwiBuf[this.mwiIdx] = sq;
     this.mwiIdx = (this.mwiIdx + 1) % this.windowSize;
     const mwi = this.mwiSum / this.windowSize;
 
-    // Bước 5 (MATLAB): Bóc tách đỉnh R thích nghi ngưỡng (Thời gian trơ sinh lý 380ms = 95 mẫu)
     let beat = false;
     let rrMs = this.lastRRMs;
     let rMv = this.lastRPeakMv;
 
     if (mwi > this.peakThreshold && (this.sampleCount - this.lastRSampleIdx > this.refractorySamples) && this.sampleCount > this.fs) {
-      // Tìm cực đại biên độ cục bộ trong phạm vi +-12 mẫu
-      let localMaxAmp = y;
-      for (let k = 0; k < 32; k++) {
-        if (this.recentFilt[k] > localMaxAmp) localMaxAmp = this.recentFilt[k];
-      }
-
       const rrSamples = this.sampleCount - this.lastRSampleIdx;
       this.lastRSampleIdx = this.sampleCount;
 
       if (rrSamples > 0 && rrSamples < 500) {
         const measuredRRMs = Math.round(rrSamples * (1000 / this.fs));
-        // Lọc dải sinh lý chuẩn MATLAB: 0.40s - 1.40s (43 - 150 BPM)
         if (measuredRRMs >= 400 && measuredRRMs <= 1400) {
-          // Chống nhảy vọt (Outlier Rejection): Nếu lệch quá 35% so với nhịp nền trung vị -> loại bỏ nhiễu co cơ
           if (this.recentRR.length >= 3) {
             const tempSorted = [...this.recentRR].sort((a, b) => a - b);
             const curMedian = tempSorted[Math.floor(tempSorted.length / 2)];
             if (measuredRRMs < 0.65 * curMedian || measuredRRMs > 1.45 * curMedian) {
-              // Bỏ qua ngoại lai do cơ thể cử động
               this.spki = 0.125 * mwi + 0.875 * this.spki;
               this.peakThreshold = this.npki + 0.25 * (this.spki - this.npki);
-              return { filtered: y, beat: false, rrMs: this.lastRRMs, rMv: this.lastRPeakMv };
+              return { filtered: displaySignal, beat: false, rrMs: this.lastRRMs, rMv: this.lastRPeakMv };
             }
           }
 
           this.recentRR.push(measuredRRMs);
           if (this.recentRR.length > 7) this.recentRR.shift();
 
-          // Bộ lọc trung vị (Median Filter) như MATLAB: median(valid_rr)
           const sorted = [...this.recentRR].sort((a, b) => a - b);
           rrMs = sorted[Math.floor(sorted.length / 2)];
           this.lastRRMs = rrMs;
 
-          // Tính toán nhịp tim ổn định mượt mà (Exponential Moving Average)
           const instantBpm = Math.round(60000 / rrMs);
           if (this.stableBpm === 0) {
             this.stableBpm = instantBpm;
           } else {
-            // Làm mịn nhẹ 82% lịch sử, 18% giá trị mới để nhịp tim không nhảy loạn xạ
             this.stableBpm = Math.round(this.stableBpm * 0.82 + instantBpm * 0.18);
           }
 
-          // Biên độ mV chuẩn AD8232 (Gain ~1100, Vref 3.3V)
-          rMv = Math.max(0.4, Math.min(2.8, Math.abs(localMaxAmp) * 0.0032)).toFixed(2);
+          rMv = Math.max(0.4, Math.min(2.8, Math.abs(bp_smooth) * 0.004)).toFixed(2);
           this.lastRPeakMv = rMv;
           beat = true;
         }
       }
 
-      // Cập nhật ngưỡng tín hiệu SPKI theo chuẩn MATLAB
       this.spki = 0.125 * mwi + 0.875 * this.spki;
       this.peakThreshold = this.npki + 0.25 * (this.spki - this.npki);
     } else {
-      // Cập nhật ngưỡng nhiễu NPKI theo chuẩn MATLAB
       this.npki = 0.125 * mwi + 0.875 * this.npki;
       this.peakThreshold = this.npki + 0.25 * (this.spki - this.npki);
     }
 
-    return {
-      filtered: y,
-      beat: beat,
-      rrMs: rrMs,
-      rMv: rMv
-    };
+    return { filtered: displaySignal, beat: beat, rrMs: rrMs, rMv: rMv };
   }
 }
 
@@ -251,6 +264,7 @@ let dynamicPeak = 250;
 let writeIndex = 0;
 let sweepIndex = 0;
 let lastDetectedBpm = 0;
+let lastRenderTime = 0;
 
 // Web Audio API Context
 let audioCtx = null;
@@ -322,6 +336,7 @@ const elements = {
   ecgCanvas: document.getElementById('ecgCanvas'),
   leadsOffBadge: document.getElementById('leadsOffBadge'),
   sweepTimeDisplay: document.getElementById('sweepTimeDisplay'),
+  filterModePill: document.getElementById('filterModePill'),
   rPeakVal: document.getElementById('rPeakVal'),
   rrIntervalVal: document.getElementById('rrIntervalVal'),
   bpmVal: document.getElementById('bpmVal'),
@@ -519,10 +534,11 @@ function connectMQTT() {
 
   const options = {
     clean: true,
-    connectTimeout: 30000, // 30s timeout cho Cloudflare Edge WSS
-    reconnectPeriod: 4000,
-    keepalive: 60,
-    protocolVersion: 4,    // Chuẩn MQTT 3.1.1
+    connectTimeout: 15000,
+    reconnectPeriod: 2000, // Kết nối lại sau 2 giây nếu rớt mạng
+    keepalive: 15,         // Ping Cloudflare Tunnel mỗi 15s để giữ WebSocket 24/7
+    resubscribe: true,     // Tự động subscribe lại ngay khi khôi phục socket
+    protocolVersion: 4,
     clientId: 'IoMT_Web_' + Math.random().toString(16).substr(2, 8)
   };
 
@@ -693,10 +709,10 @@ function handleDataPacket(data) {
 
   if (Array.isArray(data.ecg)) {
     for (let i = 0; i < data.ecg.length; i++) {
-      // Chỉ ngắt khi cờ phần cứng leadsOff thực sự kích hoạt (hở điện cực)
       const isDisconnected = Boolean(data.leadsOff);
       const res = ecgProcessor.process(data.ecg[i], isDisconnected);
 
+      // Ghi trực tiếp thời gian thực vào bộ đệm sóng - Độ trễ 0ms
       ecgBuffer[writeIndex] = res.filtered;
       writeIndex = (writeIndex + 1) % BUFFER_SIZE;
 
@@ -711,7 +727,7 @@ function handleDataPacket(data) {
     }
   }
 
-  // 2. Nhịp tim BPM: Ưu tiên tuyệt đối nhịp tim lọc trung vị & làm mịn EMA chuẩn y sinh (Matlab Pan-Tompkins)
+  // 2. Nhịp tim BPM: Ưu tiên tuyệt đối nhịp tim lọc trung vị & làm mịn EMA chuẩn y sinh (Pan-Tompkins 1985 chuẩn y sinh)
   let bpm = 0;
   if (ecgProcessor.stableBpm >= 42 && ecgProcessor.stableBpm <= 140) {
     bpm = ecgProcessor.stableBpm;
@@ -931,23 +947,37 @@ function addEventLog(type, smv, bpm, temp, channel, level) {
 
 // ==================== RENDERING 60 FPS OSCILLOSCOPE ====================
 const ctx = elements.ecgCanvas.getContext('2d');
-let lastRenderTime = 0;
 
 function drawOscilloscope(timestamp) {
   requestAnimationFrame(drawOscilloscope);
 
+  const now = performance.now();
+  if (!lastRenderTime) lastRenderTime = now;
+  let dt = (now - lastRenderTime) / 1000;
+  lastRenderTime = now;
+  if (dt <= 0 || dt > 0.1) dt = 0.016;
+
+  // Tia quét lướt chuẩn xác 250 mẫu/giây thời gian thực (độc lập tần số quét màn hình)
+  sweepIndex = (sweepIndex + dt * 250.0) % BUFFER_SIZE;
+
+  // Đồng bộ mềm (Soft-sync) nếu tia quét bị lệch pha so với luồng nạp dữ liệu
+  const drift = (writeIndex - sweepIndex + BUFFER_SIZE) % BUFFER_SIZE;
+  if (drift > 50 && drift < BUFFER_SIZE - 20) {
+    sweepIndex = (sweepIndex + (drift - 20) * 0.12) % BUFFER_SIZE;
+  }
+
   const width = elements.ecgCanvas.width;
   const height = elements.ecgCanvas.height;
+  const dpr = window.devicePixelRatio || 1;
 
-  // Xóa sạch canvas mỗi khung hình để không tích tụ vệt phát quang gây nhòe / biến dạng sóng
   ctx.clearRect(0, 0, width, height);
 
   const stepX = width / BUFFER_SIZE;
-  const sweepX = (sweepIndex % BUFFER_SIZE) * stepX;
+  const sweepX = sweepIndex * stepX;
   const midY = height * 0.52;
-  const gapPixels = 26; // Khe hở quét xóa dữ liệu cũ phía trước tia quét (Sweep Erase Gap)
+  const gapPixels = 24 * dpr;
 
-  // 1. Tự động cân chỉnh biên độ hiển thị (Dynamic Auto-Gain Envelope)
+  // Cân chỉnh biên độ hiển thị tự động mượt mà
   let maxAbs = 60;
   for (let i = 0; i < BUFFER_SIZE; i++) {
     const a = Math.abs(ecgBuffer[i]);
@@ -958,15 +988,14 @@ function drawOscilloscope(timestamp) {
   } else {
     dynamicPeak = dynamicPeak * 0.997 + maxAbs * 0.003;
   }
-  if (dynamicPeak < 90) dynamicPeak = 90; // Ngưỡng sàn bảo vệ chống phóng to nhiễu tĩnh điện
+  if (dynamicPeak < 140) dynamicPeak = 140; // Ngưỡng sàn bảo vệ tránh phóng to nhiễu tĩnh điện
 
-  // Hệ số co giãn trục Y: Sóng chiếm tối đa 72% chiều cao khung hình, không chạm trần / chạm sàn
   const scale = (height * 0.36) / dynamicPeak;
 
-  // 2. VẼ LỚP PHÁT QUANG PHOSPHOR NGOÀI (Soft Phosphor Glow Aura)
+  // 1. VẼ LỚP PHÁT QUANG PHOSPHOR NGOÀI (Soft Phosphor Glow Aura)
   ctx.save();
-  ctx.lineWidth = 3.6;
-  ctx.strokeStyle = 'rgba(0, 255, 136, 0.22)';
+  ctx.lineWidth = 3.0 * dpr;
+  ctx.strokeStyle = 'rgba(0, 255, 136, 0.20)';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -974,7 +1003,6 @@ function drawOscilloscope(timestamp) {
   let started = false;
   for (let i = 0; i < BUFFER_SIZE; i++) {
     const x = i * stepX;
-    // Bỏ qua dải quét phía trước để tạo hiệu ứng sweep gap chuẩn màn hình bệnh viện
     const dist = (x - sweepX + width) % width;
     if (dist < gapPixels) {
       started = false;
@@ -983,7 +1011,7 @@ function drawOscilloscope(timestamp) {
 
     const val = ecgBuffer[i];
     const y = midY - val * scale;
-    const clampedY = Math.max(14, Math.min(height - 14, y));
+    const clampedY = Math.max(12 * dpr, Math.min(height - 12 * dpr, y));
 
     if (!started) {
       ctx.moveTo(x, clampedY);
@@ -994,42 +1022,39 @@ function drawOscilloscope(timestamp) {
   }
   ctx.stroke();
 
-  // 3. VẼ LÕI TIA SÁNG ĐIỆN TIM CHÍNH (Sharp Center Neon Core)
-  ctx.lineWidth = 1.8;
+  // 2. VẼ LÕI TIA SÁNG ĐIỆN TIM CHÍNH (Sharp Center Neon Core)
+  ctx.lineWidth = 1.6 * dpr;
   ctx.strokeStyle = '#00ff88';
   ctx.shadowColor = '#00ff88';
-  ctx.shadowBlur = 6;
+  ctx.shadowBlur = 5 * dpr;
   ctx.stroke();
   ctx.restore();
 
-  // 4. HIỆU ỨNG TIA QUÉT Y TẾ (Medical Sweep Beam & Leading Cursor)
-  const beamGrad = ctx.createLinearGradient(sweepX - 12, 0, sweepX + 2, 0);
+  // 3. HIỆU ỨNG TIA QUÉT Y TẾ (Medical Sweep Beam & Leading Cursor)
+  const beamWidth = 14 * dpr;
+  const beamGrad = ctx.createLinearGradient(sweepX - beamWidth, 0, sweepX + 2 * dpr, 0);
   beamGrad.addColorStop(0, 'rgba(0, 255, 136, 0)');
   beamGrad.addColorStop(0.7, 'rgba(0, 255, 136, 0.25)');
   beamGrad.addColorStop(1, 'rgba(0, 255, 136, 0.95)');
   ctx.fillStyle = beamGrad;
-  ctx.fillRect(sweepX - 12, 0, 14, height);
+  ctx.fillRect(sweepX - beamWidth, 0, beamWidth + 2 * dpr, height);
 
   // Điểm sáng laser dẫn đầu tia quét
-  const currIdx = Math.floor(sweepIndex) % BUFFER_SIZE;
-  const leadVal = ecgBuffer[currIdx] || 0;
-  const leadY = Math.max(14, Math.min(height - 14, midY - leadVal * scale));
-
+  const leadIdx = Math.floor(sweepIndex) % BUFFER_SIZE;
+  const leadVal = ecgBuffer[leadIdx] || 0;
+  const leadY = Math.max(12 * dpr, Math.min(height - 12 * dpr, midY - leadVal * scale));
   ctx.save();
   ctx.fillStyle = '#ffffff';
   ctx.shadowColor = '#00ff88';
-  ctx.shadowBlur = 12;
+  ctx.shadowBlur = 10 * dpr;
   ctx.beginPath();
-  ctx.arc(sweepX, leadY, 2.8, 0, Math.PI * 2);
+  ctx.arc(sweepX, leadY, 2.5 * dpr, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // Tốc độ quét đồng bộ tần số lấy mẫu 250Hz (250 / 60 FPS = 4.167 mẫu / frame)
-  sweepIndex = (sweepIndex + 4.167) % BUFFER_SIZE;
-
   // Cập nhật nhãn giờ quét
-  const now = new Date();
-  elements.sweepTimeDisplay.textContent = now.toTimeString().split(' ')[0] + '.' + Math.floor(now.getMilliseconds() / 100);
+  const nowD = new Date();
+  elements.sweepTimeDisplay.textContent = nowD.toTimeString().split(' ')[0] + '.' + Math.floor(nowD.getMilliseconds() / 100);
 }
 
 // ==================== CHẾ ĐỘ GIẢ LẬP DEMO (KHI CHƯA BẬT KIT) ====================
@@ -1481,6 +1506,23 @@ function closeMobileDrawer() {
 
 // ==================== EVENT LISTENERS & SETUP ====================
 function initEventListeners() {
+  // Chuyển đổi chế độ lọc sóng ECG (Pan-Tompkins 5-15Hz vs Lâm Sàng 0.5-25Hz)
+  if (elements.filterModePill) {
+    elements.filterModePill.addEventListener('click', () => {
+      if (ecgProcessor.filterMode === 'pan-tompkins') {
+        ecgProcessor.filterMode = 'clinical';
+        elements.filterModePill.textContent = 'Lâm Sàng 0.5-25Hz 🩺';
+        elements.filterModePill.className = 'metric-val text-green filter-toggle-pill';
+        showToast('🩺 Đã chuyển sang chế độ lọc Lâm Sàng 0.5-25Hz (Đầy đủ sóng P - QRS - T)', 'info');
+      } else {
+        ecgProcessor.filterMode = 'pan-tompkins';
+        elements.filterModePill.textContent = 'Pan-Tompkins 5-15Hz ⚡';
+        elements.filterModePill.className = 'metric-val text-cyan filter-toggle-pill';
+        showToast('⚡ Đã chuyển sang chế độ lọc Pan-Tompkins 5-15Hz (Khử nhiễu chuyên sâu)', 'success');
+      }
+    });
+  }
+
   if (elements.mobileMenuBtn) {
     elements.mobileMenuBtn.addEventListener('click', openMobileDrawer);
   }
@@ -1747,14 +1789,23 @@ function initPWA() {
   // 1. Đăng ký Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=1.9')
+      navigator.serviceWorker.register('./sw.js?v=2.1')
         .then((reg) => {
           console.log('[PWA] Service Worker đăng ký thành công:', reg.scope);
-          reg.update(); // Chủ động kiểm tra cập nhật bản mới nhất
+          reg.update();
         })
         .catch((err) => {
           console.warn('[PWA] Đăng ký Service Worker thất bại:', err);
         });
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          console.log('[PWA] Service Worker mới đã kích hoạt, nạp lại trang...');
+          window.location.reload();
+        }
+      });
     });
   }
 

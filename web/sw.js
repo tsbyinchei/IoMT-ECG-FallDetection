@@ -3,12 +3,12 @@
  * Cache Shell Assets and handle offline capabilities.
  */
 
-const CACHE_NAME = 'iomt-monitor-v1.9';
+const CACHE_NAME = 'iomt-monitor-v2.1';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './style.css?v=1.9',
-  './app.js?v=1.9',
+  './style.css?v=2.1',
+  './app.js?v=2.1',
   './style.css',
   './app.js',
   './manifest.json',

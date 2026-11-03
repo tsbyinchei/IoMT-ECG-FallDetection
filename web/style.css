@@ -1758,3 +1758,24 @@ body {
   letter-spacing: 0.5px;
   margin-bottom: 12px;
 }
+
+
+.filter-toggle-pill {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filter-toggle-pill:hover {
+  background: rgba(0, 240, 255, 0.22);
+  border-color: rgba(0, 240, 255, 0.7);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+  transform: translateY(-1px);
+}

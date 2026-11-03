@@ -18,7 +18,7 @@
   <link rel="icon" type="image/webp" href="assets/icon-192.webp">
   <link rel="apple-touch-icon" href="assets/icon-192.webp">
   <link rel="apple-touch-startup-image" href="assets/splash.webp">
-  <link rel="stylesheet" href="style.css?v=1.9">
+  <link rel="stylesheet" href="style.css?v=2.1">
   <!-- MQTT.js qua CDN an toàn -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
@@ -190,7 +190,7 @@
         </div>
         <div class="metric-item">
           <span class="metric-label">Trạng thái lọc:</span>
-          <span class="metric-val text-cyan">Pan-Tompkins 5-15Hz</span>
+          <span id="filterModePill" class="metric-val text-cyan filter-toggle-pill" title="Bấm để chuyển chế độ lọc: Pan-Tompkins 5-15Hz hoặc Lâm Sàng 0.5-25Hz">Pan-Tompkins 5-15Hz ⚡</span>
         </div>
       </div>
     </section>
@@ -504,6 +504,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=1.9"></script>
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>
