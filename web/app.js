@@ -40,11 +40,8 @@ let replayDataset = null;
 let selectedEventId = 'preset_fall';
 let loadedInfluxEvents = [];
 
-// ==================== BỘ LỌC TÍN HIỆU ECG CHUẨN MATLAB & PAN-TOMPKINS ====================
-/**
- * Mô hình xử lý tín hiệu điện tim chuẩn y sinh tương thích 100% với file MATLAB
- * ('matlab_mqtt_ecg_processor.m' & 'matlab_serial_ecg_processor.m'):
- * 
+// ==================== BỘ LỌC TÍN HIỆU ECG CHUẨN PAN-TOMPKINS ====================
+/** 
  * 1. Bước 1 - Bộ lọc thông dải Butterworth 5 - 15 Hz bậc 2 [butter(2, [5 15]/(Fs/2), 'bandpass')]
  *    thực thi qua cấu trúc Direct Form II Transposed bảo toàn trạng thái trễ liên tục z_bp.
  * 2. Bước 2 - Bộ vi phân 5 điểm Pan-Tompkins: (2*x[n] + x[n-1] - x[n-3] - 2*x[n-4]) * (Fs/8)
@@ -150,7 +147,7 @@ class MedicalEcgProcessor {
     this.z[0] = this.b[1] * x + this.z[1] - this.a[1] * y;
     this.z[1] = this.b[2] * x + this.z[2] - this.a[2] * y;
     this.z[2] = this.b[3] * x + this.z[3] - this.a[3] * y;
-    this.z[3] = this.b[4] * x             - this.a[4] * y;
+    this.z[3] = this.b[4] * x - this.a[4] * y;
 
     // Lưu vào buffer ngắn để tìm cực đại cục bộ đỉnh R
     this.recentFilt[this.recentFiltIdx] = y;
@@ -443,11 +440,11 @@ function stopAlarmSiren() {
     try {
       currentSirenOsc.stop();
       currentSirenOsc.disconnect();
-    } catch (e) {}
+    } catch (e) { }
     currentSirenOsc = null;
   }
   if (currentSirenGain) {
-    try { currentSirenGain.disconnect(); } catch (e) {}
+    try { currentSirenGain.disconnect(); } catch (e) { }
     currentSirenGain = null;
   }
 }
@@ -613,7 +610,7 @@ function connectMQTT() {
 function updateConnectionStatus(type, text) {
   elements.statusBadge.className = 'status-badge ' + type;
   if (elements.statusText) elements.statusText.textContent = text;
-  
+
   if (elements.statusTextShort) {
     if (type === 'connected') elements.statusTextShort.textContent = 'WSS';
     else if (type === 'demo') elements.statusTextShort.textContent = 'DEMO';
@@ -879,7 +876,7 @@ function handleGatewayStatus(status) {
 function triggerHeartBeat(bpm) {
   elements.heartPulse.classList.add('heart-beat');
   setTimeout(() => elements.heartPulse.classList.remove('heart-beat'), 350);
-  
+
   if (elements.bpmPulseBar) {
     elements.bpmPulseBar.style.width = '100%';
     setTimeout(() => {
@@ -897,7 +894,7 @@ function triggerFallEmergency(smv, bpm, temp, impactPeak = null) {
   const peakVal = impactPeak || (Number(smv) >= 2.2 ? Number(smv) : 3.42);
   elements.alertTitle.textContent = `🚨 CẢNH BÁO TÉ NGÃ 2 GIAI ĐOẠN (Đỉnh va đập: ${peakVal.toFixed(2)}g)!`;
   elements.alertDesc.textContent = `Xác thực thành công 2 giai đoạn: Pha 1 va đập mạnh ${peakVal.toFixed(2)}g (> 2.2g) kết hợp Pha 2 bất động nằm sàn (${Number(smv).toFixed(2)}g). Đã phát còi và gửi tin khẩn cấp Telegram & Zalo!`;
-  
+
   if (!isBuzzerMuted) {
     playAlarmSiren();
   }
@@ -1041,7 +1038,7 @@ let demoPhase = 0;
 
 function startDemoMode() {
   if (mqttClient) {
-    try { mqttClient.end(true); } catch (e) {}
+    try { mqttClient.end(true); } catch (e) { }
   }
   isDemoMode = true;
   updateConnectionStatus('demo', 'Chế độ Demo (Simulator)');
@@ -1338,7 +1335,7 @@ function startReplay(eventId) {
   // 1. Dừng các chế độ khác
   if (isDemoMode) stopDemoMode();
   if (mqttClient) {
-    try { mqttClient.end(true); } catch (e) {}
+    try { mqttClient.end(true); } catch (e) { }
   }
 
   // 2. Nạp dữ liệu sự kiện

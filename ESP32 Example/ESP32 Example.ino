@@ -231,6 +231,13 @@ static bool snapshotCapturing = false;
 static uint16_t postEventSamplesCollected = 0;
 
 int edgeBpm = 0;
+int lastValidBpm = 0;                  // Nhịp tim ổn định gần nhất trước khi hở cực hoặc té ngã
+unsigned long lastValidBpmTime = 0;    // Mốc thời gian ghi nhận nhịp tim hợp lệ
+unsigned long lastHeartAlertTime = 0;  // Chống spam cảnh báo nhịp tim bất thường (cooldown 2 phút)
+unsigned long hrAbnormalStartTime = 0; // Đếm thời gian nhịp tim bất thường kéo dài (> 5s mới báo)
+unsigned long lastPeriodicReportTime = 0; // Mốc thời gian gửi báo cáo định kỳ
+const unsigned long PERIODIC_REPORT_INTERVAL = 30UL * 60UL * 1000UL; // 30 phút một lần
+
 unsigned long lastPeakTime = 0;
 uint16_t dynamicMax = 2500;
 uint16_t dynamicMin = 1800;
@@ -426,6 +433,10 @@ void processEdgeBPM(float hp) {
       } else {
         // Bộ lọc trung bình trượt có trọng số (EMA): 81.25% lịch sử + 18.75% giá trị mới
         edgeBpm = (edgeBpm * 13 + calculatedBpm * 3) / 16;
+      }
+      if (edgeBpm >= 45 && edgeBpm <= 160) {
+        lastValidBpm = edgeBpm;
+        lastValidBpmTime = millis();
       }
     }
   }
@@ -877,16 +888,25 @@ void sendTelegramFallAlert(float smv, float temp, int bpm) {
     return;
   }
 
-  char textBuf[256];
+  char hrStr[64];
+  if (bpm > 0) {
+    snprintf(hrStr, sizeof(hrStr), "%d BPM", bpm);
+  } else if (lastValidBpm > 0) {
+    snprintf(hrStr, sizeof(hrStr), "%d BPM (Truoc va dap)", lastValidBpm);
+  } else {
+    snprintf(hrStr, sizeof(hrStr), "Tuot dien cuc luc nga");
+  }
+
+  char textBuf[280];
   snprintf(textBuf, sizeof(textBuf),
            "🚨 [CẢNH BÁO TÉ NGÃ KHẨN CẤP - GATEWAY ESP32]!\n"
            "Bệnh nhân vừa bị té ngã!\n"
            "- Lực va đập SMV: %.2fg\n"
-           "- Nhịp tim hiện tại: %d BPM\n"
+           "- Nhịp tim: %s\n"
            "- Thân nhiệt: %.1f*C\n"
            "- Thiết bị: IoMT Gateway\n"
            "Cần kiểm tra ngay lập tức!",
-           smv, bpm, temp);
+           smv, hrStr, temp);
 
   String url = "/bot" + String(TELEGRAM_BOT_TOKEN) +
                "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) +
@@ -917,16 +937,25 @@ void sendZaloFallAlert(float smv, float temp, int bpm) {
     return;
   }
 
-  char textBuf[256];
+  char hrStr[64];
+  if (bpm > 0) {
+    snprintf(hrStr, sizeof(hrStr), "%d BPM", bpm);
+  } else if (lastValidBpm > 0) {
+    snprintf(hrStr, sizeof(hrStr), "%d BPM (Truoc va dap)", lastValidBpm);
+  } else {
+    snprintf(hrStr, sizeof(hrStr), "Tuot dien cuc luc nga");
+  }
+
+  char textBuf[280];
   snprintf(textBuf, sizeof(textBuf),
            "🚨 [CẢNH BÁO TÉ NGÃ KHẨN CẤP - GATEWAY ESP32]!\n"
            "Bệnh nhân vừa bị té ngã!\n"
            "- Lực va đập SMV: %.2fg\n"
-           "- Nhịp tim hiện tại: %d BPM\n"
+           "- Nhịp tim: %s\n"
            "- Thân nhiệt: %.1f*C\n"
            "- Thiết bị: IoMT Gateway\n"
            "Cần kiểm tra ngay lập tức!",
-           smv, bpm, temp);
+           smv, hrStr, temp);
 
   String url = "/bot" + String(ZALO_BOT_TOKEN) +
                "/sendMessage?chat_id=" + String(ZALO_CHAT_ID) +
@@ -939,9 +968,116 @@ void sendZaloFallAlert(float smv, float temp, int bpm) {
   client.stop();
 }
 
-// ==================== IN DỮ LIỆU SERIAL (CHO MATLAB OFFLINE & DEBUG)
-// ==================== IN DỮ LIỆU SERIAL (CHO MATLAB OFFLINE & DEBUG) ====================
-void outputSerialForMatlab() {
+void sendTelegramHeartAlert(int bpm, const char* condition, float temp) {
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(4000);
+
+  if (!client.connect("api.telegram.org", 443)) {
+    Serial.println("[TELEGRAM] Khong the ket noi api.telegram.org");
+    return;
+  }
+
+  char textBuf[280];
+  snprintf(textBuf, sizeof(textBuf),
+           "❤️ [CẢNH BÁO NHỊP TIM BẤT THƯỜNG - GATEWAY]!\n"
+           "Phát hiện biến cố: %s!\n"
+           "- Nhịp tim ghi nhận: %d BPM\n"
+           "- Thân nhiệt: %.1f*C\n"
+           "- Thiết bị: IoMT Gateway\n"
+           "Vui lòng kiểm tra tình trạng người bệnh!",
+           condition, bpm, temp);
+
+  String url = "/bot" + String(TELEGRAM_BOT_TOKEN) +
+               "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) +
+               "&text=" + urlEncodeString(textBuf);
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: api.telegram.org\r\n" + "Connection: close\r\n\r\n");
+
+  Serial.println("[TELEGRAM] >>> Da gui canh bao nhip tim bat thuong! <<<");
+  client.stop();
+}
+
+void sendZaloHeartAlert(int bpm, const char* condition, float temp) {
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+  if (strlen(ZALO_BOT_TOKEN) == 0 || strlen(ZALO_CHAT_ID) == 0)
+    return;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(4000);
+
+  if (!client.connect("bot-api.zaloplatforms.com", 443)) {
+    Serial.println("[ZALO] Khong the ket noi bot-api.zaloplatforms.com");
+    return;
+  }
+
+  char textBuf[280];
+  snprintf(textBuf, sizeof(textBuf),
+           "❤️ [CẢNH BÁO NHỊP TIM BẤT THƯỜNG - GATEWAY]!\n"
+           "Phát hiện biến cố: %s!\n"
+           "- Nhịp tim ghi nhận: %d BPM\n"
+           "- Thân nhiệt: %.1f*C\n"
+           "- Thiết bị: IoMT Gateway\n"
+           "Vui lòng kiểm tra tình trạng người bệnh!",
+           condition, bpm, temp);
+
+  String url = "/bot" + String(ZALO_BOT_TOKEN) +
+               "/sendMessage?chat_id=" + String(ZALO_CHAT_ID) +
+               "&text=" + urlEncodeString(textBuf);
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: bot-api.zaloplatforms.com\r\n" +
+               "Connection: close\r\n\r\n");
+
+  Serial.println("[ZALO] >>> Da gui canh bao nhip tim bat thuong qua Zalo! <<<");
+  client.stop();
+}
+
+void sendPeriodicTelemetryReport(int bpm, float temp, float smv, uint16_t falls) {
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(4000);
+
+  if (!client.connect("api.telegram.org", 443))
+    return;
+
+  int displayBpm = (bpm > 0) ? bpm : lastValidBpm;
+  char hrStr[32];
+  if (displayBpm > 0) {
+    snprintf(hrStr, sizeof(hrStr), "%d BPM (On dinh)", displayBpm);
+  } else {
+    snprintf(hrStr, sizeof(hrStr), "Cho ket noi dien cuc");
+  }
+
+  char textBuf[280];
+  snprintf(textBuf, sizeof(textBuf),
+           "📊 [BÁO CÁO SINH HIỆU ĐỊNH KỲ - GATEWAY]\n"
+           "- Nhịp tim: %s\n"
+           "- Thân nhiệt: %.1f*C\n"
+           "- Gia tốc chuyển động: %.2fg\n"
+           "- Số lần té ngã: %d lan\n"
+           "- Trang thai: Binh thuong / An toan",
+           hrStr, temp, smv, falls);
+
+  String url = "/bot" + String(TELEGRAM_BOT_TOKEN) +
+               "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) +
+               "&text=" + urlEncodeString(textBuf);
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: api.telegram.org\r\n" + "Connection: close\r\n\r\n");
+  Serial.println("[TELEGRAM] >>> Da gui bao cao sinh hieu dinh ky! <<<");
+  client.stop();
+}
+
+// ==================== IN DỮ LIỆU SERIAL (DEBUG & TELEMETRY STREAM)
+// ==================== IN DỮ LIỆU SERIAL (DEBUG & TELEMETRY STREAM) ====================
+void outputSerialData() {
 #if DEBUG_MUTE_DATA_STREAM
   // Tắt 10 dòng $DATA/giây để Serial Monitor không bị tràn trôi log
   // Chỉ in 1 dòng tóm tắt trạng thái cảm biến mỗi 5 giây
@@ -1164,8 +1300,8 @@ void loop() {
         }
       }
 
-      // Xuất dữ liệu ra cổng Serial phục vụ thu thập trên MATLAB và giám sát offline
-      outputSerialForMatlab();
+      // Xuất dữ liệu ra cổng Serial phục vụ giám sát và debug thời gian thực
+      outputSerialData();
 
       // Đóng gói JSON và đẩy lên Broker MQTT Cloud (WebSocket Secure TLS 1.3)
       publishDataMQTT();
@@ -1181,6 +1317,31 @@ void loop() {
     drawOLED();
   }
 
-  // 5. Quản lý trạng thái còi chip Active Buzzer (còi hú liên tục khi ngã, bíp nhẹ khi tuột điện cực)
+  // 5. Kiểm tra cảnh báo nhịp tim bất thường (Tachycardia > 120 BPM hoặc Bradycardia < 50 BPM) kéo dài > 5s
+  if (edgeBpm > 0 && !incomingData.leadsOff && (edgeBpm > 120 || edgeBpm < 50)) {
+    if (hrAbnormalStartTime == 0) {
+      hrAbnormalStartTime = millis();
+    } else if (millis() - hrAbnormalStartTime >= 5000) {
+      if (millis() - lastHeartAlertTime >= 120000) {
+        lastHeartAlertTime = millis();
+        const char* cond = (edgeBpm > 120) ? "NHỊP TIM NHANH (Tachycardia)" : "NHỊP TIM CHẬM (Bradycardia)";
+        Serial.printf("\n🚨 [CẢNH BÁO TIM] %s: %d BPM! Đang gửi Telegram/Zalo...\n", cond, edgeBpm);
+        sendTelegramHeartAlert(edgeBpm, cond, incomingData.bodyTemp);
+        sendZaloHeartAlert(edgeBpm, cond, incomingData.bodyTemp);
+      }
+    }
+  } else {
+    hrAbnormalStartTime = 0;
+  }
+
+  // 6. Gửi báo cáo sinh hiệu định kỳ mỗi 30 phút qua Telegram
+  if (millis() - lastPeriodicReportTime >= PERIODIC_REPORT_INTERVAL) {
+    lastPeriodicReportTime = millis();
+    if (totalPacketsReceived > 100) {
+      sendPeriodicTelemetryReport(edgeBpm, incomingData.bodyTemp, incomingData.smv, totalFallsCount);
+    }
+  }
+
+  // 7. Quản lý trạng thái còi chip Active Buzzer (còi hú liên tục khi ngã, bíp nhẹ khi tuột điện cực)
   handleBuzzer();
 }
