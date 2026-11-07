@@ -523,7 +523,7 @@ flowchart TD
      - Gateway ESP32 duy trì một bộ đệm tròn (**Circular Ring Buffer**) dung lượng $\mathbf{15\text{ KB SRAM}}$ trong bộ nhớ nội, liên tục ghi đè $7,500\text{ mẫu ECG}$ gần nhất ($30\text{ giây}$ trước sự kiện).
      - Khi phát hiện biến cố lâm sàng:
        - Cảnh báo té ngã được xác thực (`fallDetected == 1`).
-       - Cơn loạn nhịp tim nguy hiểm: Nhịp chậm kịch phát ($\text{BPM} < 50$) hoặc Nhịp nhanh khi nghỉ ($\text{BPM} > 120$).
+       - Cơn loạn nhịp tim nguy hiểm: Nhịp chậm kịch phát ($\text{BPM} < 50$) hoặc Nhịp nhanh khi nghỉ ($\text{BPM} > 105$).
      - Gateway lập tức kích hoạt:
        1. Khóa và đóng băng $7,500\text{ mẫu}$ trong quá khứ ($30\text{s}$ trước biến cố).
        2. Tiếp tục thu thập $7,500\text{ mẫu}$ kế tiếp ($30\text{s}$ sau biến cố).
@@ -536,7 +536,7 @@ flowchart TD
   2. **Tắt các khối vô tuyến không dùng:** Vô hiệu hóa hoàn toàn bộ điều khiển Bluetooth nội vi (`btStop()`, `esp_bt_controller_disable()`).
   3. **Kích hoạt Wi-Fi Modem-sleep:** Cho phép mạch RF nghỉ giữa các khoảng truyền dữ liệu.
   4. **Gom cụm gói tin (Packet Batching):** Gom $200\text{ ms}$ (50 mẫu ECG) trên 1 gói UDP để giảm 50% số lần kích hoạt bộ khuếch đại công suất PA.
-  - **Kết quả Thực nghiệm Định mức:** Dòng tiêu thụ trung bình giảm từ $\approx 90\text{ mA}$ xuống **$\approx 55\text{ mA}$**, nâng thời lượng pin Li-Po $1000\text{ mAh}$ lên **$\approx 14.5\text{ giờ}$** (đáp ứng trọn vẹn 1 ngày sinh hoạt ban ngày, sạc đêm).
+  - **Kết quả Thực nghiệm & Dự toán Nguồn:** Trên nguyên mẫu thực nghiệm Breadboard cấp nguồn 5V USB (dùng sạc dự phòng mini), dòng tiêu thụ trung bình đo đạc thực tế chỉ khoảng **$34.2\text{ mA}$**. Khi áp dụng các kỹ thuật hạ xung và tối ưu hóa firmware, tính toán dự toán cho phiên bản mạch in PCB tích hợp pin Li-Po $500 - 1000\text{ mAh}$ cho phép hệ thống duy trì thời gian vận hành liên tục từ **$13.0 - 14.5\text{ giờ}$** (đáp ứng trọn vẹn 1 ngày sinh hoạt ban ngày, sạc đêm).
   - **Lộ trình Thế hệ Mới:** Chuyển đổi tầng vật lý sang **Bluetooth Low Energy (BLE 5.0 Coded PHY)** với dòng tiêu thụ $< 8\text{ mA}$ để đạt tuổi thọ pin $> 3 - 5\text{ ngày}$.
 
 ---

@@ -108,7 +108,7 @@
 ### 4.1. Tiêu chuẩn Nhịp tim Lâm sàng (AHA Standard)
 * **Dải nhịp nghỉ ngơi bình thường:** $60 - 100\text{ BPM}$.
 * **Cảnh báo nhịp chậm (Bradycardia):** $< 50\text{ BPM}$ (Còi bíp nhịp đôi).
-* **Cảnh báo nhịp nhanh (Tachycardia):** $> 120\text{ BPM}$ (Còi bíp nhịp đôi).
+* **Cảnh báo nhịp nhanh lâm sàng (Tachycardia):** $> 105\text{ BPM}$ (kéo dài $> 5\text{s}$, còi bíp nhịp đôi).
 
 ### 4.2. Tiêu chuẩn Thân nhiệt Lâm sàng
 * **Thân nhiệt bề mặt da (Skin Temperature):** $31.5^\circ\text{C} - 34.5^\circ\text{C}$ (Điều kiện phòng $28^\circ\text{C}$).
@@ -124,6 +124,8 @@
 ---
 
 ## 🔋 5. PHÂN TÍCH NĂNG LƯỢNG & DỰ TOÁN PIN (POWER BUDGET)
+
+> 📝 **Lưu ý Hiện trạng Phần cứng:** Bảng phân tích năng lượng dưới đây là **Dự toán Thiết kế Nguồn (Power Budgeting)** cho phiên bản thương mại tích hợp mạch in PCB và pin Li-Po. Trong giai đoạn thử nghiệm Proof of Concept (PoC) hiện tại, thiết bị được lắp ráp trên Bo mạch thử nghiệm (Breadboard) và cấp nguồn thực tế qua cổng **USB 5V** (từ pin sạc dự phòng mini hoặc adapter), với dòng tiêu thụ trung bình đo kiểm thực tế đạt **$34.2\text{ mA}$** (chế độ phát UDP ngắt quãng).
 
 ### 5.1. Bảng Dòng Điện Tiêu Thụ Từng Khối Phần Cứng
 * **Điện áp danh định:** $3.3\text{V}$ (hoặc Pin Li-Po 1S $3.7\text{V} - 4.2\text{V}$ qua IC ổn áp LDO ME6211 dung sai thấp).

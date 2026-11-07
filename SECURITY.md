@@ -10,7 +10,7 @@ Tài liệu này xác định các chính sách bảo mật thông tin mạng v�
 > ⚠️ **CẢNH BÁO QUAN TRỌNG:** Thiết bị AD8232 kết nối trực tiếp các điện cực Ag/AgCl vào da người bệnh nhân, do đó việc tuân thủ an toàn điện sinh học (chuẩn **IEC 60601-1**) là ưu tiên hàng đầu!
 
 1. **Nguồn cấp an toàn (Power Isolation):**
-   * **Bắt buộc:** Chỉ cấp nguồn cho Node cảm biến ESP32-C3 bằng **Pin sạc Li-Po/Li-Ion (3.7V - 4.2V)** hoặc cổng USB của máy tính xách tay **đang chạy bằng pin thuần túy** (đã rút cắm sạc 220V).
+   * **Bắt buộc:** Chỉ cấp nguồn cho Node cảm biến ESP32-C3 bằng **Pin sạc dự phòng mini (5V Power Bank)**, Pin sạc Li-Po/Li-Ion (3.7V - 4.2V) hoặc cổng USB của máy tính xách tay **đang chạy bằng pin thuần túy** (đã rút cắm sạc 220V).
    * **Tuyệt đối nghiêm cấm:** Không được cắm nguồn ESP32 vào củ sạc điện thoại hoặc máy tính đang cắm nguồn lưới điện $220\text{V}$ không có bộ cách ly y tế (Medical Galvanic Isolation), nhằm tránh nguy cơ dòng rò điện áp cao gây nguy hiểm cho người đeo điện cực.
 2. **Khuyến cáo ứng dụng:**
    * Dự án được thiết kế cho mục đích học tập, nghiên cứu khoa học và phát triển nguyên mẫu (Prototype). Không được sử dụng thay thế các thiết bị chẩn đoán lâm sàng chuyên dụng trong phòng hồi sức cấp cứu (ICU) mà chưa qua kiểm định của cơ quan y tế có thẩm quyền (Bộ Y tế / FDA / CE).
