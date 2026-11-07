@@ -132,8 +132,37 @@ Tài liệu này cung cấp mục lục chi tiết, khung sườn nội dung và
 
 ---
 
-### TÀI LIỆU THAM KHẢO (IEEE Standard)
-1. J. Pan and W. J. Tompkins, "A Real-Time QRS Detection Algorithm," *IEEE Transactions on Biomedical Engineering*, vol. BME-32, no. 3, pp. 230-236, 1985.
-2. ITU-T Recommendation Y.2060, "Overview of the Internet of things," International Telecommunication Union, 2012.
-3. ANSI/AAMI EC13:2002, "Cardiac monitors, heart rate meters, and alarms," Association for the Advancement of Medical Instrumentation, 2002.
-4. Circuit Digest, "IoT Elderly Fall Detection System with WhatsApp Alert," GitHub Repository: https://github.com/Circuit-Digest/Elderly-Fall-Detection-System, 2024.
+## TÀI LIỆU THAM KHẢO
+
+### I. Tiêu chuẩn Quốc tế, Bài báo Khoa học & Tài liệu Kỹ thuật (Standards & Publications)
+1. **J. Pan and W. J. Tompkins**, "A Real-Time QRS Detection Algorithm," *IEEE Transactions on Biomedical Engineering*, vol. BME-32, no. 3, pp. 230-236, Mar. 1985, doi: [10.1109/TBME.1985.325532](https://doi.org/10.1109/TBME.1985.325532).
+2. **International Telecommunication Union (ITU)**, "Overview of the Internet of things," *ITU-T Recommendation Y.2060*, Series Y: Global Information Infrastructure, Internet Protocol Aspects and Next-Generation Networks, Jun. 2012. [Online]. Available: [https://www.itu.int/rec/T-REC-Y.2060-201206-I/en](https://www.itu.int/rec/T-REC-Y.2060-201206-I/en).
+3. **Association for the Advancement of Medical Instrumentation (AAMI)**, "Cardiac monitors, heart rate meters, and alarms," *ANSI/AAMI EC13:2002*, Arlington, VA: AAMI, 2002. [Online]. Available: [https://standards.globalspec.com/std/1036814/ansi-aami-ec13](https://standards.globalspec.com/std/1036814/ansi-aami-ec13).
+4. **A. K. Bourke, J. V. O'Brien, and G. M. Lyons**, "Evaluation of a threshold-based tri-axial accelerometer fall detection algorithm," *Gait & Posture*, vol. 26, no. 2, pp. 194-199, Jul. 2007, doi: [10.1016/j.gaitpost.2006.09.012](https://doi.org/10.1016/j.gaitpost.2006.09.012).
+5. **Analog Devices, Inc.**, "AD8232: Single-Lead, Heart Rate Monitor Front End," *Technical Data Sheet*, Rev. D, Norwood, MA, 2020. [Online]. Available: [https://www.analog.com/media/en/technical-documentation/data-sheets/ad8232.pdf](https://www.analog.com/media/en/technical-documentation/data-sheets/ad8232.pdf).
+6. **TDK InvenSense**, "MPU-6000 and MPU-6050 Product Specification," *Document Number: PS-MPU-6000A-00*, Rev. 3.4, Sunnyvale, CA, 2013. [Online]. Available: [https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf).
+7. **Maxim Integrated / Analog Devices**, "DS18B20: Programmable Resolution 1-Wire Digital Thermometer," *Data Sheet 19-7487*, Rev. 6, San Jose, CA, 2019. [Online]. Available: [https://www.analog.com/media/en/technical-documentation/data-sheets/ds18b20.pdf](https://www.analog.com/media/en/technical-documentation/data-sheets/ds18b20.pdf).
+8. **Espressif Systems**, "ESP32-C3 Series Datasheet," *Document Release v1.4*, Shanghai, China, 2024. [Online]. Available: [https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf](https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf).
+9. **Espressif Systems**, "ESP32 Series Datasheet," *Document Release v4.3*, Shanghai, China, 2024. [Online]. Available: [https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf).
+10. **A. Banks and R. Gupta**, "MQTT Version 3.1.1," *OASIS Standard*, Oct. 2014. [Online]. Available: [http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html).
+11. **E. Rescorla**, "The Transport Layer Security (TLS) Protocol Version 1.3," *IETF RFC 8446*, Aug. 2018. [Online]. Available: [https://datatracker.ietf.org/doc/html/rfc8446](https://datatracker.ietf.org/doc/html/rfc8446).
+12. **World Health Organization (WHO)**, "Ageing and health," *WHO Fact Sheets*, Oct. 2022. [Online]. Available: [https://www.who.int/news-room/fact-sheets/detail/ageing-and-health](https://www.who.int/news-room/fact-sheets/detail/ageing-and-health).
+13. **M. Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology**, "Heart rate variability: standards of measurement, physiological interpretation, and clinical use," *Circulation*, vol. 93, no. 5, pp. 1043-1065, 1996. [Online]. Available: [https://doi.org/10.1161/01.CIR.93.5.1043](https://doi.org/10.1161/01.CIR.93.5.1043).
+14. **InfluxData, Inc.**, "InfluxDB OSS v2.7 Documentation: High-performance Time Series Database," 2024. [Online]. Available: [https://docs.influxdata.com/influxdb/v2.7/](https://docs.influxdata.com/influxdb/v2.7/).
+
+### II. Các Dự Án Mã Nguồn Mở Kế Thừa & Tham Khảo Kỹ Thuật (Open-Source Project References)
+15. **Circuit Digest (Ashish Choudhary)**, "IoT Elderly Fall Detection System with WhatsApp & Telegram Alert," GitHub Repository, 2024. [Online]. Available: [https://github.com/Circuit-Digest/Elderly-Fall-Detection-System](https://github.com/Circuit-Digest/Elderly-Fall-Detection-System).  
+    *(Kế thừa nguyên lý tính toán độ lớn vector gia tốc SMV của MPU-6050; đồ án đã nâng cấp lên thuật toán 3 pha Free-fall/Impact/Immobility và tích hợp thêm kênh Zalo OA).*
+16. **bromoket**, "ESP32-ECG: A from-scratch single-lead ECG heart monitor with OLED and Web Dashboard," GitHub Repository, 2024. [Online]. Available: [https://github.com/bromoket/ESP32-ECG](https://github.com/bromoket/ESP32-ECG).  
+    *(Tham khảo kiến trúc chia tách tác vụ xử lý ECG và giao diện PWA; đồ án đã chuyển đổi Web Dashboard sang Zero-dependency Canvas 2D tia quét Phosphor ICU 60 FPS mượt mà và bộ lọc kép Pan-Tompkins vs Lâm sàng).*
+17. **Alejandro Pulido Saravia (Alpusa)**, "AWECG-Monitor: ESP32 BLE ECG Data Acquisition with AD8232," GitHub Repository, 2023. [Online]. Available: [https://github.com/Alpusa/AWECG-Monitor](https://github.com/Alpusa/AWECG-Monitor).  
+    *(Tham khảo sơ đồ phần cứng kết nối AD8232 và thông số lấy mẫu chuẩn 250 Hz, 12-bit ADC; đồ án đã nâng cấp luồng truyền BLE cục bộ lên WSS Cloudflare Tunnel bảo mật toàn cầu).*
+18. **Danny Ng Wee Kiat**, "esp32-serial-BLE-ECG: ECG Data Acquisition and Transmission using ESP32 and AD8232," GitHub Repository, 2023. [Online]. Available: [https://github.com/dannyngweekiat/esp32-serial-BLE-ECG](https://github.com/dannyngweekiat/esp32-serial-BLE-ECG).  
+    *(Tham khảo kỹ thuật đóng gói chuỗi dữ liệu Serial Framing chống phân mảnh gói tin khi truyền không dây).*
+19. **Milad Mohseni**, "ESP32-DS18B20-OLED-Thermometer: Real-time Digital Thermometer using DS18B20 and SSD1306," GitHub Repository, 2023. [Online]. Available: [https://github.com/Milad-Mohseni-Eng/ESP32-DS18B20-OLED-Thermometer](https://github.com/Milad-Mohseni-Eng/ESP32-DS18B20-OLED-Thermometer).  
+    *(Tham khảo kỹ thuật điều khiển bus 1-Wire DS18B20 trên ESP32; đồ án đã tối ưu hóa đọc cảm biến bất đồng bộ không gây blocking luồng lấy mẫu ECG 250 Hz).*
+20. **Peter Greenland (pgreenland)**, "esp32_ds18b20_example: ESP32-C3 PlatformIO project for Dallas DS18B20 sensors via UART 1-Wire," GitHub Repository, 2022. [Online]. Available: [https://github.com/pgreenland/esp32_ds18b20_example](https://github.com/pgreenland/esp32_ds18b20_example).  
+    *(Tham khảo kỹ thuật giao tiếp 1-Wire trên kiến trúc vi điều khiển RISC-V ESP32-C3).*
+21. **coniferconifer**, "ESP32_Heart_Rate_MQTT: AD8232 ECG Heart Rate Telemetry via MQTT Server," GitHub Repository, 2021. [Online]. Available: [https://github.com/coniferconifer/ESP32_Heart_Rate_MQTT](https://github.com/coniferconifer/ESP32_Heart_Rate_MQTT).  
+    *(Tham khảo mô hình đẩy dữ liệu nhịp tim lên máy chủ MQTT; đồ án đã nâng cấp từ MQTT TCP 1883 truyền thống sang WSS MQTT qua Cloudflare Tunnel Port 443 mã hóa TLS 1.3).*
+
