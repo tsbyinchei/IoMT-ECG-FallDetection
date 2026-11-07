@@ -76,7 +76,7 @@
 ### 3.3. Giao thức Tầng 3: Cloudflare Tunnel MQTT WSS Stream (Gateway $\to$ Cloud Broker)
 * **Kiến trúc Broker:** EMQX v5 triển khai trên Ubuntu Server 1Panel (IP nội bộ `192.168.1.x`, cổng WebSocket `8083`).
 * **Định tuyến toàn cầu:** Cloudflare Zero Trust Tunnel chuyển tiếp SSL/TLS an toàn qua Public Hostname:
-  * **URI WSS:** `wss://mqtt.yourdomain.com/mqtt` (Port 443 WSS)
+  * **URI WSS:** `wss://mqtt.tsbyin.dev/mqtt` (Port 443 WSS)
   * **Client ESP32:** Thư viện `esp_mqtt_client` (FreeRTOS Native Task).
   * **Xác thực an toàn:** Password-based Authentication (Tài khoản xác thực trên EMQX Broker của bạn).
 * **Topic dữ liệu sinh hiệu:** `biomed/patient/data` (Publish chu kỳ 100ms)
