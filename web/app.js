@@ -265,6 +265,7 @@ let writeIndex = 0;
 let sweepIndex = 0;
 let lastDetectedBpm = 0;
 let lastRenderTime = 0;
+let lastDataPacketTime = 0;
 
 // Web Audio API Context
 let audioCtx = null;
@@ -701,6 +702,7 @@ async function checkInfluxDBHealth(silent = true) {
 
 // ==================== XỬ LÝ DỮ LIỆU SINH HIỆU ====================
 function handleDataPacket(data) {
+  lastDataPacketTime = performance.now();
   totalPackets++;
   elements.packetCountVal.textContent = totalPackets.toLocaleString();
 
@@ -731,7 +733,7 @@ function handleDataPacket(data) {
   let bpm = 0;
   if (ecgProcessor.stableBpm >= 42 && ecgProcessor.stableBpm <= 140) {
     bpm = ecgProcessor.stableBpm;
-  } else if (data.bpm >= 45 && data.bpm <= 120) {
+  } else if (data.bpm >= 45 && data.bpm <= 140) {
     bpm = data.bpm;
   }
 
@@ -743,7 +745,7 @@ function handleDataPacket(data) {
     if (elements.rrIntervalVal) elements.rrIntervalVal.textContent = '-- ms';
   } else if (bpm > 0) {
     elements.bpmVal.textContent = bpm;
-    if (bpm > 120) {
+    if (bpm > 105) {
       elements.bpmStatus.textContent = 'NHỊP TIM NHANH (Tachycardia)';
       elements.bpmStatus.className = 'vital-status-pill text-danger';
     } else if (bpm < 50) {
@@ -960,10 +962,14 @@ function drawOscilloscope(timestamp) {
   // Tia quét lướt chuẩn xác 250 mẫu/giây thời gian thực (độc lập tần số quét màn hình)
   sweepIndex = (sweepIndex + dt * 250.0) % BUFFER_SIZE;
 
-  // Đồng bộ mềm (Soft-sync) nếu tia quét bị lệch pha so với luồng nạp dữ liệu
-  const drift = (writeIndex - sweepIndex + BUFFER_SIZE) % BUFFER_SIZE;
-  if (drift > 50 && drift < BUFFER_SIZE - 20) {
-    sweepIndex = (sweepIndex + (drift - 20) * 0.12) % BUFFER_SIZE;
+  // Đồng bộ mềm (Soft-sync) CHỈ KHI đang có luồng dữ liệu thời gian thực gửi đến (< 500ms)
+  // Khi ở trạng thái chờ thiết bị (Idle/Standby), tia quét tự do quét mượt mà qua màn hình, không bị kẹt ở mép phải (98%)
+  const isDataStreaming = (performance.now() - lastDataPacketTime < 500);
+  if (isDataStreaming) {
+    const drift = (writeIndex - sweepIndex + BUFFER_SIZE) % BUFFER_SIZE;
+    if (drift > 50 && drift < BUFFER_SIZE - 20) {
+      sweepIndex = (sweepIndex + (drift - 20) * 0.12) % BUFFER_SIZE;
+    }
   }
 
   const width = elements.ecgCanvas.width;
@@ -1504,6 +1510,75 @@ function closeMobileDrawer() {
   if (elements.drawerBackdrop) elements.drawerBackdrop.classList.add('hidden');
 }
 
+// ==================== BẢO VỆ GIAO DIỆN KIOSK Y TẾ (KIOSK SECURITY & SHORTCUT LOCK) ====================
+class KioskSecurityManager {
+  constructor(enabled = true) {
+    this.enabled = enabled;
+    this._keyboardHandler = null;
+    this._contextMenuHandler = null;
+    this.init();
+  }
+
+  init() {
+    this.blockKeyboardShortcuts();
+    this.blockContextMenu();
+  }
+
+  blockKeyboardShortcuts() {
+    if (this._keyboardHandler) {
+      document.removeEventListener('keydown', this._keyboardHandler, true);
+    }
+
+    const blockedKeys = new Set(['u', 's', 'p', 'c', 'x', 'v', 'i', 'j']);
+
+    this._keyboardHandler = (e) => {
+      if (!this.enabled) return;
+
+      const target = e.target;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+      const isMac = navigator.platform ? navigator.platform.toUpperCase().indexOf('MAC') >= 0 : false;
+      const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+      const key = e.key ? e.key.toLowerCase() : '';
+
+      const isF12 = key === 'f12';
+      const isDevTools = ctrlKey && e.shiftKey && (key === 'i' || key === 'j');
+      // Cho phép copy/paste/cut nếu người dùng đang nhập liệu trong ô modal cấu hình
+      const isBrowserShortcuts = ctrlKey && !e.shiftKey && blockedKeys.has(key) && (!isInput || key === 'u' || key === 's' || key === 'p');
+      const isWinSnip = e.metaKey && e.shiftKey && key === 's';
+      const isMacSnip = isMac && e.metaKey && e.shiftKey && ['3', '4', '5'].includes(key);
+
+      if (isF12 || isDevTools || isBrowserShortcuts || isWinSnip || isMacSnip) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    document.addEventListener('keydown', this._keyboardHandler, true);
+  }
+
+  blockContextMenu() {
+    if (this._contextMenuHandler) {
+      document.removeEventListener('contextmenu', this._contextMenuHandler, false);
+    }
+
+    this._contextMenuHandler = (e) => {
+      if (!this.enabled) return;
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        return;
+      }
+      e.preventDefault();
+      return false;
+    };
+
+    document.addEventListener('contextmenu', this._contextMenuHandler, false);
+  }
+}
+
+const kioskSecurity = new KioskSecurityManager(true);
+
 // ==================== EVENT LISTENERS & SETUP ====================
 function initEventListeners() {
   // Chuyển đổi chế độ lọc sóng ECG (Pan-Tompkins 5-15Hz vs Lâm Sàng 0.5-25Hz)
@@ -1775,10 +1850,17 @@ function onWindowResize() {
 
 function resizeCanvas() {
   if (!elements.ecgCanvas) return;
-  const rect = elements.ecgCanvas.getBoundingClientRect();
+  const wrapper = elements.ecgCanvas.parentElement;
+  if (!wrapper) return;
+  const rect = wrapper.getBoundingClientRect();
   if (rect.width > 0 && rect.height > 0) {
-    elements.ecgCanvas.width = Math.round(rect.width * (window.devicePixelRatio || 1));
-    elements.ecgCanvas.height = Math.round(rect.height * (window.devicePixelRatio || 1));
+    const dpr = window.devicePixelRatio || 1;
+    const targetW = Math.round(rect.width * dpr);
+    const targetH = Math.round(rect.height * dpr);
+    if (elements.ecgCanvas.width !== targetW || elements.ecgCanvas.height !== targetH) {
+      elements.ecgCanvas.width = targetW;
+      elements.ecgCanvas.height = targetH;
+    }
   }
 }
 
@@ -1843,6 +1925,12 @@ function initPWA() {
 // ==================== ENTRY POINT ====================
 window.addEventListener('DOMContentLoaded', () => {
   resizeCanvas();
+  if (typeof ResizeObserver !== 'undefined' && elements.ecgCanvas && elements.ecgCanvas.parentElement) {
+    const ro = new ResizeObserver(() => {
+      resizeCanvas();
+    });
+    ro.observe(elements.ecgCanvas.parentElement);
+  }
   initEventListeners();
   initPWA();
   requestAnimationFrame(drawOscilloscope);

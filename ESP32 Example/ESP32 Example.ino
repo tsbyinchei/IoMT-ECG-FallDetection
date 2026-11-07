@@ -537,7 +537,7 @@ void drawOLED() {
       u8g2.drawStr(5, 58, "TT: SOT CAO (>38*C)");
     } else if (incomingData.bodyTemp >= 37.5f) {
       u8g2.drawStr(5, 58, "TT: SOT NHE");
-    } else if (edgeBpm > 120) {
+    } else if (edgeBpm > 105) {
       u8g2.drawStr(5, 58, "TT: NHIP NHANH!");
     } else if (edgeBpm > 0 && edgeBpm < 50) {
       u8g2.drawStr(5, 58, "TT: NHIP CHAM!");
@@ -648,7 +648,7 @@ void handleBuzzer() {
   }
 
   // 2. CẢNH BÁO NHỊP TIM BẤT THƯỜNG: Bíp kép chu kỳ 1s
-  if (edgeBpm > 0 && (edgeBpm > 125 || edgeBpm < 45)) {
+  if (edgeBpm > 0 && (edgeBpm > 105 || edgeBpm < 50)) {
     unsigned long cycle = millis() % 1000;
     if (cycle < 100 || (cycle > 200 && cycle < 300)) {
       digitalWrite(BUZZER_PIN, HIGH);
@@ -1317,14 +1317,14 @@ void loop() {
     drawOLED();
   }
 
-  // 5. Kiểm tra cảnh báo nhịp tim bất thường (Tachycardia > 120 BPM hoặc Bradycardia < 50 BPM) kéo dài > 5s
-  if (edgeBpm > 0 && !incomingData.leadsOff && (edgeBpm > 120 || edgeBpm < 50)) {
+  // 5. Kiểm tra cảnh báo nhịp tim bất thường (Tachycardia > 105 BPM hoặc Bradycardia < 50 BPM) kéo dài > 5s
+  if (edgeBpm > 0 && !incomingData.leadsOff && (edgeBpm > 105 || edgeBpm < 50)) {
     if (hrAbnormalStartTime == 0) {
       hrAbnormalStartTime = millis();
     } else if (millis() - hrAbnormalStartTime >= 5000) {
       if (millis() - lastHeartAlertTime >= 120000) {
         lastHeartAlertTime = millis();
-        const char* cond = (edgeBpm > 120) ? "NHỊP TIM NHANH (Tachycardia)" : "NHỊP TIM CHẬM (Bradycardia)";
+        const char* cond = (edgeBpm > 105) ? "NHỊP TIM NHANH (Tachycardia)" : "NHỊP TIM CHẬM (Bradycardia)";
         Serial.printf("\n🚨 [CẢNH BÁO TIM] %s: %d BPM! Đang gửi Telegram/Zalo...\n", cond, edgeBpm);
         sendTelegramHeartAlert(edgeBpm, cond, incomingData.bodyTemp);
         sendZaloHeartAlert(edgeBpm, cond, incomingData.bodyTemp);
