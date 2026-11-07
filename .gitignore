@@ -52,3 +52,7 @@ __pycache__/
 .venv/
 *.py
 
+
+# Báo cáo đồ án nội bộ (Bảo mật, không public lên GitHub)
+BAO_CAO_DO_AN.md
+REPORT_GUIDE.md
