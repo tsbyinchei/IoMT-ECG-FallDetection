@@ -133,8 +133,9 @@ Kiến trúc phần cứng của hệ thống phân định rõ ràng giữa cá
 
 ### 2.3. Đặc tả Kỹ thuật Cơ cấu Chấp hành & Hiển thị (Actuators & Displays)
 
-#### A. Còi Chíp Tích cực (Active Buzzer - GPIO 23)
-- Hoạt động ở mức điện áp logic $3.3\text{V}$, dòng định mức $\approx 30\text{ mA}$, tạo áp suất âm thanh $\ge 85\text{ dB}$ ở khoảng cách $10\text{ cm}$.
+#### A. Còi Báo Động Active Buzzer (GPIO 23)
+- Module còi báo Active Buzzer 5V kết nối trực tiếp chân điều khiển I/O với GPIO 23 của ESP32 Gateway.
+- Do còi Active Buzzer đã tích hợp sẵn mạch dao động nội bên trong, vi điều khiển chỉ cần kích hoạt mức logic CAO ($3.3\text{V}$) ra chân GPIO 23 là còi tự động phát âm thanh cảnh báo tần số cố định khoảng $2.5\text{ kHz}$ với cường độ âm thanh $\ge 85\text{ dB}$ ở khoảng cách $10\text{ cm}$. Dòng định mức hoạt động $\approx 30\text{ mA}$.
 - Hoạt động theo chế độ **Chốt giữ Khẩn cấp (Latching Alarm State)**: Khi có biến cố té ngã được xác nhận, còi duy trì kích hoạt liên tục cho đến khi người chăm sóc bấm nút vật lý BOOT trên Gateway hoặc gửi lệnh giải tỏa `{"cmd":"mute"}` từ Web Dashboard qua MQTT topic `biomed/gateway/cmd`.
 
 #### B. Màn hình Đồ họa OLED SH1106 $1.3\text{ inch}$ (I2C)

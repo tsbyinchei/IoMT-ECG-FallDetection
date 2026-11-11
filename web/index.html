@@ -360,79 +360,93 @@
     </section>
   </main>
 
-  <!-- Modal Cấu hình MQTT Broker -->
+  <!-- Modal Cấu hình MQTT Broker & InfluxDB (2 Cột Song Song) -->
   <div id="configModal" class="modal-backdrop hidden">
-    <div class="modal-card">
+    <div class="modal-card modal-card-wide">
       <div class="modal-header">
-        <h3 class="modal-title">⚙️ Cấu Hình Kết Nối MQTT Broker</h3>
+        <h3 class="modal-title">⚙️ Cấu Hình Kết Nối Hệ Thống</h3>
         <button id="closeModalBtn" class="modal-close">&times;</button>
       </div>
       <form id="configForm" class="modal-body">
-        <div class="form-group">
-          <label for="cfgUri">WebSocket URI Broker (WSS):</label>
-          <input type="text" id="cfgUri" placeholder="wss://mqtt.yourdomain.com/mqtt" required>
-          <small class="form-tip">Cloudflare Tunnel: cổng 443 WSS (Ví dụ: <code>wss://mqtt.tsbyin.dev/mqtt</code>)</small>
-        </div>
+        <div class="modal-grid-2cols">
+          <!-- Cột Trái: Cấu Hình MQTT Broker (WSS) -->
+          <div class="config-col config-col-mqtt">
+            <div class="form-section-title mqtt-title">
+              <span>📡</span> MÁY CHỦ MQTT BROKER (WSS)
+            </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="cfgUser">Tài khoản EMQX:</label>
-            <input type="text" id="cfgUser" placeholder="Tài khoản (nếu có)">
+            <div class="form-group">
+              <label for="cfgUri">WebSocket URI Broker (WSS):</label>
+              <input type="text" id="cfgUri" placeholder="wss://mqtt.yourdomain.com/mqtt" required>
+              <small class="form-tip">Cloudflare Tunnel: cổng 443 WSS (Ví dụ: <code>wss://mqtt.tsbyin.dev/mqtt</code>)</small>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfgUser">Tài khoản EMQX:</label>
+                <input type="text" id="cfgUser" placeholder="Tài khoản (nếu có)">
+              </div>
+              <div class="form-group">
+                <label for="cfgPass">Mật khẩu EMQX:</label>
+                <input type="password" id="cfgPass" placeholder="Mật khẩu (nếu có)">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfgTopicData">Topic Dữ liệu Sinh hiệu:</label>
+                <input type="text" id="cfgTopicData" value="biomed/patient/data" required>
+              </div>
+              <div class="form-group">
+                <label for="cfgTopicAlert">Topic Cảnh báo Khẩn:</label>
+                <input type="text" id="cfgTopicAlert" value="biomed/patient/alert" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="cfgTopicCmd">Topic Lệnh Gateway (Remote Mute):</label>
+              <input type="text" id="cfgTopicCmd" value="biomed/gateway/cmd" required>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="cfgPass">Mật khẩu EMQX:</label>
-            <input type="password" id="cfgPass" placeholder="Mật khẩu (nếu có)">
+
+          <!-- Cột Phải: Cấu Hình Cơ Sở Dữ Liệu InfluxDB v2 -->
+          <div class="config-col config-col-influx">
+            <div class="form-section-title influx-title">
+              <span>📊</span> CƠ SỞ DỮ LIỆU INFLUXDB V2
+            </div>
+
+            <div class="form-group">
+              <label for="cfgInfluxUrl">InfluxDB API URL:</label>
+              <input type="text" id="cfgInfluxUrl" placeholder="https://influx.yourdomain.com:8086 hoặc http://localhost:8086">
+              <small class="form-tip">Địa chỉ máy chủ InfluxDB v2 (HTTP / HTTPS REST API)</small>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfgInfluxOrg">Organization:</label>
+                <input type="text" id="cfgInfluxOrg" placeholder="biomed" value="biomed">
+              </div>
+              <div class="form-group">
+                <label for="cfgInfluxBucket">Events Bucket:</label>
+                <input type="text" id="cfgInfluxBucket" placeholder="biomed_events" value="biomed_events">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="cfgInfluxToken">API Token (Read-Only):</label>
+              <input type="password" id="cfgInfluxToken" placeholder="Token xác thực truy vấn InfluxDB v2">
+            </div>
+
+            <div class="form-row-test">
+              <button type="button" id="testDbBtn" class="btn btn-secondary" title="Kiểm tra kết nối trực tiếp đến InfluxDB v2">
+                <span>🔄 Test Kết Nối InfluxDB</span>
+              </button>
+              <span id="testDbResult" class="form-test-result"></span>
+            </div>
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="cfgTopicData">Topic Dữ liệu Sinh hiệu:</label>
-            <input type="text" id="cfgTopicData" value="biomed/patient/data" required>
-          </div>
-          <div class="form-group">
-            <label for="cfgTopicAlert">Topic Cảnh báo Khẩn:</label>
-            <input type="text" id="cfgTopicAlert" value="biomed/patient/alert" required>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="cfgTopicCmd">Topic Lệnh Gateway (Remote Mute):</label>
-          <input type="text" id="cfgTopicCmd" value="biomed/gateway/cmd" required>
-        </div>
-
-        <hr class="form-divider">
-        <div class="form-section-title">📊 Cấu Hình Cơ Sở Dữ Liệu InfluxDB v2</div>
-        <div class="form-group">
-          <label for="cfgInfluxUrl">InfluxDB API URL:</label>
-          <input type="text" id="cfgInfluxUrl" placeholder="https://influx.yourdomain.com:8086 hoặc http://localhost:8086">
-          <small class="form-tip">Địa chỉ máy chủ InfluxDB v2 (HTTP / HTTPS REST API)</small>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="cfgInfluxOrg">Organization:</label>
-            <input type="text" id="cfgInfluxOrg" placeholder="biomed" value="biomed">
-          </div>
-          <div class="form-group">
-            <label for="cfgInfluxBucket">Events Bucket:</label>
-            <input type="text" id="cfgInfluxBucket" placeholder="biomed_events" value="biomed_events">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="cfgInfluxToken">API Token (Read-Only):</label>
-          <input type="password" id="cfgInfluxToken" placeholder="Token xác thực truy vấn InfluxDB v2">
-        </div>
-
-        <div class="form-row-test">
-          <button type="button" id="testDbBtn" class="btn btn-secondary" title="Kiểm tra kết nối trực tiếp đến InfluxDB v2">
-            <span>🔄 Test Kết Nối InfluxDB</span>
-          </button>
-          <span id="testDbResult" class="form-test-result"></span>
-        </div>
-
-        <div class="modal-actions">
+        <div class="modal-actions modal-actions-split">
           <button type="button" id="resetConfigBtn" class="btn btn-ghost">Mặc định</button>
           <button type="submit" class="btn btn-primary">Lưu & Kết Nối</button>
         </div>

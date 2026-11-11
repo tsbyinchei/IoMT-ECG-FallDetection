@@ -28,6 +28,31 @@
 
 ---
 
+## 🔍 BẢNG TỪ KHÓA TRA CỨU NHANH BẰNG CTRL + F (TIẾNG VIỆT KHÔNG DẤU)
+> *Mẹo thực chiến: Khi thầy hỏi vào chức năng nào, mở file code tương ứng, bấm `Ctrl + F`, gõ từ khóa không dấu là con trỏ nhảy ngay đến dòng code!*
+
+| Chức năng thầy hỏi | Từ khóa Ctrl + F (Không dấu) | Mở file nào? | Ý nghĩa tóm tắt |
+| :--- | :--- | :---: | :--- |
+| **Định thời lấy mẫu ECG 250Hz** | `TAG_LAY_MAU_250HZ` hoặc `LAY_MAU` | `ESP32C3.ino` | Dùng `micros()` vi sai chu kỳ 4.0ms, không trôi pha |
+| **Bắt xung va chạm ngã 2.8g** | `TAG_VA_DAP_NGA` hoặc `2.8G` | `ESP32C3.ino` | Giai đoạn 1: $SMV \ge 2.8g$, mở cửa sổ thẩm định 2.5s |
+| **Thẩm định nằm im sau ngã** | `TAG_THAM_DINH_NGA` hoặc `THAM_DINH` | `ESP32C3.ino` | Giai đoạn 2: $Tilt \ge 40^\circ$ và $Gyro < 45^\circ/\text{s}$ |
+| **Chống tuột điện cực giả** | `TAG_TUOT_DIEN_CUC` hoặc `TUOT_DIEN_CUC` | `ESP32C3.ino` | Xử lý kẹt chân Strapping Pin GPIO 2 và bão hòa ADC |
+| **Đo nhiệt độ DS18B20 1-Wire** | `TAG_NHIET_DO_FSM` hoặc `NHIET_DO` | `ESP32C3.ino` | FSM 2 bước non-blocking, chờ 800ms không khóa CPU |
+| **Đóng gói UDP nhị phân 62B** | `TAG_DONG_GOI_UDP` hoặc `62BYTES` | `ESP32C3.ino` | Packed struct gom 25 mẫu ECG + thân nhiệt + CRC16 |
+| **Mã kiểm tra toàn vẹn CRC-16** | `TAG_CRC16` hoặc `CRC16` | Cả 2 file | Đa thức 0x1021 bảo vệ 100% lỗi sai lệch bit |
+| **Hạ xung CPU 80MHz tiết kiệm pin** | `TAG_HA_XUNG` hoặc `80MHZ` | `ESP32C3.ino` | Hạ xung 80MHz và tắt Bluetooth tiết kiệm 35% pin |
+| **Tự động chuyển mạng Wi-Fi** | `TAG_ROAMING_WIFI` hoặc `ROAMING` | `ESP32C3.ino` | Tự đổi giữa SoftAP Gateway và Wi-Fi gia đình |
+| **Bóc tách đỉnh R Pan-Tompkins**| `TAG_PAN_TOMPKINS` hoặc `PAN_TOMPKINS`| `ESP32.ino` | Đạo hàm 5 điểm, bình phương phi tuyến, MWI |
+| **Khóa trơ sinh lý chống đúp sóng T** | `TAG_KHOA_TRO` hoặc `380MS` | `ESP32.ino` | Khóa trơ 380ms (95 mẫu @ 250Hz) chuẩn tim mạch |
+| **Lọc trung vị loại ngoại tâm thu** | `TAG_LOC_TRUNG_VI` hoặc `TRUNG_VI` | `ESP32.ino` | Lọc trung vị 7 khoảng RR + trung bình trượt EMA |
+| **Bộ lọc số IIR thông dải 5-15Hz**| `TAG_LOC_IIR` hoặc `5_15HZ` | `ESP32.ino` | Triệt hoàn toàn nhiễu thở 0.5Hz và điện lưới 50Hz |
+| **Điều khiển còi hú khẩn cấp** | `TAG_COI_BUZZER` hoặc `COI` | `ESP32.ino` | Ưu tiên còi ngã cao nhất, chốt giữ liên tục |
+| **Nút bấm BOOT tắt còi tại chỗ** | `TAG_NUT_BOOT` hoặc `NUT_BOOT` | `ESP32.ino` | Nút GPIO 0 giải tỏa còi sau khi đã sơ cứu |
+| **Gửi cảnh báo Telegram Bot** | `TAG_TELEGRAM` hoặc `TELEGRAM` | `ESP32.ino` | HTTPS POST API gửi báo động đỏ kèm nhịp tim |
+| **Gửi thông báo Zalo OA** | `TAG_ZALO` hoặc `ZALO` | `ESP32.ino` | Webhook gửi Zalo Notification Service |
+
+---
+
 # BỘ 60 CÂU HỎI VẤN ĐÁP KỸ THUẬT & TRUY VẾT MÃ NGUỒN
 
 ## PHẦN 1: PHẦN CỨNG & SƠ ĐỒ NGUYÊN LÝ VI MẠCH (CÂU 1 – 10)
