@@ -873,70 +873,103 @@ String urlEncodeString(const char *msg) {
   return encoded;
 }
 
-void sendTelegramFallAlert(float smv, float temp, int bpm) {
-  // Chỉ gửi qua Internet nếu kit Gateway đang kết nối Router Wi-Fi
+// ====================================================================================================
+// [TAG_DONG_BO_NOTIFY] HE THONG PHAT THONG BAO DONG BO SONG SONG (TELEGRAM BOT & ZALO OA)
+// - Co che Broadcast: 100% noi dung duoc format chung trong textBuf, dam bao 2 kenh luon giong het nhau.
+// - Chong rot goi TLS: Co vong lap cho server ACK (drain buffer toi da 1.5s) truoc khi ngat client.stop().
+// - Toi uu bo nho RAM: Dem delay(200) giua 2 phien HTTPS de mbedTLS heap kip giai phong sach se.
+// - Tieu chuan y te AHA: Nhip tim > 105 BPM la Nhip nhanh, < 50 BPM la Nhip cham, 50-105 BPM la On dinh.
+// ====================================================================================================
+
+// [TAG_TELEGRAM] [TAG_CHONG_ROT_TLS] Gui tin nhan toi Telegram Bot qua HTTPS GET API (cong 443)
+bool sendTelegramMessage(const char *text) {
   if (WiFi.status() != WL_CONNECTED)
-    return;
+    return false;
+  if (strlen(TELEGRAM_BOT_TOKEN) == 0 || strlen(TELEGRAM_CHAT_ID) == 0 ||
+      strcmp(TELEGRAM_BOT_TOKEN, "YOUR_TELEGRAM_BOT_TOKEN") == 0) {
+    return false;
+  }
 
   WiFiClientSecure client;
-  client
-      .setInsecure(); // Bỏ qua chứng chỉ SSL để gửi tin nhắn nhanh không bị trễ
+  client.setInsecure(); // Bo qua xac thuc chung chi SSL de gui tin tuc thi khong gay delay CPU
   client.setTimeout(4000);
 
   if (!client.connect("api.telegram.org", 443)) {
-    Serial.println("[TELEGRAM] Khong the ket noi api.telegram.org");
-    return;
+    Serial.println("[TELEGRAM] Khong the ket noi api.telegram.org:443");
+    return false;
   }
-
-  char hrStr[64];
-  if (bpm > 0) {
-    snprintf(hrStr, sizeof(hrStr), "%d BPM", bpm);
-  } else if (lastValidBpm > 0) {
-    snprintf(hrStr, sizeof(hrStr), "%d BPM (Truoc va dap)", lastValidBpm);
-  } else {
-    snprintf(hrStr, sizeof(hrStr), "Tuot dien cuc luc nga");
-  }
-
-  char textBuf[280];
-  snprintf(textBuf, sizeof(textBuf),
-           "🚨 [CẢNH BÁO TÉ NGÃ KHẨN CẤP - GATEWAY ESP32]!\n"
-           "Bệnh nhân vừa bị té ngã!\n"
-           "- Lực va đập SMV: %.2fg\n"
-           "- Nhịp tim: %s\n"
-           "- Thân nhiệt: %.1f*C\n"
-           "- Thiết bị: IoMT Gateway\n"
-           "Cần kiểm tra ngay lập tức!",
-           smv, hrStr, temp);
 
   String url = "/bot" + String(TELEGRAM_BOT_TOKEN) +
                "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) +
-               "&text=" + urlEncodeString(textBuf);
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: api.telegram.org\r\n" + "Connection: close\r\n\r\n");
+               "&text=" + urlEncodeString(text);
 
-  Serial.println(
-      "[TELEGRAM] >>> Da gui tin nhan canh bao te nga thanh cong! <<<");
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: api.telegram.org\r\n" +
+               "User-Agent: ESP32-IoMT-Gateway\r\n" +
+               "Connection: close\r\n\r\n");
+
+  // Cho phan hoi ACK ngan chong rot goi tin tren socket TLS (toi da 1.5s)
+  unsigned long startWait = millis();
+  while (client.connected() && !client.available() && millis() - startWait < 1500) {
+    delay(10);
+  }
+  while (client.available()) {
+    client.read();
+  }
   client.stop();
+  Serial.println("[TELEGRAM] >>> Da gui tin nhan thanh cong! <<<");
+  return true;
 }
 
-void sendZaloFallAlert(float smv, float temp, int bpm) {
-  // Chỉ gửi qua Internet nếu kit Gateway đang kết nối Router Wi-Fi
+// [TAG_ZALO] [TAG_CHONG_ROT_TLS] Gui tin nhan toi Zalo Bot Platform qua HTTPS GET API (cong 443)
+bool sendZaloMessage(const char *text) {
   if (WiFi.status() != WL_CONNECTED)
-    return;
+    return false;
   if (strlen(ZALO_BOT_TOKEN) == 0 || strlen(ZALO_CHAT_ID) == 0 ||
       strcmp(ZALO_BOT_TOKEN, "YOUR_ZALO_BOT_TOKEN") == 0) {
-    return;
+    return false;
   }
 
   WiFiClientSecure client;
-  client.setInsecure(); // Bỏ qua chứng chỉ SSL để gửi tin nhắn nhanh không trễ
+  client.setInsecure(); // Bo qua xac thuc chung chi SSL de gui tin nhanh khong tre
   client.setTimeout(4000);
 
   if (!client.connect("bot-api.zaloplatforms.com", 443)) {
-    Serial.println("[ZALO] Khong the ket noi bot-api.zaloplatforms.com");
-    return;
+    Serial.println("[ZALO] Khong the ket noi bot-api.zaloplatforms.com:443");
+    return false;
   }
 
+  String url = "/bot" + String(ZALO_BOT_TOKEN) +
+               "/sendMessage?chat_id=" + String(ZALO_CHAT_ID) +
+               "&text=" + urlEncodeString(text);
+
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: bot-api.zaloplatforms.com\r\n" +
+               "User-Agent: ESP32-IoMT-Gateway\r\n" +
+               "Connection: close\r\n\r\n");
+
+  // Cho phan hoi ACK ngan chong rot goi tin (toi da 1.5s)
+  unsigned long startWait = millis();
+  while (client.connected() && !client.available() && millis() - startWait < 1500) {
+    delay(10);
+  }
+  while (client.available()) {
+    client.read();
+  }
+  client.stop();
+  Serial.println("[ZALO] >>> Da gui tin nhan qua Zalo Bot thanh cong! <<<");
+  return true;
+}
+
+// [TAG_BROADCAST] Ham phat thong bao song song toi ca Telegram & Zalo (Noi dung dong nhat 100%)
+void broadcastNotification(const char *text) {
+  sendTelegramMessage(text);
+  delay(200); // Dem 200ms giai phong bo nho mbedTLS heap truoc khi mo ket noi SSL tiep theo
+  sendZaloMessage(text);
+}
+
+// [TAG_CANH_BAO_NGA] 1. Canh bao te nga khan cap (Gia toc SMV va nhip tim truoc va dap)
+void broadcastFallAlert(float smv, float temp, int bpm) {
   char hrStr[64];
   if (bpm > 0) {
     snprintf(hrStr, sizeof(hrStr), "%d BPM", bpm);
@@ -946,7 +979,7 @@ void sendZaloFallAlert(float smv, float temp, int bpm) {
     snprintf(hrStr, sizeof(hrStr), "Tuot dien cuc luc nga");
   }
 
-  char textBuf[280];
+  char textBuf[320];
   snprintf(textBuf, sizeof(textBuf),
            "🚨 [CẢNH BÁO TÉ NGÃ KHẨN CẤP - GATEWAY ESP32]!\n"
            "Bệnh nhân vừa bị té ngã!\n"
@@ -957,31 +990,12 @@ void sendZaloFallAlert(float smv, float temp, int bpm) {
            "Cần kiểm tra ngay lập tức!",
            smv, hrStr, temp);
 
-  String url = "/bot" + String(ZALO_BOT_TOKEN) +
-               "/sendMessage?chat_id=" + String(ZALO_CHAT_ID) +
-               "&text=" + urlEncodeString(textBuf);
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: bot-api.zaloplatforms.com\r\n" +
-               "Connection: close\r\n\r\n");
-
-  Serial.println("[ZALO] >>> Da gui tin nhan canh bao te nga qua Zalo Bot! <<<");
-  client.stop();
+  broadcastNotification(textBuf);
 }
 
-void sendTelegramHeartAlert(int bpm, const char* condition, float temp) {
-  if (WiFi.status() != WL_CONNECTED)
-    return;
-
-  WiFiClientSecure client;
-  client.setInsecure();
-  client.setTimeout(4000);
-
-  if (!client.connect("api.telegram.org", 443)) {
-    Serial.println("[TELEGRAM] Khong the ket noi api.telegram.org");
-    return;
-  }
-
-  char textBuf[280];
+// [TAG_CANH_BAO_TIM] [TAG_TIM_BAT_THUONG] 2. Canh bao nhip tim bat thuong (Nhip nhanh > 105 hoac Nhip cham < 50)
+void broadcastHeartAlert(int bpm, const char *condition, float temp) {
+  char textBuf[320];
   snprintf(textBuf, sizeof(textBuf),
            "❤️ [CẢNH BÁO NHỊP TIM BẤT THƯỜNG - GATEWAY]!\n"
            "Phát hiện biến cố: %s!\n"
@@ -991,89 +1005,49 @@ void sendTelegramHeartAlert(int bpm, const char* condition, float temp) {
            "Vui lòng kiểm tra tình trạng người bệnh!",
            condition, bpm, temp);
 
-  String url = "/bot" + String(TELEGRAM_BOT_TOKEN) +
-               "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) +
-               "&text=" + urlEncodeString(textBuf);
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: api.telegram.org\r\n" + "Connection: close\r\n\r\n");
-
-  Serial.println("[TELEGRAM] >>> Da gui canh bao nhip tim bat thuong! <<<");
-  client.stop();
+  broadcastNotification(textBuf);
 }
 
-void sendZaloHeartAlert(int bpm, const char* condition, float temp) {
-  if (WiFi.status() != WL_CONNECTED)
-    return;
-  if (strlen(ZALO_BOT_TOKEN) == 0 || strlen(ZALO_CHAT_ID) == 0)
-    return;
-
-  WiFiClientSecure client;
-  client.setInsecure();
-  client.setTimeout(4000);
-
-  if (!client.connect("bot-api.zaloplatforms.com", 443)) {
-    Serial.println("[ZALO] Khong the ket noi bot-api.zaloplatforms.com");
-    return;
-  }
-
-  char textBuf[280];
-  snprintf(textBuf, sizeof(textBuf),
-           "❤️ [CẢNH BÁO NHỊP TIM BẤT THƯỜNG - GATEWAY]!\n"
-           "Phát hiện biến cố: %s!\n"
-           "- Nhịp tim ghi nhận: %d BPM\n"
-           "- Thân nhiệt: %.1f*C\n"
-           "- Thiết bị: IoMT Gateway\n"
-           "Vui lòng kiểm tra tình trạng người bệnh!",
-           condition, bpm, temp);
-
-  String url = "/bot" + String(ZALO_BOT_TOKEN) +
-               "/sendMessage?chat_id=" + String(ZALO_CHAT_ID) +
-               "&text=" + urlEncodeString(textBuf);
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: bot-api.zaloplatforms.com\r\n" +
-               "Connection: close\r\n\r\n");
-
-  Serial.println("[ZALO] >>> Da gui canh bao nhip tim bat thuong qua Zalo! <<<");
-  client.stop();
-}
-
-void sendPeriodicTelemetryReport(int bpm, float temp, float smv, uint16_t falls) {
-  if (WiFi.status() != WL_CONNECTED)
-    return;
-
-  WiFiClientSecure client;
-  client.setInsecure();
-  client.setTimeout(4000);
-
-  if (!client.connect("api.telegram.org", 443))
-    return;
-
+// [TAG_BAO_CAO_DINH_KY] [TAG_DINH_KY] 3. Bao cao sinh hieu dinh ky (Chuẩn y khoa tim mach AHA: >105 BPM nhip nhanh, <50 BPM nhip cham)
+void broadcastPeriodicReport(int bpm, float temp, float smv, uint16_t falls) {
   int displayBpm = (bpm > 0) ? bpm : lastValidBpm;
-  char hrStr[32];
-  if (displayBpm > 0) {
+  char hrStr[64];
+  const char *overallStatus = "Binh thuong / An toan";
+
+  // Danh gia trang thai nhip tim theo tieu chuan AHA
+  if (displayBpm > 105) {
+    snprintf(hrStr, sizeof(hrStr), "%d BPM (Nhip nhanh - Canh bao)", displayBpm);
+    overallStatus = "Canh bao: Nhip tim nhanh (Tachycardia)!";
+  } else if (displayBpm > 0 && displayBpm < 50) {
+    snprintf(hrStr, sizeof(hrStr), "%d BPM (Nhip cham - Canh bao)", displayBpm);
+    overallStatus = "Canh bao: Nhip tim cham (Bradycardia)!";
+  } else if (displayBpm >= 50 && displayBpm <= 105) {
     snprintf(hrStr, sizeof(hrStr), "%d BPM (On dinh)", displayBpm);
+    overallStatus = "Binh thuong / An toan";
   } else {
     snprintf(hrStr, sizeof(hrStr), "Cho ket noi dien cuc");
+    overallStatus = "Chua co tin hieu ECG";
   }
 
-  char textBuf[280];
+  char textBuf[350];
   snprintf(textBuf, sizeof(textBuf),
            "📊 [BÁO CÁO SINH HIỆU ĐỊNH KỲ - GATEWAY]\n"
            "- Nhịp tim: %s\n"
            "- Thân nhiệt: %.1f*C\n"
            "- Gia tốc chuyển động: %.2fg\n"
            "- Số lần té ngã: %d lan\n"
-           "- Trang thai: Binh thuong / An toan",
-           hrStr, temp, smv, falls);
+           "- Trang thai: %s",
+           hrStr, temp, smv, falls, overallStatus);
 
-  String url = "/bot" + String(TELEGRAM_BOT_TOKEN) +
-               "/sendMessage?chat_id=" + String(TELEGRAM_CHAT_ID) +
-               "&text=" + urlEncodeString(textBuf);
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: api.telegram.org\r\n" + "Connection: close\r\n\r\n");
-  Serial.println("[TELEGRAM] >>> Da gui bao cao sinh hieu dinh ky! <<<");
-  client.stop();
+  broadcastNotification(textBuf);
 }
+
+// Các hàm tương thích ngược (wrapper)
+void sendTelegramFallAlert(float smv, float temp, int bpm) { broadcastFallAlert(smv, temp, bpm); }
+void sendZaloFallAlert(float smv, float temp, int bpm) { /* Đã được broadcastFallAlert gửi song song */ }
+void sendTelegramHeartAlert(int bpm, const char *cond, float temp) { broadcastHeartAlert(bpm, cond, temp); }
+void sendZaloHeartAlert(int bpm, const char *cond, float temp) { /* Đã được broadcastHeartAlert gửi song song */ }
+void sendPeriodicTelemetryReport(int bpm, float temp, float smv, uint16_t falls) { broadcastPeriodicReport(bpm, temp, smv, falls); }
 
 // ==================== IN DỮ LIỆU SERIAL (DEBUG & TELEMETRY STREAM)
 // ==================== IN DỮ LIỆU SERIAL (DEBUG & TELEMETRY STREAM) ====================
@@ -1267,8 +1241,7 @@ void loop() {
         buzzerMuted = false;    // Tự động giải trừ cờ tắt còi nếu trước đó người dùng từng bấm tắt
         digitalWrite(BUZZER_PIN, HIGH);
         Serial.println("\n🚨 >>> [CẢNH BÁO TÉ NGÃ KHẨN CẤP] CÒI BÁO ĐỘNG HÚ LIÊN TỤC! <<< 🚨");
-        sendTelegramFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
-        sendZaloFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
+        broadcastFallAlert(incomingData.smv, incomingData.bodyTemp, edgeBpm);
         if (mqtt_connected) {
           esp_mqtt_client_publish(mqtt_client, TOPIC_ALERT,
                                   "{\"alert\":\"fall\",\"status\":\"alarming\"}", 0, 1, 0);
@@ -1325,20 +1298,19 @@ void loop() {
       if (millis() - lastHeartAlertTime >= 120000) {
         lastHeartAlertTime = millis();
         const char* cond = (edgeBpm > 105) ? "NHỊP TIM NHANH (Tachycardia)" : "NHỊP TIM CHẬM (Bradycardia)";
-        Serial.printf("\n🚨 [CẢNH BÁO TIM] %s: %d BPM! Đang gửi Telegram/Zalo...\n", cond, edgeBpm);
-        sendTelegramHeartAlert(edgeBpm, cond, incomingData.bodyTemp);
-        sendZaloHeartAlert(edgeBpm, cond, incomingData.bodyTemp);
+        Serial.printf("\n🚨 [CẢNH BÁO TIM] %s: %d BPM! Đang phát thông báo Telegram & Zalo...\n", cond, edgeBpm);
+        broadcastHeartAlert(edgeBpm, cond, incomingData.bodyTemp);
       }
     }
   } else {
     hrAbnormalStartTime = 0;
   }
 
-  // 6. Gửi báo cáo sinh hiệu định kỳ mỗi 30 phút qua Telegram
+  // 6. Gửi báo cáo sinh hiệu định kỳ mỗi 30 phút qua Telegram & Zalo (Đồng bộ song song)
   if (millis() - lastPeriodicReportTime >= PERIODIC_REPORT_INTERVAL) {
     lastPeriodicReportTime = millis();
     if (totalPacketsReceived > 100) {
-      sendPeriodicTelemetryReport(edgeBpm, incomingData.bodyTemp, incomingData.smv, totalFallsCount);
+      broadcastPeriodicReport(edgeBpm, incomingData.bodyTemp, incomingData.smv, totalFallsCount);
     }
   }
 

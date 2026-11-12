@@ -48,8 +48,11 @@
 | **Bộ lọc số IIR thông dải 5-15Hz**| `TAG_LOC_IIR` hoặc `5_15HZ` | `ESP32.ino` | Triệt hoàn toàn nhiễu thở 0.5Hz và điện lưới 50Hz |
 | **Điều khiển còi hú khẩn cấp** | `TAG_COI_BUZZER` hoặc `COI` | `ESP32.ino` | Ưu tiên còi ngã cao nhất, chốt giữ liên tục |
 | **Nút bấm BOOT tắt còi tại chỗ** | `TAG_NUT_BOOT` hoặc `NUT_BOOT` | `ESP32.ino` | Nút GPIO 0 giải tỏa còi sau khi đã sơ cứu |
-| **Gửi cảnh báo Telegram Bot** | `TAG_TELEGRAM` hoặc `TELEGRAM` | `ESP32.ino` | HTTPS POST API gửi báo động đỏ kèm nhịp tim |
+| **Gửi cảnh báo Telegram Bot** | `TAG_TELEGRAM` hoặc `TELEGRAM` | `ESP32.ino` | HTTPS GET/POST API gửi báo động đỏ kèm nhịp tim |
 | **Gửi thông báo Zalo OA** | `TAG_ZALO` hoặc `ZALO` | `ESP32.ino` | Webhook gửi Zalo Notification Service |
+| **Đồng bộ hóa Telegram & Zalo** | `TAG_DONG_BO_NOTIFY` hoặc `DONG_BO` | `ESP32.ino` | Broadcast song song 100% nội dung giống nhau |
+| **Chống rớt gói tin TLS/HTTPS** | `TAG_CHONG_ROT_TLS` hoặc `ROT_TLS` | `ESP32.ino` | Chờ server ACK drain buffer 1.5s + đệm delay 200ms |
+| **Báo cáo định kỳ chuẩn AHA** | `TAG_BAO_CAO_DINH_KY` hoặc `DINH_KY` | `ESP32.ino` | Định kỳ 30p, phân loại >105 BPM nhịp nhanh, <50 chậm |
 
 ---
 
